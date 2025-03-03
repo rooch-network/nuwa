@@ -261,7 +261,7 @@ module nuwa_framework::memory_action {
     fun test_memory_action_examples() {
         // Test add memory example
         let add_args = json::from_json<AddMemoryArgs>(ADD_MEMORY_EXAMPLE);
-        assert!(add_args.target == @0x42, 1);
+        assert!(add_args.target == @0x5e379ab70f1cc09b5d8e86a32833ccf5eddef0cb376402b5d0d4e9074eb16a4f, 1);
         assert!(add_args.content == string::utf8(b"User prefers detailed explanations"), 2);
         assert!(add_args.context == string::utf8(b"preference"), 3);
         assert!(add_args.is_long_term == true, 4);
@@ -269,7 +269,7 @@ module nuwa_framework::memory_action {
 
         // Test update memory example
         let update_args = json::from_json<UpdateMemoryArgs>(UPDATE_MEMORY_EXAMPLE);
-        assert!(update_args.target == @0x123, 6);
+        assert!(update_args.target == @0x5e379ab70f1cc09b5d8e86a32833ccf5eddef0cb376402b5d0d4e9074eb16a4f, 6);
         assert!(update_args.index == 5, 7);
         assert!(update_args.new_content == string::utf8(b"User now prefers concise explanations"), 8);
         assert!(update_args.new_context == string::utf8(b"preference"), 9);

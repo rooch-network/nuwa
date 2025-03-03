@@ -6,8 +6,7 @@ module nuwa_framework::agent_tests {
     use moveos_std::object;
     use nuwa_framework::character;
     use nuwa_framework::action;
-    use nuwa_framework::memory_action;  
-    use nuwa_framework::response_action;
+    use nuwa_framework::action_dispatcher;
     use nuwa_framework::agent;
     use nuwa_framework::channel;
     use nuwa_framework::message;
@@ -17,8 +16,7 @@ module nuwa_framework::agent_tests {
     fun test_prompt_builder() {
         // Initialize actions
         action::init_for_test();
-        memory_action::register_actions();
-        response_action::register_actions();
+        action_dispatcher::init_for_test();
 
         // Create test character with more detailed personality
         let char_data = character::new_character_data(

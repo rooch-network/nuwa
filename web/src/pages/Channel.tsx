@@ -332,7 +332,7 @@ export function ChannelPage() {
       
       const tx = new Transaction();
       tx.callFunction({
-        target: `${packageId}::channel::send_message_entry`,
+        target: `${packageId}::channel_entry::send_message`,
         args: [
           Args.objectId(channelId), 
           Args.string(finalContent),

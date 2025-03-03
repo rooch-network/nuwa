@@ -16,6 +16,7 @@ module nuwa_framework::agent {
     use nuwa_framework::agent_state::{Self, AgentStates};
 
     friend nuwa_framework::memory_action;
+    friend nuwa_framework::transfer_action;
     friend nuwa_framework::action_dispatcher;
 
     //TODO use a new agent_runner module to handle agent running, this module only contains agent data structure
@@ -229,6 +230,11 @@ module nuwa_framework::agent {
         
         // Get all memories about this specific user
         memory::get_all_memories(memory_store, user_address, true)
+    }
+
+    public(friend) fun create_agent_signer(agent: &mut Object<Agent>): signer {
+        let agent_ref = object::borrow_mut(agent);
+        account::create_signer_with_account(&mut agent_ref.account)
     }
 
     #[test_only]

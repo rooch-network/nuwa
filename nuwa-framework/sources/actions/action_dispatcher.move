@@ -4,6 +4,7 @@ module nuwa_framework::action_dispatcher {
     use moveos_std::json;
     use nuwa_framework::memory_action;
     use nuwa_framework::response_action;
+    use nuwa_framework::transfer_action;
     use nuwa_framework::agent::Agent;
     use nuwa_framework::string_utils;
     use moveos_std::object::Object;
@@ -36,6 +37,7 @@ module nuwa_framework::action_dispatcher {
     entry fun register_actions() {
         memory_action::register_actions();
         response_action::register_actions();
+        transfer_action::register_actions();
     }
 
     /// Dispatch all actions from line-based format
@@ -60,6 +62,8 @@ module nuwa_framework::action_dispatcher {
             memory_action::execute(agent, *action_name, *args);
         } else if (string_utils::starts_with(action_name, &b"response::")) {
             response_action::execute(agent, *action_name, *args);
+        } else if (string_utils::starts_with(action_name, &b"transfer::")) {
+            transfer_action::execute(agent, *action_name, *args);
         };
         // Add other action types here
     }
@@ -193,6 +197,11 @@ module nuwa_framework::action_dispatcher {
         result
     }
 
+    #[test_only]
+    public fun init_for_test() {
+        init();
+    }
+
     #[test]
     fun test_dispatch_actions() {
         use nuwa_framework::agent;
@@ -200,12 +209,14 @@ module nuwa_framework::action_dispatcher {
         use nuwa_framework::memory;
         use nuwa_framework::memory_action;
         use nuwa_framework::response_action;
+        use nuwa_framework::transfer_action;
         use nuwa_framework::channel;
 
         // Initialize
         action::init_for_test();
         memory_action::register_actions();
         response_action::register_actions();
+        transfer_action::register_actions();
 
         let (agent, cap) = agent::create_test_agent();
         let test_addr = @0x42;
