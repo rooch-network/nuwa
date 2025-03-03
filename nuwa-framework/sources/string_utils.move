@@ -8,6 +8,10 @@ module nuwa_framework::string_utils {
     friend nuwa_framework::action_dispatcher;
     friend nuwa_framework::response_action;
     friend nuwa_framework::message;
+    friend nuwa_framework::agent_state;
+    friend nuwa_framework::channel_provider;
+    friend nuwa_framework::state_providers;
+    friend nuwa_framework::balance_provider;
 
     //TODO migrate to std::string::starts_with
     public(friend) fun starts_with(haystack_str: &String, needle: &vector<u8>): bool {

@@ -23,6 +23,7 @@ module nuwa_framework::channel {
     const ErrorInvalidChannelName: u64 = 6;
     const ErrorInvalidChannelType: u64 = 7;
     const ErrorNotMember: u64 = 8;
+    const ErrorDeprecatedFunction: u64 = 9;
 
     /// Channel status constants
     const CHANNEL_STATUS_ACTIVE: u8 = 0;
@@ -308,31 +309,15 @@ module nuwa_framework::channel {
         )
     }
 
+    //TODO remove this function
     /// Send a message and trigger AI response if needed
     public entry fun send_message_entry(
-        caller: &signer,
-        channel_obj: &mut Object<Channel>,
-        content: String,
-        mentions: vector<address>
+        _caller: &signer,
+        _channel_obj: &mut Object<Channel>,
+        _content: String,
+        _mentions: vector<address>
     ) {
-        send_message(caller, channel_obj, content, mentions);
-
-        let mentioned_ai_agents = vector::empty();
-        vector::for_each(mentions, |addr| {
-            if (agent::is_agent_account(addr)) {
-                vector::push_back(&mut mentioned_ai_agents, addr);
-            }
-        });
-        if (vector::length(&mentioned_ai_agents) > 0) {
-            //TODO make the number of messages to fetch configurable
-            let message_limit: u64 = 11;
-            let messages = get_last_messages(channel_obj, message_limit);
-            let message_input = message::new_agent_input(messages);
-            vector::for_each(mentioned_ai_agents, |ai_addr| {
-                let agent = agent::borrow_mut_agent_by_address(ai_addr);
-                agent::process_input(caller, agent, message_input);
-            });
-        }
+        abort ErrorDeprecatedFunction
     }
 
     /// Update channel title

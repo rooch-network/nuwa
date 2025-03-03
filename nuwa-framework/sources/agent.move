@@ -13,10 +13,12 @@ module nuwa_framework::agent {
     use nuwa_framework::ai_request;
     use nuwa_framework::ai_service;
     use nuwa_framework::agent_input::{AgentInput};
+    use nuwa_framework::agent_state::{Self, AgentStates};
 
     friend nuwa_framework::memory_action;
     friend nuwa_framework::action_dispatcher;
 
+    //TODO use a new agent_runner module to handle agent running, this module only contains agent data structure
     /// Agent represents a running instance of a Character
     struct Agent has key {
         agent_address: address,
@@ -80,17 +82,45 @@ module nuwa_framework::agent {
         )
     }
 
+    public fun generate_system_prompt_v2<I: copy + drop>(
+        agent: &Agent,
+        states: AgentStates,
+        input: AgentInput<I>,
+    ): String {
+        let character = object::borrow(&agent.character);
+        let available_actions = get_available_actions(&input);
+        //TODO put AgentInfo to prompt_builder
+        prompt_builder::build_complete_prompt_v2(
+            agent.agent_address,
+            character,
+            &agent.memory_store,
+            input,
+            available_actions,
+            states,
+        )
+    }
+
     public fun process_input<I: copy + drop>(
         caller: &signer,
         agent_obj: &mut Object<Agent>,
+        input: AgentInput<I>,
+    ) {
+        process_input_v2(caller, agent_obj, agent_state::new_agent_states(), input);
+    }
+
+    public fun process_input_v2<I: copy + drop>(
+        caller: &signer,
+        agent_obj: &mut Object<Agent>,
+        states: AgentStates,
         input: AgentInput<I>,
     ) {
         let agent_id = object::id(agent_obj);
         let agent = object::borrow_mut(agent_obj);
         
         // Generate system prompt with context
-        let system_prompt = generate_system_prompt(
+        let system_prompt = generate_system_prompt_v2(
             agent,
+            states,
             input
         );
 
