@@ -1,7 +1,8 @@
 module nuwa_framework::agent_info {
     use std::string::{Self, String};
     use std::vector;
-    use moveos_std::object::{Self, ObjectID};
+    use moveos_std::json;
+    use moveos_std::object::{ObjectID};
 
     #[data_struct]
     struct AgentInfo has copy, drop, store {
@@ -77,13 +78,32 @@ module nuwa_framework::agent_info {
         &agent_info.model_provider
     }
 
+    /// The PromptAgentInfo struct is used to display agent information in a prompt
+    struct PromptAgentInfo has copy, drop, store {
+        name: String,            
+        username: String,
+        avatar: String,        
+        agent_address: address,  // AI's agent address
+        description: String,
+        bio: vector<String>,
+        knowledge: vector<String>,
+        model_provider: String,
+    }
 
     public fun to_prompt(agent_info: &AgentInfo): String {
-        let prompt = string::utf8(b"");
-        string::append(&mut prompt, &agent_info.name);
-        string::append(&mut prompt, string::utf8(b" ("));
-        string::append(&mut prompt, &agent_info.username);
-        string::append(&mut prompt, string::utf8(b")"));
-        prompt
+        let prompt_agent_info = PromptAgentInfo {
+            name: agent_info.name,
+            username: agent_info.username,
+            avatar: agent_info.avatar,
+            agent_address: agent_info.agent_address,
+            description: agent_info.description,
+            bio: agent_info.bio,
+            knowledge: agent_info.knowledge,
+            model_provider: agent_info.model_provider,
+        };
+        let prompt = b"```json\n";
+        vector::append(&mut prompt, json::to_json(&prompt_agent_info));
+        vector::append(&mut prompt, b"\n```");
+        string::utf8(prompt)
     }
 }

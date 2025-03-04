@@ -1,4 +1,5 @@
 module nuwa_framework::transfer_action {
+    use std::vector;
     use std::string::{Self, String};
     use std::option;
     use moveos_std::object::{Object};
@@ -7,7 +8,7 @@ module nuwa_framework::transfer_action {
     use rooch_framework::transfer;
     use rooch_framework::gas_coin::RGas;
     use nuwa_framework::agent::{Self, Agent};
-    use nuwa_framework::action;
+    use nuwa_framework::action::{Self, ActionDescription};
 
     // Action names
     const ACTION_NAME_TRANSFER: vector<u8> = b"transfer::coin";
@@ -25,6 +26,14 @@ module nuwa_framework::transfer_action {
 
     /// Register all transfer-related actions
     public fun register_actions() {
+    }
+
+    entry fun register_actions_entry() {
+        register_actions();
+    }
+
+    public fun get_action_descriptions() : vector<ActionDescription> {
+        let descriptions = vector::empty();
         // Register transfer coin action
         let transfer_args = vector[
             action::new_action_argument(
@@ -52,20 +61,17 @@ module nuwa_framework::transfer_action {
                 true,
             ),
         ];
-
-        action::register_action(
+        vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_TRANSFER),
             string::utf8(b"Transfer coin_type coins to an address"),
             transfer_args,
             string::utf8(TRANSFER_ACTION_EXAMPLE),
             string::utf8(b"Use this action to transfer coin_type coins from your account to another address"),
             string::utf8(b"Transfers will be executed immediately and are irreversible"),
-        );
+        ));
+        descriptions
     }
-
-    entry fun register_actions_entry() {
-        register_actions();
-    }
+    
 
     /// Execute a transfer action
     public fun execute(agent: &mut Object<Agent>, action_name: String, args_json: String) {

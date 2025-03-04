@@ -1,12 +1,14 @@
 module nuwa_framework::response_action {
     use std::string::{Self, String};
     use std::option;
+    use std::vector;
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::json;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action;
     use nuwa_framework::channel;
     use nuwa_framework::string_utils::{channel_id_to_string, string_to_channel_id};
+    use nuwa_framework::action::ActionDescription;
 
     const ACTION_NAME_SAY: vector<u8> = b"response::say";
     // Action example
@@ -32,6 +34,11 @@ module nuwa_framework::response_action {
     }
 
     public fun register_actions() {
+    }
+
+    public fun get_action_descriptions() : vector<ActionDescription> {
+        let descriptions = vector::empty();
+
         // Register say action with channel_id parameter
         let say_args = vector[
             action::new_action_argument(
@@ -48,14 +55,17 @@ module nuwa_framework::response_action {
             ),
         ];
 
-        action::register_action(
-            string::utf8(ACTION_NAME_SAY),
-            string::utf8(b"Send a response to the user"),
-            say_args,
-            string::utf8(SAY_ACTION_EXAMPLE),
-            string::utf8(b"Use this action to send your final response to the specified channel"),
-            string::utf8(b"Must be used exactly once in each response"),
+        vector::push_back(&mut descriptions,
+            action::new_action_description(
+                string::utf8(ACTION_NAME_SAY),
+                string::utf8(b"Send a response to the user"),
+                say_args,
+                string::utf8(SAY_ACTION_EXAMPLE),
+                string::utf8(b"Use this action to send your final response to the specified channel"),
+                string::utf8(b"Must be used exactly once in each response"),
+            )
         );
+        descriptions
     }
 
     public fun execute(agent: &mut Object<Agent>, action_name: String, args_json: String) {

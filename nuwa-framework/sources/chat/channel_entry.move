@@ -2,10 +2,12 @@ module nuwa_framework::channel_entry {
     use std::vector;
     use std::string::String;
     use moveos_std::object::Object;
+    use rooch_framework::coin;
+    use rooch_framework::gas_coin::RGas;
     use nuwa_framework::message;
     use nuwa_framework::channel::{Self, Channel};
     use nuwa_framework::agent;
-    use nuwa_framework::state_providers;
+    use nuwa_framework::agent_runner;
 
     /// Send a message and trigger AI response if needed
     public entry fun send_message(
@@ -29,8 +31,8 @@ module nuwa_framework::channel_entry {
             let message_input = message::new_agent_input(messages);
             vector::for_each(mentioned_ai_agents, |ai_addr| {
                 let agent = agent::borrow_mut_agent_by_address(ai_addr);
-                let states = state_providers::build_agent_state(agent);
-                agent::process_input_v2(caller, agent, states, message_input);
+                let fee = coin::zero<RGas>();
+                agent_runner::process_input(caller, agent, message_input, fee);
             });
         }
     }

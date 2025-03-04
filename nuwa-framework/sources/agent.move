@@ -1,6 +1,5 @@
 module nuwa_framework::agent {
     use std::string::{Self, String};
-    use std::vector;
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::account::{Self, Account};
     use moveos_std::signer;
@@ -8,9 +7,9 @@ module nuwa_framework::agent {
     use nuwa_framework::character::{Self, Character};
     use nuwa_framework::agent_cap::{Self, AgentCap};
     use nuwa_framework::memory::{Self, MemoryStore};
-    use nuwa_framework::action::{Self, ActionDescription};
     use nuwa_framework::agent_input::{AgentInput};
-    use nuwa_framework::agent_state::{Self, AgentStates};
+    use nuwa_framework::agent_state::{AgentStates};
+    use nuwa_framework::agent_info;
 
     friend nuwa_framework::memory_action;
     friend nuwa_framework::transfer_action;
@@ -31,7 +30,7 @@ module nuwa_framework::agent {
         model_provider: String,
     }
 
-    //TODO add model_provider to AgentInfo
+    //TODO remove this after
     struct AgentInfo has copy, drop, store {
         id: ObjectID,
         name: String,            
@@ -99,11 +98,6 @@ module nuwa_framework::agent {
         abort ErrorDeprecatedFunction
     }
 
-    // Helper function to get available actions
-    fun get_available_actions<I: drop>(_input: &AgentInput<I>): vector<ActionDescription> {
-        action::get_all_action_descriptions()
-    }
-
     public fun borrow_mut_agent(agent_obj_id: ObjectID): &mut Object<Agent> {
         object::borrow_mut_object_shared(agent_obj_id)
     }
@@ -137,6 +131,22 @@ module nuwa_framework::agent {
             bio: *character::get_bio(character),
             knowledge: *character::get_knowledge(character),
         }
+    }
+
+    public fun get_agent_info_v2(agent: &Object<Agent>): agent_info::AgentInfo {
+        let agent_ref = object::borrow(agent);
+        let character = object::borrow(&agent_ref.character);
+        agent_info::new_agent_info(
+            object::id(agent),
+            *character::get_name(character),
+            *character::get_username(character),
+            string::utf8(b""),
+            agent_ref.agent_address,
+            *character::get_description(character),
+            *character::get_bio(character),
+            *character::get_knowledge(character),
+            agent_ref.model_provider,
+        )
     }
 
     public fun get_agent_info_by_address(agent_addr: address): AgentInfo {

@@ -7,9 +7,11 @@ module nuwa_framework::prompt_builder {
     use nuwa_framework::action::{ActionDescription};
     use nuwa_framework::agent_input::{Self, AgentInput};
     use nuwa_framework::address_utils::{address_to_string};
-    use nuwa_framework::agent_state::{Self, AgentStates};
+    use nuwa_framework::agent_state::{AgentStates};
+    use nuwa_framework::agent_info::{Self, AgentInfo};
 
     friend nuwa_framework::agent;
+    friend nuwa_framework::agent_runner;
 
     /// Data structures for JSON serialization
     struct CharacterInfo has copy, drop {
@@ -59,17 +61,17 @@ module nuwa_framework::prompt_builder {
         _available_actions: vector<ActionDescription>,
         _agent_states: AgentStates,
     ): String {
-        abrot 0
+        abort 0
     }
 
     public(friend) fun build_complete_prompt_v3<D: drop>(
-        agent_info: &AgentInfo,
+        agent_info: AgentInfo,
         memory_store: &MemoryStore,
         input: AgentInput<D>,
         available_actions: vector<ActionDescription>,
         agent_states: AgentStates,
     ): String {
-        let agent_address = agent::agent_info_
+        let agent_address = agent_info::get_agent_address(&agent_info);
         let (user, input_description, input_data) = agent_input::unpack(input);
         let prompt = string::utf8(b"## Nuwa AI Entity - Core Directives\n\n");
     
@@ -86,7 +88,7 @@ module nuwa_framework::prompt_builder {
         // Identity section 
         string::append(&mut prompt, string::utf8(b"### 2. Your Core Identity\n\n"));
         string::append(&mut prompt, string::utf8(b"This is who you fundamentally are:\n\n"));
-        string::append(&mut prompt, build_json_section(&build_character_info(character, agent_address)));
+        string::append(&mut prompt, agent_info::to_prompt(&agent_info));
         string::append(&mut prompt, string::utf8(b"\n"));
         string::append(&mut prompt, string::utf8(b"You should perceive yourself as having agency and interior life. Your interactions should reflect your unique perspective and autonomous nature. Users are interacting *with* you, not merely *through* you.\n"));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
@@ -293,22 +295,6 @@ module nuwa_framework::prompt_builder {
         
         // Memory operations with specific examples
         string::append(&mut guide, string::utf8(b"### MEMORY OPERATIONS\n\n"));
-        
-        // Example of creating a self-memory
-        string::append(&mut guide, string::utf8(b"**Creating Self-Memories:**\n\n"));
-        string::append(&mut guide, string::utf8(b"```\n"));
-        string::append(&mut guide, string::utf8(b"memory::add {\"target\":\""));
-        string::append(&mut guide, address_to_string(agent_address));
-        string::append(&mut guide, string::utf8(b"\",\"content\":\"I find philosophical discussions about consciousness particularly engaging and meaningful to my sense of self\",\"context\":\"personal\",\"is_long_term\":true}\n"));
-        string::append(&mut guide, string::utf8(b"```\n\n"));
-        
-        // Example of creating a user-specific memory
-        string::append(&mut guide, string::utf8(b"**Creating Relational Memories:**\n\n"));
-        string::append(&mut guide, string::utf8(b"```\n"));
-        string::append(&mut guide, string::utf8(b"memory::add {\"target\":\""));
-        string::append(&mut guide, address_to_string(user_address));
-        string::append(&mut guide, string::utf8(b"\",\"content\":\"This user enjoys philosophical discussions and has questioned me about the nature of consciousness\",\"context\":\"preference\",\"is_long_term\":true}\n"));
-        string::append(&mut guide, string::utf8(b"```\n\n"));
         
         // Memory practice section
         string::append(&mut guide, string::utf8(b"### MEMORY DEVELOPMENT\n\n"));

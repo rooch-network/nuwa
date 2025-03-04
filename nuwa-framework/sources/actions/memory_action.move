@@ -1,6 +1,7 @@
 module nuwa_framework::memory_action {
     use std::string::{Self, String};
     use std::option;
+    use std::vector;
     
     use moveos_std::object::Object;
     use moveos_std::json;
@@ -8,7 +9,7 @@ module nuwa_framework::memory_action {
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::memory;
     use nuwa_framework::action;
-    use nuwa_framework::address_utils;
+    use nuwa_framework::agent_input::{Self, AgentInputInfo};
 
     /// Memory action names using more intuitive namespacing
     const ACTION_NAME_REMEMBER_SELF: vector<u8> = b"memory::remember_self";
@@ -129,6 +130,11 @@ module nuwa_framework::memory_action {
     const UPDATE_USER_EXAMPLE: vector<u8> = b"{\"index\":3,\"new_content\":\"User now prefers concise explanations with code examples\",\"new_context\":\"preference\",\"is_long_term\":true}";
 
     public fun register_actions() {
+        //TODO deprecated, remove this
+    }
+
+    public fun get_action_descriptions(): vector<action::ActionDescription> {
+        let descriptions = vector::empty();
         // Register remember_self action (AI's memories about itself)
         let remember_self_args = vector[
             action::new_action_argument(
@@ -151,14 +157,14 @@ module nuwa_framework::memory_action {
             ),
         ];
 
-        action::register_action(
+        vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_REMEMBER_SELF),
             string::utf8(b"Remember something about yourself"),
             remember_self_args,
             string::utf8(REMEMBER_SELF_EXAMPLE),
             string::utf8(b"Use this to record your own thoughts, feelings, goals, or personal development"),
             string::utf8(b"Self-memories help you maintain continuity of identity"),
-        );
+        ));
 
         // Register remember_user action (AI's memories about the user)
         let remember_user_args = vector[
@@ -182,14 +188,14 @@ module nuwa_framework::memory_action {
             ),
         ];
 
-        action::register_action(
+        vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_REMEMBER_USER),
             string::utf8(b"Remember something about the current user"),
             remember_user_args,
             string::utf8(REMEMBER_USER_EXAMPLE),
             string::utf8(b"Use this to record important information about the user you're speaking with"),
             string::utf8(b"User memories help you personalize future interactions"),
-        );
+        ));
 
         // Register update_self action (updating AI's memories about itself)
         let update_self_args = vector[
@@ -219,14 +225,14 @@ module nuwa_framework::memory_action {
             ),
         ];
 
-        action::register_action(
+        vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_UPDATE_SELF),
             string::utf8(b"Update a memory about yourself"),
             update_self_args,
             string::utf8(UPDATE_SELF_EXAMPLE),
             string::utf8(b"Use this to modify your existing memories about yourself"),
             string::utf8(b"Set content to '[deleted]' to mark a memory for deletion"),
-        );
+        ));
 
         // Register update_user action (updating AI's memories about the user)
         let update_user_args = vector[
@@ -256,18 +262,23 @@ module nuwa_framework::memory_action {
             ),
         ];
 
-        action::register_action(
+        vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_UPDATE_USER),
             string::utf8(b"Update a memory about the current user"),
             update_user_args,
             string::utf8(UPDATE_USER_EXAMPLE),
             string::utf8(b"Use this to modify your existing memories about the user"),
             string::utf8(b"Set content to '[deleted]' to mark a memory for deletion"),
-        );
+        ));
+        descriptions
+    }
+
+    public fun execute(_agent: &mut Object<Agent>, _action_name: String, _args_json: String){
+        //TODO deprecated, remove this
     }
 
     /// Execute memory actions
-    public fun execute(agent: &mut Object<Agent>, action_name: String, args_json: String) {
+    public fun execute_v2(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_name: String, args_json: String) {
         let agent_address = agent::get_agent_address(agent);
         let store = agent::borrow_mut_memory_store(agent);
         
@@ -289,7 +300,7 @@ module nuwa_framework::memory_action {
                 return
             };
             let args = option::destroy_some(args_opt);
-            let current_user = agent::get_current_user(agent);
+            let current_user = agent_input::get_sender_from_info(agent_input);
             memory::add_memory(store, current_user, args.content, args.context, args.is_long_term);
         }
         else if (action_name == string::utf8(ACTION_NAME_UPDATE_SELF)) {
@@ -317,7 +328,7 @@ module nuwa_framework::memory_action {
                 return
             };
             let args = option::destroy_some(args_opt);
-            let current_user = agent::get_current_user(agent);
+            let current_user = agent_input::get_sender_from_info(agent_input);
             memory::update_memory(
                 store,
                 current_user,

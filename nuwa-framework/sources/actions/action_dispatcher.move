@@ -2,12 +2,14 @@ module nuwa_framework::action_dispatcher {
     use std::string::{Self, String};
     use std::vector;
     use moveos_std::json;
+    use moveos_std::object::Object;
     use nuwa_framework::memory_action;
     use nuwa_framework::response_action;
     use nuwa_framework::transfer_action;
     use nuwa_framework::agent::Agent;
     use nuwa_framework::string_utils;
-    use moveos_std::object::Object;
+    use nuwa_framework::action::ActionDescription;
+    use nuwa_framework::agent_input::AgentInputInfo;
 
     /// Error codes
     const ERROR_INVALID_RESPONSE: u64 = 1;
@@ -40,26 +42,47 @@ module nuwa_framework::action_dispatcher {
         transfer_action::register_actions();
     }
 
+    public fun get_action_descriptions(): vector<ActionDescription> {
+        let descriptions = vector::empty();
+
+        // Register memory actions
+        let memory_descriptions = memory_action::get_action_descriptions();
+        vector::append(&mut descriptions, memory_descriptions);
+
+        // Register response actions
+        let response_descriptions = response_action::get_action_descriptions();
+        vector::append(&mut descriptions, response_descriptions);
+
+        // Register transfer actions
+        let transfer_descriptions = transfer_action::get_action_descriptions();
+        vector::append(&mut descriptions, transfer_descriptions);
+
+        descriptions
+    }
+
     /// Dispatch all actions from line-based format
-    public fun dispatch_actions(agent: &mut Object<Agent>, response: String) {
+    public fun dispatch_actions(_agent: &mut Object<Agent>, _response: String) {
+    }
+
+    public fun dispatch_actions_v2(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
         let action_response = parse_line_based_response(&response);
         let actions = action_response.actions;
         let i = 0;
         let len = vector::length(&actions);
         while (i < len) {
             let action_call = vector::borrow(&actions, i);
-            execute_action(agent, action_call);
+            execute_action(agent, &agent_input, action_call);
             i = i + 1;
         };
     }
 
     /// Execute a single action call
-    fun execute_action(agent: &mut Object<Agent>, action_call: &ActionCall) {
+    fun execute_action(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_call: &ActionCall) {
         let action_name = &action_call.action;
         let args = &action_call.args;
 
         if (string_utils::starts_with(action_name, &b"memory::")) {
-            memory_action::execute(agent, *action_name, *args);
+            memory_action::execute_v2(agent,agent_input, *action_name, *args);
         } else if (string_utils::starts_with(action_name, &b"response::")) {
             response_action::execute(agent, *action_name, *args);
         } else if (string_utils::starts_with(action_name, &b"transfer::")) {
