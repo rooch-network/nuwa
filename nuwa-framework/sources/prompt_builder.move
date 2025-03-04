@@ -42,23 +42,34 @@ module nuwa_framework::prompt_builder {
     }
 
     public fun build_complete_prompt<D: drop>(
-        agent_address: address,
-        character: &Character,
-        memory_store: &MemoryStore,
-        input: AgentInput<D>,
-        available_actions: vector<ActionDescription>,
+        _agent_address: address,
+        _character: &Character,
+        _memory_store: &MemoryStore,
+        _input: AgentInput<D>,
+        _available_actions: vector<ActionDescription>,
     ): String {
-        build_complete_prompt_v2(agent_address, character, memory_store, input, available_actions, agent_state::new_agent_states())
+        abort 0
     }
 
     public(friend) fun build_complete_prompt_v2<D: drop>(
-        agent_address: address,
-        character: &Character,
+        _agent_address: address,
+        _character: &Character,
+        _memory_store: &MemoryStore,
+        _input: AgentInput<D>,
+        _available_actions: vector<ActionDescription>,
+        _agent_states: AgentStates,
+    ): String {
+        abrot 0
+    }
+
+    public(friend) fun build_complete_prompt_v3<D: drop>(
+        agent_info: &AgentInfo,
         memory_store: &MemoryStore,
         input: AgentInput<D>,
         available_actions: vector<ActionDescription>,
         agent_states: AgentStates,
     ): String {
+        let agent_address = agent::agent_info_
         let (user, input_description, input_data) = agent_input::unpack(input);
         let prompt = string::utf8(b"## Nuwa AI Entity - Core Directives\n\n");
     

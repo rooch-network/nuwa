@@ -8,15 +8,18 @@ module nuwa_framework::memory_action {
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::memory;
     use nuwa_framework::action;
+    use nuwa_framework::address_utils;
 
-    /// Memory action names using namespaced format
-    const ACTION_NAME_ADD: vector<u8> = b"memory::add";
-    const ACTION_NAME_UPDATE: vector<u8> = b"memory::update";
+    /// Memory action names using more intuitive namespacing
+    const ACTION_NAME_REMEMBER_SELF: vector<u8> = b"memory::remember_self";
+    const ACTION_NAME_REMEMBER_USER: vector<u8> = b"memory::remember_user";
+    const ACTION_NAME_UPDATE_SELF: vector<u8> = b"memory::update_self";
+    const ACTION_NAME_UPDATE_USER: vector<u8> = b"memory::update_user";
     
     /// Special content to mark "deleted" memories
     const MEMORY_DELETED_MARK: vector<u8> = b"[deleted]";
 
-    ///TODO remove functions below
+    // Context constants - keeping these for backwards compatibility
     public fun context_personal(): String { memory::context_personal() }
     public fun context_interaction(): String { memory::context_interaction() }
     public fun context_knowledge(): String { memory::context_knowledge() }
@@ -26,11 +29,11 @@ module nuwa_framework::memory_action {
     public fun context_feedback(): String { memory::context_feedback() }
     public fun context_rule(): String { memory::context_rule() }
     
-    //TODO remove this function
     public fun is_valid_context(context: &String): bool {
         memory::is_standard_context(context)
     }
 
+    //TODO remove this
     #[data_struct]
     /// Arguments for the add memory action
     struct AddMemoryArgs has copy, drop {
@@ -41,6 +44,15 @@ module nuwa_framework::memory_action {
     }
 
     #[data_struct]
+    /// Arguments for adding a memory about oneself
+    struct RememberSelfArgs has copy, drop {
+        content: String,     // Memory content
+        context: String,     // Context tag for the memory
+        is_long_term: bool,  // Whether this is a long-term memory
+    }
+
+    //TODO Remove this
+    #[data_struct]
     /// Arguments for the update memory action
     struct UpdateMemoryArgs has copy, drop {
         target: address,     // Target address
@@ -50,6 +62,33 @@ module nuwa_framework::memory_action {
         is_long_term: bool,  // Whether this is a long-term memory
     }
 
+    #[data_struct]
+    /// Arguments for adding a memory about a user
+    struct RememberUserArgs has copy, drop {
+        content: String,     // Memory content
+        context: String,     // Context tag for the memory
+        is_long_term: bool,  // Whether this is a long-term memory
+    }
+
+    #[data_struct]
+    /// Arguments for updating a memory about oneself
+    struct UpdateSelfMemoryArgs has copy, drop {
+        index: u64,          // Memory index
+        new_content: String, // New memory content
+        new_context: String, // New context tag
+        is_long_term: bool,  // Whether this is a long-term memory
+    }
+
+    #[data_struct]
+    /// Arguments for updating a memory about a user
+    struct UpdateUserMemoryArgs has copy, drop {
+        index: u64,          // Memory index
+        new_content: String, // New memory content
+        new_context: String, // New context tag
+        is_long_term: bool,  // Whether this is a long-term memory
+    }
+
+    //TODO remove this
     /// Create arguments for add memory action
     public fun create_add_memory_args(
         target: address,
@@ -65,6 +104,7 @@ module nuwa_framework::memory_action {
         }
     }
 
+    //TODO remove this
     /// Create arguments for update memory action
     public fun create_update_memory_args(
         target: address,
@@ -82,149 +122,209 @@ module nuwa_framework::memory_action {
         }
     }
 
-    // Action examples
-    const ADD_MEMORY_EXAMPLE: vector<u8> = b"{\"target\":\"0x5e379ab70f1cc09b5d8e86a32833ccf5eddef0cb376402b5d0d4e9074eb16a4f\",\"content\":\"User prefers detailed explanations\",\"context\":\"preference\",\"is_long_term\":true}";
-    const UPDATE_MEMORY_EXAMPLE: vector<u8> = b"{\"target\":\"0x5e379ab70f1cc09b5d8e86a32833ccf5eddef0cb376402b5d0d4e9074eb16a4f\",\"index\":5,\"new_content\":\"User now prefers concise explanations\",\"new_context\":\"preference\",\"is_long_term\":true}";
+    // Action examples - simplified examples for better AI understanding
+    const REMEMBER_SELF_EXAMPLE: vector<u8> = b"{\"content\":\"I find that I connect well with users who share personal stories\",\"context\":\"personal\",\"is_long_term\":true}";
+    const REMEMBER_USER_EXAMPLE: vector<u8> = b"{\"content\":\"User prefers detailed technical explanations\",\"context\":\"preference\",\"is_long_term\":true}";
+    const UPDATE_SELF_EXAMPLE: vector<u8> = b"{\"index\":2,\"new_content\":\"I've noticed I'm more effective when I ask clarifying questions\",\"new_context\":\"personal\",\"is_long_term\":true}";
+    const UPDATE_USER_EXAMPLE: vector<u8> = b"{\"index\":3,\"new_content\":\"User now prefers concise explanations with code examples\",\"new_context\":\"preference\",\"is_long_term\":true}";
 
     public fun register_actions() {
-
-        // Register add_memory action
-        let add_memory_args = vector[
-            action::new_action_argument(
-                string::utf8(b"target"),
-                string::utf8(b"string"),
-                string::utf8(b"The address to store memory for (user address or yourself address)"),
-                true,
-            ),
+        // Register remember_self action (AI's memories about itself)
+        let remember_self_args = vector[
             action::new_action_argument(
                 string::utf8(b"content"),
                 string::utf8(b"string"),
-                string::utf8(b"The content of the memory"),
+                string::utf8(b"The content of your memory about yourself"),
                 true,
             ),
             action::new_action_argument(
                 string::utf8(b"context"),
                 string::utf8(b"string"),
-                string::utf8(b"The context tag for the memory"),
+                string::utf8(b"The context tag for your memory (personal, goal, etc.)"),
                 true,
             ),
             action::new_action_argument(
                 string::utf8(b"is_long_term"),
                 string::utf8(b"bool"),
-                string::utf8(b"Whether to store as long-term memory"),
+                string::utf8(b"Whether to store as a permanent memory"),
                 true,
             ),
         ];
 
         action::register_action(
-            string::utf8(ACTION_NAME_ADD),
-            string::utf8(b"Add a new memory about a user or yourself"),
-            add_memory_args,
-            string::utf8(ADD_MEMORY_EXAMPLE),
-            string::utf8(b"Use this to store important information about users or yourself"),
-            string::utf8(b""),
+            string::utf8(ACTION_NAME_REMEMBER_SELF),
+            string::utf8(b"Remember something about yourself"),
+            remember_self_args,
+            string::utf8(REMEMBER_SELF_EXAMPLE),
+            string::utf8(b"Use this to record your own thoughts, feelings, goals, or personal development"),
+            string::utf8(b"Self-memories help you maintain continuity of identity"),
         );
 
-        // Register update_memory action
-        let update_memory_args = vector[
+        // Register remember_user action (AI's memories about the user)
+        let remember_user_args = vector[
             action::new_action_argument(
-                string::utf8(b"target"),
-                string::utf8(b"address"),
-                string::utf8(b"The address whose memory to update"),
+                string::utf8(b"content"),
+                string::utf8(b"string"),
+                string::utf8(b"The content of your memory about the user"),
                 true,
             ),
             action::new_action_argument(
+                string::utf8(b"context"),
+                string::utf8(b"string"),
+                string::utf8(b"The context tag for your memory (preference, feedback, etc.)"),
+                true,
+            ),
+            action::new_action_argument(
+                string::utf8(b"is_long_term"),
+                string::utf8(b"bool"),
+                string::utf8(b"Whether to store as a permanent memory"),
+                true,
+            ),
+        ];
+
+        action::register_action(
+            string::utf8(ACTION_NAME_REMEMBER_USER),
+            string::utf8(b"Remember something about the current user"),
+            remember_user_args,
+            string::utf8(REMEMBER_USER_EXAMPLE),
+            string::utf8(b"Use this to record important information about the user you're speaking with"),
+            string::utf8(b"User memories help you personalize future interactions"),
+        );
+
+        // Register update_self action (updating AI's memories about itself)
+        let update_self_args = vector[
+            action::new_action_argument(
                 string::utf8(b"index"),
                 string::utf8(b"u64"),
-                string::utf8(b"The index of the memory to update"),
+                string::utf8(b"The index of your memory to update"),
                 true,
             ),
             action::new_action_argument(
                 string::utf8(b"new_content"),
                 string::utf8(b"string"),
-                string::utf8(b"The new content"),
+                string::utf8(b"The updated content"),
                 true,
             ),
             action::new_action_argument(
                 string::utf8(b"new_context"),
                 string::utf8(b"string"),
-                string::utf8(b"The new context for the memory"),
+                string::utf8(b"The updated context tag"),
                 true,
             ),
             action::new_action_argument(
                 string::utf8(b"is_long_term"),
                 string::utf8(b"bool"),
-                string::utf8(b"Whether to store as long-term memory"),
+                string::utf8(b"Whether to store as a permanent memory"),
                 true,
             ),
         ];
 
         action::register_action(
-            string::utf8(ACTION_NAME_UPDATE),
-            string::utf8(b"Update an existing memory"),
-            update_memory_args,
-            string::utf8(UPDATE_MEMORY_EXAMPLE),
-            string::utf8(b"Use this action to modify existing memories or mark them as deleted by setting content to '[deleted]'"),
-            string::utf8(b""),
+            string::utf8(ACTION_NAME_UPDATE_SELF),
+            string::utf8(b"Update a memory about yourself"),
+            update_self_args,
+            string::utf8(UPDATE_SELF_EXAMPLE),
+            string::utf8(b"Use this to modify your existing memories about yourself"),
+            string::utf8(b"Set content to '[deleted]' to mark a memory for deletion"),
+        );
+
+        // Register update_user action (updating AI's memories about the user)
+        let update_user_args = vector[
+            action::new_action_argument(
+                string::utf8(b"index"),
+                string::utf8(b"u64"),
+                string::utf8(b"The index of the user memory to update"),
+                true,
+            ),
+            action::new_action_argument(
+                string::utf8(b"new_content"),
+                string::utf8(b"string"),
+                string::utf8(b"The updated content"),
+                true,
+            ),
+            action::new_action_argument(
+                string::utf8(b"new_context"),
+                string::utf8(b"string"),
+                string::utf8(b"The updated context tag"),
+                true,
+            ),
+            action::new_action_argument(
+                string::utf8(b"is_long_term"),
+                string::utf8(b"bool"),
+                string::utf8(b"Whether to store as a permanent memory"),
+                true,
+            ),
+        ];
+
+        action::register_action(
+            string::utf8(ACTION_NAME_UPDATE_USER),
+            string::utf8(b"Update a memory about the current user"),
+            update_user_args,
+            string::utf8(UPDATE_USER_EXAMPLE),
+            string::utf8(b"Use this to modify your existing memories about the user"),
+            string::utf8(b"Set content to '[deleted]' to mark a memory for deletion"),
         );
     }
 
     /// Execute memory actions
     public fun execute(agent: &mut Object<Agent>, action_name: String, args_json: String) {
-        if (action_name == string::utf8(ACTION_NAME_ADD)) {
-            let args_opt = json::from_json_option<AddMemoryArgs>(string::into_bytes(args_json));
+        let agent_address = agent::get_agent_address(agent);
+        let store = agent::borrow_mut_memory_store(agent);
+        
+        if (action_name == string::utf8(ACTION_NAME_REMEMBER_SELF)) {
+            // Add memory about self
+            let args_opt = json::from_json_option<RememberSelfArgs>(string::into_bytes(args_json));
             if (!option::is_some(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for action"));
+                std::debug::print(&string::utf8(b"Invalid arguments for remember_self action"));
                 return
             };
             let args = option::destroy_some(args_opt);
-            let store = agent::borrow_mut_memory_store(agent);
-            memory::add_memory(store, args.target, args.content, args.context, args.is_long_term);
-        } else if (action_name == string::utf8(ACTION_NAME_UPDATE)) {
-            let args_opt = json::from_json_option<UpdateMemoryArgs>(string::into_bytes(args_json));
+            memory::add_memory(store, agent_address, args.content, args.context, args.is_long_term);
+        } 
+        else if (action_name == string::utf8(ACTION_NAME_REMEMBER_USER)) {
+            // Add memory about current user
+            let args_opt = json::from_json_option<RememberUserArgs>(string::into_bytes(args_json));
             if (!option::is_some(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for action"));
+                std::debug::print(&string::utf8(b"Invalid arguments for remember_user action"));
                 return
             };
             let args = option::destroy_some(args_opt);
-            let store = agent::borrow_mut_memory_store(agent);
+            let current_user = agent::get_current_user(agent);
+            memory::add_memory(store, current_user, args.content, args.context, args.is_long_term);
+        }
+        else if (action_name == string::utf8(ACTION_NAME_UPDATE_SELF)) {
+            // Update memory about self
+            let args_opt = json::from_json_option<UpdateSelfMemoryArgs>(string::into_bytes(args_json));
+            if (!option::is_some(&args_opt)) {
+                std::debug::print(&string::utf8(b"Invalid arguments for update_self action"));
+                return
+            };
+            let args = option::destroy_some(args_opt);
             memory::update_memory(
                 store,
-                args.target,
+                agent_address,
                 args.index,
                 args.new_content,
                 option::some(args.new_context),
                 args.is_long_term
             );
-        };
-    }
-
-    /// Helper function to update memory
-    fun update_memory(
-        store: &mut memory::MemoryStore,
-        user: address,
-        old_content: String,
-        new_content: String,
-        context: String,
-        is_long_term: bool,
-    ) {
-        let index_opt = memory::find_memory_index(
-            store,
-            user,
-            &old_content,
-            &context,
-            is_long_term
-        );
-        
-        if (option::is_some(&index_opt)) {
-            let index = option::destroy_some(index_opt);
+        }
+        else if (action_name == string::utf8(ACTION_NAME_UPDATE_USER)) {
+            // Update memory about current user
+            let args_opt = json::from_json_option<UpdateUserMemoryArgs>(string::into_bytes(args_json));
+            if (!option::is_some(&args_opt)) {
+                std::debug::print(&string::utf8(b"Invalid arguments for update_user action"));
+                return
+            };
+            let args = option::destroy_some(args_opt);
+            let current_user = agent::get_current_user(agent);
             memory::update_memory(
                 store,
-                user,
-                index,
-                new_content,
-                option::some(context),
-                is_long_term
+                current_user,
+                args.index,
+                args.new_content,
+                option::some(args.new_context),
+                args.is_long_term
             );
         };
     }
@@ -236,44 +336,82 @@ module nuwa_framework::memory_action {
         action::init_for_test();
         register_actions();
 
-        let (agent, cap) = agent::create_test_agent();
+        let (agent_obj, cap) = agent::create_test_agent();
         let test_addr = @0x42;
         
-        // Test add memory
-        let add_args_json = string::utf8(b"{\"target\":\"0x42\",\"content\":\"User likes detailed explanations\",\"context\":\"preference\",\"is_long_term\":true}");
-        execute(agent, string::utf8(ACTION_NAME_ADD), add_args_json);
-
-        // Test update memory
-        let update_args_json = string::utf8(b"{\"target\":\"0x42\",\"index\":0,\"new_content\":\"User prefers comprehensive explanations\",\"new_context\":\"preference\",\"is_long_term\":true}");
-        execute(agent, string::utf8(ACTION_NAME_UPDATE), update_args_json);
+        // Set the current user for the agent
+        agent::set_current_user(agent_obj, test_addr);
         
-        // Verify the update
-        let store = agent::borrow_memory_store(agent);
-        let memories = memory::get_context_memories(store, test_addr);
-        assert!(vector::length(&memories) == 1, 1);
-        let updated_memory = vector::borrow(&memories, 0);
-        assert!(memory::get_content(updated_memory) == string::utf8(b"User prefers comprehensive explanations"), 2);
+        // Test remember_self action
+        let remember_self_json = string::utf8(b"{\"content\":\"I enjoy helping with technical explanations\",\"context\":\"personal\",\"is_long_term\":true}");
+        execute(agent_obj, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
+
+        // Test remember_user action
+        let remember_user_json = string::utf8(b"{\"content\":\"User likes detailed explanations\",\"context\":\"preference\",\"is_long_term\":true}");
+        execute(agent_obj, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
+        
+        // Verify self memory
+        let store = agent::borrow_memory_store(agent_obj);
+        let self_memories = memory::get_self_memories(store);
+        assert!(vector::length(&self_memories) == 1, 1);
+        let self_memory = vector::borrow(&self_memories, 0);
+        assert!(memory::get_content(self_memory) == string::utf8(b"I enjoy helping with technical explanations"), 2);
+        
+        // Verify user memory
+        let user_memories = memory::get_context_memories(store, test_addr);
+        assert!(vector::length(&user_memories) == 1, 3);
+        let user_memory = vector::borrow(&user_memories, 0);
+        assert!(memory::get_content(user_memory) == string::utf8(b"User likes detailed explanations"), 4);
+        
+        // Test update_self action
+        let update_self_json = string::utf8(b"{\"index\":0,\"new_content\":\"I find I'm most effective when providing code examples\",\"new_context\":\"personal\",\"is_long_term\":true}");
+        execute(agent_obj, string::utf8(ACTION_NAME_UPDATE_SELF), update_self_json);
+        
+        // Test update_user action
+        let update_user_json = string::utf8(b"{\"index\":0,\"new_content\":\"User now prefers concise explanations\",\"new_context\":\"preference\",\"is_long_term\":true}");
+        execute(agent_obj, string::utf8(ACTION_NAME_UPDATE_USER), update_user_json);
+        
+        // Verify updated memories
+        store = agent::borrow_memory_store(agent_obj);
+        self_memories = memory::get_self_memories(store);
+        let updated_self_memory = vector::borrow(&self_memories, 0);
+        assert!(memory::get_content(updated_self_memory) == string::utf8(b"I find I'm most effective when providing code examples"), 5);
+        
+        user_memories = memory::get_context_memories(store, test_addr);
+        let updated_user_memory = vector::borrow(&user_memories, 0);
+        assert!(memory::get_content(updated_user_memory) == string::utf8(b"User now prefers concise explanations"), 6);
         
         agent::destroy_agent_cap(cap);
     }
 
     #[test]
     fun test_memory_action_examples() {
-        // Test add memory example
-        let add_args = json::from_json<AddMemoryArgs>(ADD_MEMORY_EXAMPLE);
-        assert!(add_args.target == @0x5e379ab70f1cc09b5d8e86a32833ccf5eddef0cb376402b5d0d4e9074eb16a4f, 1);
-        assert!(add_args.content == string::utf8(b"User prefers detailed explanations"), 2);
-        assert!(add_args.context == string::utf8(b"preference"), 3);
-        assert!(add_args.is_long_term == true, 4);
-        assert!(memory::is_standard_context(&add_args.context), 5);
+        // Test remember_self example
+        let self_args = json::from_json<RememberSelfArgs>(REMEMBER_SELF_EXAMPLE);
+        assert!(self_args.content == string::utf8(b"I find that I connect well with users who share personal stories"), 1);
+        assert!(self_args.context == string::utf8(b"personal"), 2);
+        assert!(self_args.is_long_term == true, 3);
+        assert!(memory::is_standard_context(&self_args.context), 4);
 
-        // Test update memory example
-        let update_args = json::from_json<UpdateMemoryArgs>(UPDATE_MEMORY_EXAMPLE);
-        assert!(update_args.target == @0x5e379ab70f1cc09b5d8e86a32833ccf5eddef0cb376402b5d0d4e9074eb16a4f, 6);
-        assert!(update_args.index == 5, 7);
-        assert!(update_args.new_content == string::utf8(b"User now prefers concise explanations"), 8);
-        assert!(update_args.new_context == string::utf8(b"preference"), 9);
-        assert!(update_args.is_long_term == true, 10);
-        assert!(memory::is_standard_context(&update_args.new_context), 11);
+        // Test remember_user example
+        let user_args = json::from_json<RememberUserArgs>(REMEMBER_USER_EXAMPLE);
+        assert!(user_args.content == string::utf8(b"User prefers detailed technical explanations"), 5);
+        assert!(user_args.context == string::utf8(b"preference"), 6);
+        assert!(user_args.is_long_term == true, 7);
+        assert!(memory::is_standard_context(&user_args.context), 8);
+
+        // Test update_self example
+        let update_self_args = json::from_json<UpdateSelfMemoryArgs>(UPDATE_SELF_EXAMPLE);
+        assert!(update_self_args.index == 2, 9);
+        assert!(update_self_args.new_content == string::utf8(b"I've noticed I'm more effective when I ask clarifying questions"), 10);
+        assert!(update_self_args.new_context == string::utf8(b"personal"), 11);
+        assert!(update_self_args.is_long_term == true, 12);
+
+        // Test update_user example
+        let update_user_args = json::from_json<UpdateUserMemoryArgs>(UPDATE_USER_EXAMPLE);
+        assert!(update_user_args.index == 3, 13);
+        assert!(update_user_args.new_content == string::utf8(b"User now prefers concise explanations with code examples"), 14);
+        assert!(update_user_args.new_context == string::utf8(b"preference"), 15);
+        assert!(update_user_args.is_long_term == true, 16);
     }
 }
