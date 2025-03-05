@@ -204,7 +204,7 @@ export function CreateChannel() {
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
           <h1 className="text-xl font-semibold text-center mb-4">
-            {isLoading ? 'Setting up chat with ' + agentName : 'Creating a new peer chat'}
+            {isLoading ? 'Setting up chat with ' + agentName : 'Creating a new chat'}
           </h1>
           
           {isLoading && (
