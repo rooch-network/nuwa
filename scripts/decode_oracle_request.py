@@ -21,9 +21,9 @@ def format_timestamp(timestamp_ms: str) -> str:
     timestamp_s = int(timestamp_ms) / 1000
     return datetime.fromtimestamp(timestamp_s).strftime('%Y-%m-%d %H:%M:%S')
 
-def fetch_object_data(object_id: str) -> Dict[str, Any]:
-    """Fetch object data using rooch CLI command."""
-    print(f"Fetching object data for {object_id}...")
+def fetch_object_by_id(object_id: str) -> Dict[str, Any]:
+    """Fetch object data using rooch object -i command."""
+    print(f"Fetching object data for ID: {object_id}...")
     try:
         result = subprocess.run(
             ['rooch', 'object', '-i', object_id], 
@@ -32,6 +32,36 @@ def fetch_object_data(object_id: str) -> Dict[str, Any]:
             check=True
         )
         return json.loads(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing rooch command: {e}")
+        print(f"stderr: {e.stderr}")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing response from rooch command: {e}")
+        sys.exit(1)
+
+def fetch_latest_request() -> Dict[str, Any]:
+    """Fetch the latest Oracle request object."""
+    print("Fetching the latest Oracle request object...")
+    try:
+        result = subprocess.run(
+            [
+                'rooch', 'object', 
+                '-t', '0xf1290fb0e7e1de7e92e616209fb628970232e85c4c1a264858ff35092e1be231::oracles::Request',
+                '-d', '--limit', '1'
+            ], 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        data = json.loads(result.stdout)
+        
+        # Check if we got any data
+        if not data.get('data'):
+            print("No Oracle request objects found.")
+            sys.exit(1)
+            
+        return data
     except subprocess.CalledProcessError as e:
         print(f"Error executing rooch command: {e}")
         print(f"stderr: {e.stderr}")
@@ -58,24 +88,36 @@ def process_request_body(body: str) -> str:
         
         # Special handling for OpenAI API requests
         if 'messages' in body_json and isinstance(body_json['messages'], list):
-            # Create simplified view of messages with truncated content
-            simplified_messages = []
+            # Extract the model and other info first
+            result = f"Model: {body_json.get('model', 'Not specified')}\n"
+            if 'temperature' in body_json:
+                result += f"Temperature: {body_json['temperature']}\n"
+            
+            # Add a separator before messages
+            result += "\n----- Messages -----\n\n"
+            
+            # Print each message with role and content
             for msg in body_json['messages']:
                 role = msg.get('role', 'unknown')
                 content = msg.get('content', '')
-                # For system messages, we show a bit more
-                max_length = 500 if role == 'system' else 100
-                if len(content) > max_length:
-                    content = content[:max_length] + "... (truncated)"
-                simplified_messages.append({"role": role, "content": content})
+                
+                # Format the role with proper capitalization
+                formatted_role = role.upper() if role == "system" else role.capitalize()
+                
+                # Add the message
+                result += f"[{formatted_role}]\n{content}\n\n"
+                
+            return result
+        else:
+            # For other JSON types, use standard formatting
+            return json.dumps(body_json, indent=2)
             
-            body_json['messages'] = simplified_messages
-        
-        return json.dumps(body_json, indent=2)
-    except:
+    except json.JSONDecodeError:
         # If not JSON, return truncated version
         preview_length = min(200, len(body))
         return f"{body[:preview_length]}...\n(Request body truncated for readability)"
+    except Exception as e:
+        return f"Error processing request body: {e}"
 
 def process_openai_response(response_json: Dict[str, Any]) -> Optional[str]:
     """Extract the assistant's message content from an OpenAI API response."""
@@ -147,9 +189,10 @@ def analyze_oracle_request(data: Dict[str, Any]) -> None:
     notify_vec = extract_nested_value(value, 'notify.value.vec')
     if notify_vec:
         try:
-            hex_string = notify_vec['value'][0][0]
-            print("\n===== Callback Details =====\n")
-            print(f"Callback: {decode_hex(hex_string)}")
+            hex_string = extract_nested_value(notify_vec, 'value.0.0')
+            if hex_string:
+                print("\n===== Callback Details =====\n")
+                print(f"Callback: {decode_hex(hex_string)}")
         except (KeyError, IndexError):
             pass
     
@@ -157,29 +200,40 @@ def analyze_oracle_request(data: Dict[str, Any]) -> None:
     print("\n===== Response =====\n")
     if 'response_status' in value:
         print(f"Status: {value['response_status']}")
-        
+
+     
     # Extract and decode response if present
     response_vec = extract_nested_value(value, 'response.value.vec')
     if response_vec:
         try:
-            hex_string = response_vec['value'][0][0]
-            decoded = decode_hex(hex_string)
-            
-            print("\nResponse Content:")
-            try:
-                # Try to parse as JSON for better formatting
-                json_response = json.loads(decoded)
-                print(json.dumps(json_response, indent=2))
-                
-                # Extract OpenAI message content if available
-                ai_content = process_openai_response(json_response)
-                if ai_content:
-                    print("\n===== AI Response Content =====\n")
-                    print(ai_content)
-            except:
-                print(decoded)
-        except (KeyError, IndexError):
-            pass
+            # 找到正确的嵌套路径
+            if 'value' in response_vec and isinstance(response_vec['value'], list) and len(response_vec['value']) > 0:
+                if isinstance(response_vec['value'][0], list) and len(response_vec['value'][0]) > 0:
+                    hex_string = response_vec['value'][0][0]
+                    
+                    if hex_string:
+                        decoded = decode_hex(hex_string)
+                        
+                        print("\nResponse Content:")
+                        try:
+                            # Try to parse as JSON for better formatting
+                            json_str_response = json.loads(decoded)
+                            json_response = json.loads(json_str_response)
+                            print(json.dumps(json_response, indent=2))
+                            
+                            # Extract OpenAI message content if available
+                            ai_content = process_openai_response(json_response)
+                            if ai_content:
+                                print("\n===== AI Response Content =====\n")
+                                print(ai_content)
+                        except json.JSONDecodeError:
+                            print(decoded)
+                        except Exception as e:
+                            print(f"Error processing response: {e}")
+                            print(decoded)
+        except (KeyError, IndexError) as e:
+            print(f"Error extracting response: {e}")
+            print(f"Response structure: {response_vec}")
     else:
         print("\nNo response content available")
 
@@ -187,13 +241,16 @@ def analyze_oracle_request(data: Dict[str, Any]) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description='Decode and display Rooch Oracle request objects')
-    parser.add_argument('object_id', help='Object ID of the Oracle request to decode')
+    parser.add_argument('object_id', nargs='?', help='Object ID of the Oracle request to decode. If not provided, shows the latest request.')
     
     args = parser.parse_args()
     
     try:
-        # Fetch object data
-        data = fetch_object_data(args.object_id)
+        # Fetch object data - either by ID or get the latest
+        if args.object_id:
+            data = fetch_object_by_id(args.object_id)
+        else:
+            data = fetch_latest_request()
         
         # Analyze and display the data
         analyze_oracle_request(data)

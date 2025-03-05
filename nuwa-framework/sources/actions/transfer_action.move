@@ -97,16 +97,18 @@ module nuwa_framework::transfer_action {
 
     /// Execute the transfer operation with dynamic coin type support
     fun execute_transfer(agent: &mut Object<Agent>, to: address, amount_str: String, coin_type_str: String) {
-        let amount_opt = moveos_std::string_utils::parse_u256_option(&amount_str);
-        if (option::is_none(&amount_opt)) {
-            std::debug::print(&string::utf8(b"Invalid amount for transfer"));
-            return
-        };
-        let amount = option::destroy_some(amount_opt);
+        
         let signer = agent::create_agent_signer(agent);
         
         // Handle different coin types based on the string value
         if (coin_type_str == type_info::type_name<RGas>()) {
+            let decimal = 8;
+            let amount_opt = moveos_std::string_utils::parse_decimal_option(&amount_str, decimal);
+            if (option::is_none(&amount_opt)) {
+                std::debug::print(&string::utf8(b"Invalid amount for transfer"));
+                return
+            };
+            let amount = option::destroy_some(amount_opt);
             transfer::transfer_coin<RGas>(&signer, to, amount);
         } else {
             // For handling other coin types, you would need to implement a 

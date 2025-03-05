@@ -4,6 +4,7 @@ module nuwa_framework::balance_provider {
     use moveos_std::json;
     use moveos_std::type_info;
     use moveos_std::object::{Object};
+    use moveos_std::decimal_value::{Self, DecimalValue};
     use rooch_framework::coin;
     use rooch_framework::account_coin_store;
     use rooch_framework::gas_coin::RGas;
@@ -12,12 +13,20 @@ module nuwa_framework::balance_provider {
 
     const BALANCE_DESCRIPTION: vector<u8> = b"This is your balances";
 
+    //TODO remove
     #[data_struct]
     struct BalanceState has copy, drop, store {
         coin_symbol: String,
         coin_type: String,
         decimals: u8,
         balance: u256,
+    }
+
+    #[data_struct]
+    struct BalanceStateV2 has copy, drop, store {
+        coin_symbol: String,
+        coin_type: String,
+        balance: DecimalValue,
     }
     
     public fun get_state(agent: &Object<Agent>): AgentState {
@@ -28,15 +37,25 @@ module nuwa_framework::balance_provider {
         let decimals = coin::decimals_by_type<RGas>();
         let agent_address = agent::get_agent_address(agent);
         let balance = account_coin_store::balance<RGas>(agent_address);
-        let balance_state = BalanceState {
+        let balance_state = BalanceStateV2 {
             coin_symbol,
             coin_type,
-            decimals,
-            balance,
+            balance: decimal_value::new(balance, decimals),
         };
         vector::push_back(&mut balance_states, balance_state);
         let state_json = string::utf8(json::to_json(&balance_states));
 
         agent_state::new_agent_state(string::utf8(BALANCE_DESCRIPTION), state_json)
+    }
+
+    #[test]
+    fun test_balance_state(){
+        let balance_state = BalanceStateV2 {
+            coin_symbol: string::utf8(b"RGas"),
+            coin_type: string::utf8(b"0x3::gas_coin::RGas"),
+            balance: decimal_value::new(110000000, 8),
+        };
+        let state_json = string::utf8(json::to_json(&balance_state));
+        std::debug::print(&state_json);
     }
 }

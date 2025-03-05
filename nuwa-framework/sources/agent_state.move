@@ -43,7 +43,7 @@ module nuwa_framework::agent_state{
             string::append(&mut prompt, string::utf8(b"\n"));
             string::append(&mut prompt, string::utf8(b"```json\n"));
             string::append(&mut prompt, state.state_json);
-            string::append(&mut prompt, string::utf8(b"```\n"));
+            string::append(&mut prompt, string::utf8(b"\n```\n"));
         });
         prompt
     }
