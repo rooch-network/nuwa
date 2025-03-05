@@ -7,7 +7,7 @@ module nuwa_framework::agent_runner {
     use rooch_framework::coin::{Self, Coin};
     use rooch_framework::gas_coin::RGas;
 
-    use nuwa_framework::action::{ActionDescription};
+    use nuwa_framework::action::ActionGroup;
     use nuwa_framework::agent_input::{Self, AgentInput};
     use nuwa_framework::ai_request;
     use nuwa_framework::ai_service;
@@ -71,7 +71,7 @@ module nuwa_framework::agent_runner {
         agent::update_last_active_timestamp(agent_obj);
     }
 
-    fun get_available_actions<I: drop>(_input: &AgentInput<I>): vector<ActionDescription> {
-        action_dispatcher::get_action_descriptions()
+    fun get_available_actions<I: drop>(_input: &AgentInput<I>): vector<ActionGroup> {
+        action_dispatcher::get_action_groups()
     }
 }

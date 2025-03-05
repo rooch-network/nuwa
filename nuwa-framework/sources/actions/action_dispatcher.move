@@ -8,7 +8,7 @@ module nuwa_framework::action_dispatcher {
     use nuwa_framework::transfer_action;
     use nuwa_framework::agent::Agent;
     use nuwa_framework::string_utils;
-    use nuwa_framework::action::ActionDescription;
+    use nuwa_framework::action::{ActionDescription, ActionGroup};
     use nuwa_framework::agent_input::AgentInputInfo;
 
     /// Error codes
@@ -36,6 +36,17 @@ module nuwa_framework::action_dispatcher {
     }
 
     entry fun register_actions() {
+    }
+
+    public fun get_action_groups(): vector<ActionGroup> {
+        let groups = vector::empty();
+        let memory_group = memory_action::get_action_group();
+        vector::push_back(&mut groups, memory_group);
+        let response_group = response_action::get_action_group();
+        vector::push_back(&mut groups, response_group);
+        let transfer_group = transfer_action::get_action_group();
+        vector::push_back(&mut groups, transfer_group);
+        groups
     }
 
     public fun get_action_descriptions(): vector<ActionDescription> {

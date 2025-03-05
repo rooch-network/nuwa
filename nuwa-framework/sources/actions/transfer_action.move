@@ -8,7 +8,7 @@ module nuwa_framework::transfer_action {
     use rooch_framework::transfer;
     use rooch_framework::gas_coin::RGas;
     use nuwa_framework::agent::{Self, Agent};
-    use nuwa_framework::action::{Self, ActionDescription};
+    use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
 
     // Action names
     const ACTION_NAME_TRANSFER: vector<u8> = b"transfer::coin";
@@ -30,6 +30,14 @@ module nuwa_framework::transfer_action {
 
     entry fun register_actions_entry() {
         register_actions();
+    }
+
+    public fun get_action_group(): ActionGroup {
+        action::new_action_group(
+            string::utf8(b"transfer"),
+            string::utf8(b"Actions related to coin transfers, including sending and managing coins."),
+            get_action_descriptions()
+        )   
     }
 
     public fun get_action_descriptions() : vector<ActionDescription> {

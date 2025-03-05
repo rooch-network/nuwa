@@ -5,6 +5,12 @@ module nuwa_framework::action {
     use moveos_std::table::{Self, Table};
     use moveos_std::object;
 
+    #[data_struct]
+    struct ActionGroup has copy, drop, store{
+        namespace: String,
+        description: String,
+        actions: vector<ActionDescription>,
+    }
     
     #[data_struct]
     /// Action description for AI
@@ -103,6 +109,18 @@ module nuwa_framework::action {
         }
     }
 
+    public fun new_action_group(
+        namespace: String,
+        description: String,
+        actions: vector<ActionDescription>,
+    ): ActionGroup {
+        ActionGroup {
+            namespace,
+            description,
+            actions,
+        }
+    }
+
     /// Get all registered action descriptions
     public fun get_all_action_descriptions(): vector<ActionDescription> {
         let registry = borrow_mut_registry();
@@ -169,6 +187,9 @@ module nuwa_framework::action {
     public fun get_arg_description(arg: &ActionArgument): &String { &arg.description }
     public fun get_arg_required(arg: &ActionArgument): bool { arg.required }
 
+    public fun get_actions_from_group(group: &ActionGroup): &vector<ActionDescription> {
+        &group.actions
+    }
 
     #[test]
     public fun init_for_test(){

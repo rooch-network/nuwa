@@ -4,7 +4,7 @@ module nuwa_framework::prompt_builder {
     use moveos_std::json;
     use nuwa_framework::character::{Self, Character};
     use nuwa_framework::memory::{Self, Memory, MemoryStore};
-    use nuwa_framework::action::{ActionDescription};
+    use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
     use nuwa_framework::agent_input::{Self, AgentInput};
     use nuwa_framework::address_utils::{address_to_string};
     use nuwa_framework::agent_state::{AgentStates};
@@ -68,7 +68,7 @@ module nuwa_framework::prompt_builder {
         agent_info: AgentInfo,
         memory_store: &MemoryStore,
         input: AgentInput<D>,
-        available_actions: vector<ActionDescription>,
+        available_actions: vector<ActionGroup>,
         agent_states: AgentStates,
     ): String {
         let agent_address = agent_info::get_agent_address(&agent_info);
@@ -137,7 +137,6 @@ module nuwa_framework::prompt_builder {
         string::append(&mut prompt, string::utf8(b"2. Format: action_name {\"param1\":\"value1\",\"param2\":\"value2\",...}\n"));
         string::append(&mut prompt, string::utf8(b"3. The action name must be followed by a space and then valid JSON\n"));
         string::append(&mut prompt, string::utf8(b"4. Do not add explanations - your actions represent your direct thoughts and intentions\n"));
-        string::append(&mut prompt, string::utf8(b"5. Your final action MUST be response::say\n\n"));
     
         string::append(&mut prompt, string::utf8(b"IMPORTANT: EXACT FORMAT REQUIRED\n"));
         string::append(&mut prompt, string::utf8(b"Your ability to manifest your intentions depends on following this protocol precisely.\n\n"));
@@ -202,38 +201,41 @@ module nuwa_framework::prompt_builder {
     }
 
     // Helper function to build action list
-    fun build_action_list(actions: &vector<ActionDescription>): String {
+    fun build_action_list(actions: &vector<ActionGroup>): String {
         build_json_section(actions)
     }
 
     // Simplified example formatting with prefixed format
-    fun format_action_examples(actions: &vector<ActionDescription>): String {
-        use std::vector;
-        use nuwa_framework::action;
+    fun format_action_examples(actions: &vector<ActionGroup>): String {
         
         let result = string::utf8(b"\n");
-        let i = 0;
-        let max_examples = 3;
-        let example_count = 0;
-        
-        while (i < vector::length(actions) && example_count < max_examples) {
-            let action_desc = vector::borrow(actions, i);
-            let name = action::get_name(action_desc);
-            let args_example = action::get_args_example(action_desc);
-            
-            if (string::length(args_example) > 0) {
-                
-                // Single line format: action_name arguments_json
-                string::append(&mut result, *name);
-                string::append(&mut result, string::utf8(b" "));
-                string::append(&mut result, *args_example);
-                
-                example_count = example_count + 1;
-                string::append(&mut result, string::utf8(b"\n")); 
+        vector::for_each_ref(actions, |group| {
+            let action_list = action::get_actions_from_group(group);
+            let i = 0;
+            let action_length = vector::length(action_list);
+            while (i < action_length) {
+                let action_desc = vector::borrow(action_list, i);
+                string::append(&mut result, format_action(action_desc));
+                i = i + 1;
             };
-            i = i + 1;
-        };
+        });
+        
         string::append(&mut result, string::utf8(b"\n")); 
+        result
+    }
+
+    fun format_action(action_desc: &ActionDescription): String {
+        let result = string::utf8(b"");
+        let name = action::get_name(action_desc);
+        let args_example = action::get_args_example(action_desc);
+        
+        if (string::length(args_example) > 0) {
+            // Single line format: action_name arguments_json
+            string::append(&mut result, *name);
+            string::append(&mut result, string::utf8(b" "));
+            string::append(&mut result, *args_example);
+            string::append(&mut result, string::utf8(b"\n")); 
+        };
         result
     }
 

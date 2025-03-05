@@ -8,7 +8,7 @@ module nuwa_framework::memory_action {
 
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::memory;
-    use nuwa_framework::action;
+    use nuwa_framework::action::{Self, ActionGroup};
     use nuwa_framework::agent_input::{Self, AgentInputInfo};
 
     /// Memory action names using more intuitive namespacing
@@ -187,6 +187,14 @@ module nuwa_framework::memory_action {
 
     public fun register_actions() {
         //TODO deprecated, remove this
+    }
+
+    public fun get_action_group(): ActionGroup {
+        action::new_action_group(
+            string::utf8(b"memory"),
+            string::utf8(b"Memory actions for storing and updating personal and user memories"),
+            get_action_descriptions()
+        )   
     }
 
     public fun get_action_descriptions(): vector<action::ActionDescription> {

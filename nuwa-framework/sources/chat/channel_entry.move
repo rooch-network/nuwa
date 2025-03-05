@@ -9,6 +9,7 @@ module nuwa_framework::channel_entry {
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
 
+    
     /// Send a message and trigger AI response if needed
     public entry fun send_message(
         caller: &signer,
@@ -20,15 +21,21 @@ module nuwa_framework::channel_entry {
 
         let mentioned_ai_agents = vector::empty();
         vector::for_each(mentions, |addr| {
-            if (agent::is_agent_account(addr)) {
+            if (agent::is_agent_account(addr) && !vector::contains(&mentioned_ai_agents, &addr)) {
                 vector::push_back(&mut mentioned_ai_agents, addr);
             }
         });
+        let is_direct_channel = channel::get_channel_type(channel_obj) == channel::channel_type_ai_peer();
         if (vector::length(&mentioned_ai_agents) > 0) {
             //TODO make the number of messages to fetch configurable
             let message_limit: u64 = 11;
             let messages = channel::get_last_messages(channel_obj, message_limit);
-            let message_input = message::new_agent_input(messages);
+            
+            let message_input = if (is_direct_channel) {
+                message::new_direct_message_input(messages)
+            } else {
+                message::new_channel_message_input(messages)
+            };
             vector::for_each(mentioned_ai_agents, |ai_addr| {
                 let agent = agent::borrow_mut_agent_by_address(ai_addr);
                 let fee = coin::zero<RGas>();

@@ -7,6 +7,7 @@ module nuwa_framework::address_utils{
 
     friend nuwa_framework::memory_action;
     friend nuwa_framework::prompt_builder;
+    friend nuwa_framework::message;
 
     //TODO Migrate this function to address.move module
     /// Convert string address to Move address, handling both short and full-length addresses

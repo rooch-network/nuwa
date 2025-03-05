@@ -24,6 +24,7 @@ module nuwa_framework::channel {
     const ErrorInvalidChannelType: u64 = 7;
     const ErrorNotMember: u64 = 8;
     const ErrorDeprecatedFunction: u64 = 9;
+    const ErrorMentionedUserNotMember: u64 = 10;
 
     /// Channel status constants
     const CHANNEL_STATUS_ACTIVE: u8 = 0;
@@ -103,15 +104,10 @@ module nuwa_framework::channel {
         object::account_named_object_id<Channel>(agent_address)
     }
 
-    /// Initialize a new AI peer channel
-    public fun create_ai_peer_channel(
-        user_account: &signer,
-        agent: &mut Object<Agent>,
-    ): ObjectID {
+    public(friend) fun create_ai_peer_channel_internal(user_address: address, agent: &mut Object<Agent>): ObjectID {
         let agent_address = agent::get_agent_address(agent);
         let creator = agent_address;
-        let user_address = signer::address_of(user_account);
-        let title = string::utf8(b"Peer chat with ");
+        let title = string::utf8(b"Direct message with ");
         string::append(&mut title, *agent::get_agent_username(agent));
         let now = timestamp::now_milliseconds();
         
@@ -137,6 +133,15 @@ module nuwa_framework::channel {
         channel_id
     }
 
+    /// Initialize a new user to AI direct message channel
+    public fun create_ai_peer_channel(
+        user_account: &signer,
+        agent: &mut Object<Agent>,
+    ): ObjectID {
+        let user_address = signer::address_of(user_account);
+        create_ai_peer_channel_internal(user_address, agent)
+    }
+
     public entry fun create_ai_peer_channel_entry(
         user_account: &signer,
         agent: &mut Object<Agent>,
@@ -152,6 +157,11 @@ module nuwa_framework::channel {
         } else {
             option::none()
         }
+    }
+
+    fun generate_ai_peer_channel_id(agent: &Object<Agent>, user_address: address): ObjectID {
+        let id = generate_peer_channel_id(agent::get_agent_address(agent), user_address);
+        object::custom_object_id<address, Channel>(id)
     }
 
     //TODO remove this function
@@ -191,6 +201,9 @@ module nuwa_framework::channel {
         content: String,
         mentions: vector<address>
     ) {
+        vector::for_each(mentions, |addr| {
+            assert!(is_channel_member(channel_obj, addr), ErrorMentionedUserNotMember);
+        });
         let sender = signer::address_of(account);
         let now = timestamp::now_milliseconds();
         let channel = object::borrow_mut(channel_obj);
@@ -216,9 +229,17 @@ module nuwa_framework::channel {
         add_message(channel_obj, ai_agent_address, response_message, message::type_ai(), vector::empty());
     }
 
-    public fun is_channel_member(channel: &Object<Channel>, addr: address): bool {
-        let channel_ref = object::borrow(channel);
-        table::contains(&channel_ref.members, addr)
+    public(friend) fun send_ai_direct_message(
+        agent: &mut Object<Agent>,
+        user_address: address,
+        content: String,
+    ){
+        let channel_id = generate_ai_peer_channel_id(agent, user_address);
+        if (!object::exists_object(channel_id)) {
+            create_ai_peer_channel_internal(user_address, agent);            
+        };
+        let channel_obj = object::borrow_mut_object_shared<Channel>(channel_id);
+        add_message(channel_obj, agent::get_agent_address(agent), content, message::type_ai(), vector::empty());
     }
 
     /// Get all messages in the channel
@@ -362,6 +383,43 @@ module nuwa_framework::channel {
         channel_obj: &mut Object<Channel>,
     ) {
         join_channel(account, channel_obj);
+    }
+
+    // ==================== Getters ====================
+
+    public fun get_channel_title(channel: &Object<Channel>): &String {
+        let channel_ref = object::borrow(channel);
+        &channel_ref.title
+    }
+
+    public fun get_channel_creator(channel: &Object<Channel>): address {
+        let channel_ref = object::borrow(channel);
+        channel_ref.creator
+    }
+
+    public fun get_channel_created_at(channel: &Object<Channel>): u64 {
+        let channel_ref = object::borrow(channel);
+        channel_ref.created_at
+    }
+
+    public fun get_channel_last_active(channel: &Object<Channel>): u64 {
+        let channel_ref = object::borrow(channel);
+        channel_ref.last_active
+    }
+
+    public fun get_channel_status(channel: &Object<Channel>): u8 {
+        let channel_ref = object::borrow(channel);
+        channel_ref.status
+    }
+
+    public fun get_channel_type(channel: &Object<Channel>): u8 {
+        let channel_ref = object::borrow(channel);
+        channel_ref.channel_type
+    }
+
+    public fun is_channel_member(channel: &Object<Channel>, addr: address): bool {
+        let channel_ref = object::borrow(channel);
+        table::contains(&channel_ref.members, addr)
     }
 
     // =================== Test helpers ===================
