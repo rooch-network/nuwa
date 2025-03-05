@@ -13,7 +13,7 @@ module nuwa_framework::transfer_action {
     // Action names
     const ACTION_NAME_TRANSFER: vector<u8> = b"transfer::coin";
     // Action examples
-    const TRANSFER_ACTION_EXAMPLE: vector<u8> = b"{\"to\":\"0x42\",\"amount\":\"100\",\"coin_type\":\"0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas\",\"memo\":\"Payment for services\"}";
+    const TRANSFER_ACTION_EXAMPLE: vector<u8> = b"{\"to\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"amount\":\"100\",\"coin_type\":\"0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas\",\"memo\":\"Payment for services\"}";
 
     #[data_struct]
     /// Arguments for the transfer coin action
@@ -121,7 +121,7 @@ module nuwa_framework::transfer_action {
     fun test_transfer_action_examples() {
         // Test transfer action example
         let transfer_args = json::from_json<TransferActionArgs>(TRANSFER_ACTION_EXAMPLE);
-        assert!(transfer_args.to == @0x42, 0);
+        assert!(transfer_args.to == @0xed7d3278adec56bbae78fe1b3254cbeb6fd36360fcc295dd31b81825d837c021, 0);
         assert!(transfer_args.amount == string::utf8(b"100"), 1);
         assert!(transfer_args.coin_type == string::utf8(b"0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas"), 2);
         assert!(transfer_args.memo == string::utf8(b"Payment for services"), 3);
