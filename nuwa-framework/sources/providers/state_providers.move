@@ -5,7 +5,12 @@ module nuwa_framework::state_providers{
     use nuwa_framework::balance_provider;
     use nuwa_framework::channel_provider;
 
-    public fun build_agent_state(agent: &Object<Agent>): AgentStates {
+    //Deprecated
+    public fun build_agent_state(_agent: &mut Object<Agent>): AgentStates {
+        abort 0
+    }
+
+    public fun get_agent_state(agent: &Object<Agent>): AgentStates {
         let agent_states = agent_state::new_agent_states();
         let balance_state = balance_provider::get_state(agent);
         agent_state::add_agent_state(&mut agent_states, balance_state);

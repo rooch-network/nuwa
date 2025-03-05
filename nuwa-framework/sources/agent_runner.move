@@ -21,7 +21,7 @@ module nuwa_framework::agent_runner {
         agent: &Object<Agent>,
         input: AgentInput<I>,
     ): String {
-        let states = state_providers::build_agent_state(agent);
+        let states = state_providers::get_agent_state(agent);
         std::debug::print(&states);
         let available_actions = get_available_actions(&input);
         let agent_info = agent::get_agent_info_v2(agent);

@@ -215,20 +215,6 @@ module nuwa_framework::agent {
         agent_ref.last_active_timestamp = timestamp::now_milliseconds();
     }
 
-    // =============== Agent Info functions ===============
-
-    public fun agent_info_name(agent_info: &AgentInfo): &String {
-        &agent_info.name
-    }
-
-    public fun agent_info_username(agent_info: &AgentInfo): &String {
-        &agent_info.username
-    }
-
-    public fun agent_info_agent_address(agent_info: &AgentInfo): address {
-        agent_info.agent_address
-    }
-
 
     #[test_only]
     /// Create a test agent for unit testing
