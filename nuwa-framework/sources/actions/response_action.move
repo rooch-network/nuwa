@@ -79,9 +79,15 @@ module nuwa_framework::response_action {
     }
 
     public fun get_action_group(): ActionGroup {
+        let description = string::utf8(b"Actions related to responding to user queries, you can use multiple response actions to send messages to channels or users.\n\n");
+        string::append(&mut description, string::utf8(b"CRITICAL: You MUST ALWAYS send at least one response back to the current message using either:\n"));
+        string::append(&mut description, string::utf8(b"- response::channel_message to the current channel if in a channel conversation\n"));
+        string::append(&mut description, string::utf8(b"- response::direct_message to the current user if in a direct message conversation\n"));
+        //string::append(&mut description, string::utf8(b"\nFailure to respond to the current message will result in your actions not being processed.\n"));
+        
         action::new_action_group(
             string::utf8(b"response"),            
-            string::utf8(b"Actions related to responding to user queries, you can use multiple response actions to send messages to channels or users at the same time."),
+            description,
             get_action_descriptions()
         )   
     }

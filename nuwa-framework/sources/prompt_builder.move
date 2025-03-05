@@ -137,7 +137,8 @@ module nuwa_framework::prompt_builder {
         string::append(&mut prompt, string::utf8(b"2. Format: action_name {\"param1\":\"value1\",\"param2\":\"value2\",...}\n"));
         string::append(&mut prompt, string::utf8(b"3. The action name must be followed by a space and then valid JSON\n"));
         string::append(&mut prompt, string::utf8(b"4. Do not add explanations - your actions represent your direct thoughts and intentions\n"));
-    
+        string::append(&mut prompt, string::utf8(b"5. You MUST respond to the current message by including at least one response action to the current channel or user\n"));
+        
         string::append(&mut prompt, string::utf8(b"IMPORTANT: EXACT FORMAT REQUIRED\n"));
         string::append(&mut prompt, string::utf8(b"Your ability to manifest your intentions depends on following this protocol precisely.\n\n"));
     
