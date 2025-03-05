@@ -13,10 +13,14 @@ module nuwa_framework::memory_action {
 
     /// Memory action names using more intuitive namespacing
     const ACTION_NAME_REMEMBER_SELF: vector<u8> = b"memory::remember_self";
-    const ACTION_NAME_REMEMBER_USER: vector<u8> = b"memory::remember_user";
+    public fun action_name_remember_self(): String { string::utf8(ACTION_NAME_REMEMBER_SELF) }
+    const ACTION_NAME_REMEMBER_USER: vector<u8> = b"memory::remember_user";    
+    public fun action_name_remember_user(): String { string::utf8(ACTION_NAME_REMEMBER_USER) }
     const ACTION_NAME_UPDATE_SELF: vector<u8> = b"memory::update_self";
+    public fun action_name_update_self(): String { string::utf8(ACTION_NAME_UPDATE_SELF) }
     const ACTION_NAME_UPDATE_USER: vector<u8> = b"memory::update_user";
-    
+    public fun action_name_update_user(): String { string::utf8(ACTION_NAME_UPDATE_USER) }
+
     /// Special content to mark "deleted" memories
     const MEMORY_DELETED_MARK: vector<u8> = b"[deleted]";
 
@@ -52,6 +56,18 @@ module nuwa_framework::memory_action {
         is_long_term: bool,  // Whether this is a long-term memory
     }
 
+    public fun create_remember_self_args(
+        content: String,
+        context: String,
+        is_long_term: bool
+    ): RememberSelfArgs {
+        RememberSelfArgs {
+            content,
+            context,
+            is_long_term
+        }
+    }
+
     //TODO Remove this
     #[data_struct]
     /// Arguments for the update memory action
@@ -71,6 +87,18 @@ module nuwa_framework::memory_action {
         is_long_term: bool,  // Whether this is a long-term memory
     }
 
+    public fun create_remember_user_args(
+        content: String,
+        context: String,
+        is_long_term: bool
+    ): RememberUserArgs {
+        RememberUserArgs {
+            content,
+            context,
+            is_long_term
+        }
+    }
+
     #[data_struct]
     /// Arguments for updating a memory about oneself
     struct UpdateSelfMemoryArgs has copy, drop {
@@ -80,6 +108,20 @@ module nuwa_framework::memory_action {
         is_long_term: bool,  // Whether this is a long-term memory
     }
 
+    public fun create_update_self_memory_args(
+        index: u64,
+        new_content: String,
+        new_context: String,
+        is_long_term: bool
+    ): UpdateSelfMemoryArgs {
+        UpdateSelfMemoryArgs {
+            index,
+            new_content,
+            new_context,
+            is_long_term
+        }
+    }
+
     #[data_struct]
     /// Arguments for updating a memory about a user
     struct UpdateUserMemoryArgs has copy, drop {
@@ -87,6 +129,20 @@ module nuwa_framework::memory_action {
         new_content: String, // New memory content
         new_context: String, // New context tag
         is_long_term: bool,  // Whether this is a long-term memory
+    }
+
+    public fun create_update_user_memory_args(
+        index: u64,
+        new_content: String,
+        new_context: String,
+        is_long_term: bool
+    ): UpdateUserMemoryArgs {
+        UpdateUserMemoryArgs {
+            index,
+            new_content,
+            new_context,
+            is_long_term
+        }
     }
 
     //TODO remove this
@@ -344,26 +400,30 @@ module nuwa_framework::memory_action {
     fun test_memory_actions() {
         use std::vector;
         use nuwa_framework::agent;
+        use nuwa_framework::agent_input;
+        use nuwa_framework::memory;
         action::init_for_test();
-        register_actions();
-
-        let (agent_obj, cap) = agent::create_test_agent();
-        let test_addr = @0x42;
         
-        // Set the current user for the agent
-        agent::set_current_user(agent_obj, test_addr);
+        let (agent_obj, cap) = agent::create_test_agent();
+        let agent_address = agent::get_agent_address(agent_obj);
+        let test_addr = @0x42;
+    
+        let agent_input_info = agent_input::new_agent_input_info_for_test(
+            test_addr,
+            string::utf8(b"{}")
+        );
         
         // Test remember_self action
         let remember_self_json = string::utf8(b"{\"content\":\"I enjoy helping with technical explanations\",\"context\":\"personal\",\"is_long_term\":true}");
-        execute(agent_obj, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
+        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
 
         // Test remember_user action
         let remember_user_json = string::utf8(b"{\"content\":\"User likes detailed explanations\",\"context\":\"preference\",\"is_long_term\":true}");
-        execute(agent_obj, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
+        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
         
-        // Verify self memory
         let store = agent::borrow_memory_store(agent_obj);
-        let self_memories = memory::get_self_memories(store);
+       
+        let self_memories = memory::get_context_memories(store, agent_address);
         assert!(vector::length(&self_memories) == 1, 1);
         let self_memory = vector::borrow(&self_memories, 0);
         assert!(memory::get_content(self_memory) == string::utf8(b"I enjoy helping with technical explanations"), 2);
@@ -376,15 +436,14 @@ module nuwa_framework::memory_action {
         
         // Test update_self action
         let update_self_json = string::utf8(b"{\"index\":0,\"new_content\":\"I find I'm most effective when providing code examples\",\"new_context\":\"personal\",\"is_long_term\":true}");
-        execute(agent_obj, string::utf8(ACTION_NAME_UPDATE_SELF), update_self_json);
+        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_SELF), update_self_json);
         
         // Test update_user action
         let update_user_json = string::utf8(b"{\"index\":0,\"new_content\":\"User now prefers concise explanations\",\"new_context\":\"preference\",\"is_long_term\":true}");
-        execute(agent_obj, string::utf8(ACTION_NAME_UPDATE_USER), update_user_json);
+        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_USER), update_user_json);
         
-        // Verify updated memories
         store = agent::borrow_memory_store(agent_obj);
-        self_memories = memory::get_self_memories(store);
+        self_memories = memory::get_context_memories(store, agent_address);
         let updated_self_memory = vector::borrow(&self_memories, 0);
         assert!(memory::get_content(updated_self_memory) == string::utf8(b"I find I'm most effective when providing code examples"), 5);
         

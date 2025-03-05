@@ -56,4 +56,12 @@ module nuwa_framework::agent_input{
     public fun get_input_data_from_info(info: &AgentInputInfo): &String {
         &info.input_data_json
     }
+
+    #[test_only]
+    public fun new_agent_input_info_for_test(sender: address, input_data_json: String) : AgentInputInfo {
+        AgentInputInfo {
+            sender,
+            input_data_json,
+        }
+    }
 }

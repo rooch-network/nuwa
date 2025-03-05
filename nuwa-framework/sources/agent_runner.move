@@ -9,7 +9,6 @@ module nuwa_framework::agent_runner {
 
     use nuwa_framework::action::{ActionDescription};
     use nuwa_framework::agent_input::{Self, AgentInput};
-    use nuwa_framework::agent_state::{AgentStates};
     use nuwa_framework::ai_request;
     use nuwa_framework::ai_service;
     use nuwa_framework::prompt_builder;
@@ -20,10 +19,10 @@ module nuwa_framework::agent_runner {
 
     public fun generate_system_prompt<I: copy + drop>(
         agent: &Object<Agent>,
-        states: AgentStates,
         input: AgentInput<I>,
     ): String {
-
+        let states = state_providers::build_agent_state(agent);
+        std::debug::print(&states);
         let available_actions = get_available_actions(&input);
         let agent_info = agent::get_agent_info_v2(agent);
         let memory_store = agent::borrow_memory_store(agent);
@@ -46,12 +45,11 @@ module nuwa_framework::agent_runner {
         coin::destroy_zero(fee);
         let agent_id = object::id(agent_obj);
         let model_provider = *agent::get_agent_model_provider(agent_obj);
-        let states = state_providers::build_agent_state(agent_obj);
+        
         let input_info = agent_input::to_agent_input_info(&input);
         // Generate system prompt with context
         let system_prompt = generate_system_prompt(
             agent_obj,
-            states,
             input
         );
 

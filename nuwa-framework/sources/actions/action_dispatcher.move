@@ -33,13 +33,9 @@ module nuwa_framework::action_dispatcher {
     }
 
     fun init() {
-        register_actions();
     }
 
     entry fun register_actions() {
-        memory_action::register_actions();
-        response_action::register_actions();
-        transfer_action::register_actions();
     }
 
     public fun get_action_descriptions(): vector<ActionDescription> {
@@ -62,6 +58,7 @@ module nuwa_framework::action_dispatcher {
 
     /// Dispatch all actions from line-based format
     public fun dispatch_actions(_agent: &mut Object<Agent>, _response: String) {
+        abort 0
     }
 
     public fun dispatch_actions_v2(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
@@ -234,6 +231,7 @@ module nuwa_framework::action_dispatcher {
         use nuwa_framework::response_action;
         use nuwa_framework::transfer_action;
         use nuwa_framework::channel;
+        use nuwa_framework::agent_input;
 
         // Initialize
         action::init_for_test();
@@ -246,11 +244,10 @@ module nuwa_framework::action_dispatcher {
 
         let channel_id = channel::create_ai_home_channel(agent);
         // Using type-specific constructors with serialization
-        let memory_args = memory_action::create_add_memory_args(
-            test_addr,
-            string::utf8(b"User prefers detailed explanations"),
-            memory::context_preference(),
-            true
+        let memory_args = memory_action::create_remember_user_args(
+            string::utf8(b"User prefers detailed explanations"), 
+            string::utf8(b"preference"),
+            true,
         );
         
         let response_args = response_action::create_say_args(
@@ -259,7 +256,7 @@ module nuwa_framework::action_dispatcher {
         );
 
         let memory_action = create_action_call_with_object(
-            string::utf8(b"memory::add"), 
+            memory_action::action_name_remember_user(),
             memory_args
         );
         
@@ -274,8 +271,10 @@ module nuwa_framework::action_dispatcher {
         add_action(&mut mut_response, response_action);
         let test_response = response_to_str(&mut_response);
 
+        let agent_input_info = agent_input::new_agent_input_info_for_test(test_addr, string::utf8(b"{}"));
+
         // Execute actions
-        dispatch_actions(agent, test_response);
+        dispatch_actions_v2(agent, agent_input_info, test_response);
 
         // Verify memory was added
         let store = agent::borrow_memory_store(agent);

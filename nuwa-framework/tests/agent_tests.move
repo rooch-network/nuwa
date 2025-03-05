@@ -3,17 +3,18 @@ module nuwa_framework::agent_tests {
     use std::debug;
     use std::string;
     use std::vector;
-    use moveos_std::object;
     use nuwa_framework::character;
     use nuwa_framework::action;
     use nuwa_framework::action_dispatcher;
     use nuwa_framework::agent;
+    use nuwa_framework::agent_runner;
     use nuwa_framework::channel;
     use nuwa_framework::message;
 
 
     #[test]
     fun test_prompt_builder() {
+        rooch_framework::genesis::init_for_test();
         // Initialize actions
         action::init_for_test();
         action_dispatcher::init_for_test();
@@ -58,9 +59,9 @@ module nuwa_framework::agent_tests {
         
         
         let agent_input = message::new_agent_input(vector[test_message]);
-
+        std::debug::print(&agent_input);
         // Get first prompt
-        let prompt = agent::generate_system_prompt(object::borrow(agent), agent_input);
+        let prompt = agent_runner::generate_system_prompt(agent, agent_input);
 
         // Print first prompt for debugging
         debug::print(&string::utf8(b"First Prompt:"));
