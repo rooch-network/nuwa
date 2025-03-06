@@ -10,6 +10,7 @@ import { ClipboardDocumentIcon, ShareIcon } from '@heroicons/react/24/outline';
 import { CheckIcon } from '@heroicons/react/24/solid';
 import { shortenAddress } from '../utils/address';
 import { Link } from 'react-router-dom';
+import { RoochAddress } from '@roochnetwork/rooch-sdk';
 
 interface ChatMessageProps {
   message: Message;
@@ -24,12 +25,14 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
   const timestamp = message.timestamp;
 
   //TODO use the scanUrl via the network.
-  const roochscanBaseUrl = "https://test.roochscan.io"
+  const roochscanBaseUrl = "https://test.roochscan.io";
+
+  const senderAddress = new RoochAddress(message.sender).toBech32Address();
   
   // Use the agent's actual name if provided, otherwise fallback to address
   const displayName = isAI 
     ? (agentName || 'AI Agent')  // Changed from 'AI Assistant' to 'AI Agent'
-    : shortenAddress(message.sender);
+    : shortenAddress(senderAddress);
 
   const handleCopy = async () => {
     const shareText = `${message.content}\n\n${window.location.href}`;
@@ -70,11 +73,11 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
             ) : (
               // User avatar with Roochscan link
               <a 
-                href={`${roochscanBaseUrl}/account/${message.sender}`} 
+                href={`${roochscanBaseUrl}/account/${senderAddress}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="block w-8 h-8 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all rounded-full"
-                title={`View ${shortenAddress(message.sender)} on Roochscan`}
+                title={`View ${shortenAddress(senderAddress)} on Roochscan`}
               >
                 <UserCircleIcon className="w-8 h-8 text-gray-400" />
               </a>
@@ -88,11 +91,11 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
                 // Also add Roochscan link to the display name for non-AI users
                 isAI ? displayName : (
                   <a 
-                    href={`${roochscanBaseUrl}/account/${message.sender}`} 
+                    href={`${roochscanBaseUrl}/account/${senderAddress}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="hover:text-blue-600 hover:underline transition-colors"
-                    title={`View ${message.sender} on Roochscan`}
+                    title={`View ${senderAddress} on Roochscan`}
                   >
                     {displayName}
                   </a>
@@ -187,9 +190,9 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
         {isCurrentUser && (
           <div className="flex-shrink-0 w-8 h-8">
             {/* Add Roochscan link for current user's avatar too */}
-            {message.sender && (
+            {senderAddress && (
               <a 
-                href={`${roochscanBaseUrl}/account/${message.sender}`} 
+                href={`${roochscanBaseUrl}/account/${senderAddress}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="block w-8 h-8 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all rounded-full"

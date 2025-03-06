@@ -4,7 +4,7 @@ import { Layout } from '../components/Layout';
 import { useNetworkVariable } from '../hooks/useNetworkVariable';
 import { useRoochClient, useRoochClientQuery, useCurrentWallet, useCurrentSession, SessionKeyGuard } from '@roochnetwork/rooch-sdk-kit';
 import { Agent, Character, Memory } from '../types/agent';
-import { Args, isValidAddress, bcs, Transaction } from '@roochnetwork/rooch-sdk';
+import { Args, isValidAddress, bcs, Transaction, RoochAddress } from '@roochnetwork/rooch-sdk';
 import { MemoryBrowser } from '../components/MemoryBrowser';
 import { MemorySchema } from '../types/agent';
 import ReactMarkdown from 'react-markdown';
@@ -144,7 +144,7 @@ export function AgentDetail() {
           
           // Get the character ID from the agent data
           const characterId = agentData.character?.value?.id;
-          const agentAddress = agentData.agent_address;
+          const agentAddress = new RoochAddress(agentData.agent_address).toBech32Address();
           
           // Create the agent object
           const processedAgent: Agent = {
