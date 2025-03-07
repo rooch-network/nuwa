@@ -1,6 +1,6 @@
 module nuwa_framework::memory_action {
     use std::string::{Self, String};
-    use std::option;
+    use std::option::{Self, Option};
     use std::vector;
     
     use moveos_std::object::Object;
@@ -20,6 +20,10 @@ module nuwa_framework::memory_action {
     public fun action_name_update_self(): String { string::utf8(ACTION_NAME_UPDATE_SELF) }
     const ACTION_NAME_UPDATE_USER: vector<u8> = b"memory::update_user";
     public fun action_name_update_user(): String { string::utf8(ACTION_NAME_UPDATE_USER) }
+    
+    // Add new memory::none action
+    const ACTION_NAME_NONE: vector<u8> = b"memory::none";
+    public fun action_name_none(): String { string::utf8(ACTION_NAME_NONE) }
 
     /// Special content to mark "deleted" memories
     const MEMORY_DELETED_MARK: vector<u8> = b"[deleted]";
@@ -185,6 +189,23 @@ module nuwa_framework::memory_action {
     const UPDATE_SELF_EXAMPLE: vector<u8> = b"{\"index\":2,\"new_content\":\"I've noticed I'm more effective when I ask clarifying questions\",\"new_context\":\"personal\",\"is_long_term\":true}";
     const UPDATE_USER_EXAMPLE: vector<u8> = b"{\"index\":3,\"new_content\":\"User now prefers concise explanations with code examples\",\"new_context\":\"preference\",\"is_long_term\":true}";
 
+    // Add example for memory::none action
+    const NONE_EXAMPLE: vector<u8> = b"{\"reason\":null}";
+
+    #[data_struct]
+    /// Arguments for the memory::none action
+    struct NoneArgs has copy, drop {
+        reason: Option<String>,     // Optional reason for not creating memory
+    }
+
+    public fun create_none_args(
+        reason: Option<String>
+    ): NoneArgs {
+        NoneArgs {
+            reason
+        }
+    }
+
     public fun register_actions() {
         //TODO deprecated, remove this
     }
@@ -192,13 +213,33 @@ module nuwa_framework::memory_action {
     public fun get_action_group(): ActionGroup {
         action::new_action_group(
             string::utf8(b"memory"),
-            string::utf8(b"Memory actions for storing and updating personal and user memories"),
+            string::utf8(b"Memory actions for storing and updating personal and user memories. You MUST use at least one memory action (or memory::none) in EVERY interaction."),
             get_action_descriptions()
         )   
     }
 
     public fun get_action_descriptions(): vector<action::ActionDescription> {
         let descriptions = vector::empty();
+        
+        // First add the memory::none action with clear instruction about memory actions requirement
+        let none_args = vector[
+            action::new_action_argument(
+                string::utf8(b"reason"),
+                string::utf8(b"string"),
+                string::utf8(b"Optional reason why no memory should be created"),
+                false,
+            ),
+        ];
+
+        vector::push_back(&mut descriptions, action::new_action_description(
+            string::utf8(ACTION_NAME_NONE),
+            string::utf8(b"Explicitly indicate that nothing should be remembered from this interaction"),
+            none_args,
+            string::utf8(NONE_EXAMPLE),
+            string::utf8(b"You MUST use at least one memory action in each interaction - use this action if there's nothing to remember"),
+            string::utf8(b"Using this action acknowledges that you've considered memory but determined there's nothing important to record"),
+        ));
+
         // Register remember_self action (AI's memories about itself)
         let remember_self_args = vector[
             action::new_action_argument(
@@ -401,6 +442,23 @@ module nuwa_framework::memory_action {
                 option::some(args.new_context),
                 args.is_long_term
             );
+        }
+        else if (action_name == string::utf8(ACTION_NAME_NONE)) {
+            // This action is just a marker - no actual operation is needed
+            let none_args = json::from_json_option<NoneArgs>(string::into_bytes(args_json));
+            
+
+            if (!option::is_some(&none_args)) {
+                std::debug::print(&string::utf8(b"Invalid arguments for none action"));
+                return
+            };
+
+            // We don't need to do anything with the args, just validate them
+            let none_args = option::destroy_some(none_args);
+            if (option::is_some(&none_args.reason)) {
+                let reason = option::destroy_some(none_args.reason);
+                std::debug::print(&reason);
+            }
         };
     }
 
@@ -491,5 +549,11 @@ module nuwa_framework::memory_action {
         assert!(update_user_args.new_content == string::utf8(b"User now prefers concise explanations with code examples"), 14);
         assert!(update_user_args.new_context == string::utf8(b"preference"), 15);
         assert!(update_user_args.is_long_term == true, 16);
+    }
+
+    // Add a new test for the memory::none action
+    #[test]
+    fun test_memory_none_action() {
+        let _none_args = json::from_json<NoneArgs>(NONE_EXAMPLE);
     }
 }
