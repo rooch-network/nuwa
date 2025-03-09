@@ -176,7 +176,7 @@ module nuwa_framework::response_action {
         descriptions
     }
 
-    public fun execute(_agent: &mut Object<Agent>, _action_name: String, _args_json: String) : Result<bool, String> {
+    public fun execute(_agent: &mut Object<Agent>, _action_name: String, _args_json: String) {
         abort 0
     }
 
