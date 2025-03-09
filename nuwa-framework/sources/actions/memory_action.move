@@ -383,7 +383,7 @@ module nuwa_framework::memory_action {
         //TODO deprecated, remove this
     }
 
-    public fun execute_v2(_agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, _action_name: String, _args_json: String) :Result<bool, String> {
+    public fun execute_v2(_agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, _action_name: String, _args_json: String) {
         abort 0
     }
 
