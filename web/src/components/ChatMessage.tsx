@@ -12,17 +12,30 @@ import { shortenAddress } from '../utils/address';
 import { Link } from 'react-router-dom';
 import { RoochAddress } from '@roochnetwork/rooch-sdk';
 
+// Add action type constants
+const MESSAGE_TYPE_NORMAL = 0;
+const MESSAGE_TYPE_ACTION_EVENT = 2;
+
+// Add interface for parsed action event
+interface ActionEvent {
+  action: string;
+  args: string;
+  success: boolean;
+  error?: string;
+}
+
 interface ChatMessageProps {
   message: Message;
   isCurrentUser: boolean;
   isAI: boolean;
   agentName?: string;
-  agentId?: string; // Add this to receive the agent's object ID
+  agentId?: string;
 }
 
 export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const timestamp = message.timestamp;
+  const isActionEvent = message.message_type === MESSAGE_TYPE_ACTION_EVENT;
 
   //TODO use the scanUrl via the network.
   const roochscanBaseUrl = "https://test.roochscan.io";
@@ -31,7 +44,7 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
   
   // Use the agent's actual name if provided, otherwise fallback to address
   const displayName = isAI 
-    ? (agentName || 'AI Agent')  // Changed from 'AI Assistant' to 'AI Agent'
+    ? (agentName || 'AI Agent')
     : shortenAddress(senderAddress);
 
   const handleCopy = async () => {
@@ -47,6 +60,134 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
     window.open(twitterUrl, '_blank');
   };
 
+  // Parse action event if message type is ACTION_EVENT
+  const parseActionEvent = (): ActionEvent | null => {
+    if (!isActionEvent) return null;
+    
+    try {
+      return JSON.parse(message.content);
+    } catch (error) {
+      console.error('Failed to parse action event:', error);
+      return null;
+    }
+  };
+
+  // Format action arguments for display
+  const formatActionArgs = (argsJson: string): any => {
+    try {
+      return JSON.parse(argsJson);
+    } catch (error) {
+      return argsJson;
+    }
+  };
+
+  // Get a human-friendly event message based on action type
+  const getActionEventMessage = (actionEvent: ActionEvent): JSX.Element => {
+    const args = formatActionArgs(actionEvent.args);
+    
+    // For transfer actions
+    if (actionEvent.action.startsWith("transfer::")) {
+      // For transfer::coin action
+      if (actionEvent.action === "transfer::coin") {
+        const amount = args.amount || "some";
+        const coinType = args.coin_type ? args.coin_type.split("::").pop() : "coins";
+        const recipient = args.to ? shortenAddress(args.to) : "someone";
+        
+        return (
+          <span>
+            {actionEvent.success ? "Transferred " : "Failed to transfer "}
+            <span className="font-medium">{amount} {coinType}</span> to{" "}
+            <a 
+              href={`${roochscanBaseUrl}/account/${args.to}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {recipient}
+            </a>
+            {args.memo && <span className="italic"> — "{args.memo}"</span>}
+          </span>
+        );
+      }
+    }
+    
+    // For memory actions
+    else if (actionEvent.action.startsWith("memory::")) {
+      if (actionEvent.action === "memory::remember_self") {
+        return <span>Saved a personal memory</span>;
+      } else if (actionEvent.action === "memory::remember_user") {
+        return <span>Remembered something about the user</span>;
+      } else if (actionEvent.action === "memory::update_self") {
+        return <span>Updated personal memory</span>;
+      } else if (actionEvent.action === "memory::update_user") {
+        return <span>Updated user information</span>;
+      } else if (actionEvent.action === "memory::none") {
+        return <span>No new memories saved</span>;
+      }
+    }
+
+    // Default fallback for other actions
+    const actionName = actionEvent.action.split("::").join("::");
+    return (
+      <span>
+        Executed{' '}
+        <span className="font-medium">{actionName}</span>
+        {actionEvent.success ? "" : " (failed)"}
+      </span>
+    );
+  };
+
+  // Render action event content in IM-style
+  const renderActionEvent = () => {
+    const actionEvent = parseActionEvent();
+    if (!actionEvent) return <div className="text-red-500">Invalid action event format</div>;
+    
+    // Get appropriate icon based on action type
+    const getActionIcon = () => {
+      if (actionEvent.action.startsWith("transfer::")) {
+        return "💸";
+      } else if (actionEvent.action.startsWith("memory::")) {
+        return "🧠";
+      } else {
+        return "⚙️";
+      }
+    };
+
+    // Get status icon
+    const getStatusIcon = () => {
+      if (actionEvent.success) {
+        return "✅";
+      } else {
+        return "❌";
+      }
+    };
+
+    return (
+      <div className="text-center py-1 text-sm text-gray-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span>{getActionIcon()}</span>
+          {getActionEventMessage(actionEvent)}
+          {actionEvent.error ? 
+            <span className="text-red-500 ml-1">— Error: {actionEvent.error}</span> : 
+            ""
+          }
+        </span>
+      </div>
+    );
+  };
+
+  // For action events, return a simplified centered message
+  if (isActionEvent) {
+    return (
+      <div className="flex justify-center w-full my-1">
+        <div className="w-full max-w-3xl">
+          {renderActionEvent()}
+        </div>
+      </div>
+    );
+  }
+
+  // For normal messages, use the existing format
   return (
     <div className="flex justify-center w-full">
       <div className="w-full max-w-3xl flex gap-3">
@@ -104,17 +245,17 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
             </span>
             <span>•</span>
             <span>
-            {formatTimestamp(message.timestamp)}
+              {formatTimestamp(timestamp)}
             </span>
           </div>
           <div className="relative group">
             <div
               className={`rounded-lg px-4 py-2 max-w-[80%] ${
                 isCurrentUser
-                  ? 'bg-blue-50 text-gray-900 border border-blue-100'  // Lighter blue for user messages
+                  ? 'bg-blue-50 text-gray-900 border border-blue-100'
                   : isAI
-                  ? 'bg-purple-50 border border-purple-100'            // Keep AI message style
-                  : 'bg-gray-50 border border-gray-100'               // Lighter gray for other users
+                  ? 'bg-purple-50 border border-purple-100'
+                  : 'bg-gray-50 border border-gray-100'
               }`}
             >
               <div className="flex justify-between items-start gap-4">
@@ -134,10 +275,10 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
                               language={language}
                               style={oneLight}
                               customStyle={{
-                                backgroundColor: '#f8fafc',  // bg-slate-50
+                                backgroundColor: '#f8fafc',
                                 padding: '1rem',
                                 borderRadius: '0.375rem',
-                                border: '1px solid #e2e8f0',  // border-slate-200
+                                border: '1px solid #e2e8f0',
                               }}
                             >
                               {String(children).replace(/\n$/, '')}
@@ -162,7 +303,6 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
                   </ReactMarkdown>
                 </div>
                 
-                {/* Action buttons */}
                 <div className="flex flex-col gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={handleCopy}

@@ -379,7 +379,7 @@ export function ChannelPage() {
 
   // Update the message tracking effect to work
   useEffect(() => {
-    if (!messages || messages.length === 0) return;
+    if (!messages || messages.length === 0 || !aiAddress) return;
     
     // Get the last message
     const lastMessage = messages[messages.length - 1];
@@ -390,18 +390,21 @@ export function ChannelPage() {
       message_type: lastMessage.message_type,
       content: lastMessage.content.substring(0, 50) + '...',
       currentAiThinking: isAiThinking,
+      aiAddress,
     });
     
-    // If the last message is from AI, the AI has responded
-    if (lastMessage.message_type === 1) {
+    // If the last message is from AI (based on sender address), the AI has responded
+    const isFromAI = lastMessage.sender === aiAddress;
+    if (isFromAI) {
       console.log('AI response received, turning off thinking state');
       setIsAiThinking(false);
       setLastMessageSentByAi(true);
       return;
     }
     
-    // If the last message is from a user and there's a pending AI mention
-    if (lastMessage.message_type === 0 && lastMessage.sender === session?.getRoochAddress().toHexAddress()) {
+    // If the last message is from a user and there's a potential AI mention
+    const isFromCurrentUser = lastMessage.sender === session?.getRoochAddress().toHexAddress();
+    if (isFromCurrentUser && lastMessage.message_type === 0) { // 0 is normal message type
       const isAiPeerChannel = channel?.channel_type === 1;
       
       // For AI_PEER channels, always consider AI mentioned
@@ -426,7 +429,7 @@ export function ChannelPage() {
         setIsAiThinking(true);
       }
     }
-  }, [messages, channel?.channel_type, aiAddress, session]);
+  }, [messages, channel?.channel_type, aiAddress, session, lastMessageSentByAi]);
   
   // Loading state
   if (isChannelLoading) {
@@ -527,7 +530,7 @@ export function ChannelPage() {
                   key={`${message.id}-${index}`}
                   message={message} 
                   isCurrentUser={message.sender === session?.getRoochAddress().toHexAddress()}
-                  isAI={message.message_type === 1}
+                  isAI={message.sender === aiAddress}
                   agentName={agentInfo.name} // Pass the agent name
                   agentId={agentInfo.id || null} // Pass the agent's object ID from the channel
                 />
