@@ -5,11 +5,12 @@ module nuwa_framework::memory_action {
     
     use moveos_std::object::Object;
     use moveos_std::json;
+    use moveos_std::result::{ok, err_str, Result};
 
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::memory;
     use nuwa_framework::action::{Self, ActionGroup};
-    use nuwa_framework::agent_input::{Self, AgentInputInfo};
+    use nuwa_framework::agent_input::{Self, AgentInputInfo, AgentInputInfoV2};
 
     /// Memory action names using more intuitive namespacing
     const ACTION_NAME_REMEMBER_SELF: vector<u8> = b"memory::remember_self";
@@ -382,8 +383,12 @@ module nuwa_framework::memory_action {
         //TODO deprecated, remove this
     }
 
+    public fun execute_v2(_agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, _action_name: String, _args_json: String) :Result<bool, String> {
+        abort 0
+    }
+
     /// Execute memory actions
-    public fun execute_v2(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_name: String, args_json: String) {
+    public fun execute_v3(agent: &mut Object<Agent>, agent_input: &AgentInputInfoV2, action_name: String, args_json: String) :Result<bool, String> {
         let agent_address = agent::get_agent_address(agent);
         let store = agent::borrow_mut_memory_store(agent);
         
@@ -391,29 +396,28 @@ module nuwa_framework::memory_action {
             // Add memory about self
             let args_opt = json::from_json_option<RememberSelfArgs>(string::into_bytes(args_json));
             if (!option::is_some(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for remember_self action"));
-                return
+                return err_str(b"Invalid arguments for remember_self action")
             };
             let args = option::destroy_some(args_opt);
             memory::add_memory(store, agent_address, args.content, args.context, args.is_long_term);
+            ok(true)
         } 
         else if (action_name == string::utf8(ACTION_NAME_REMEMBER_USER)) {
             // Add memory about current user
             let args_opt = json::from_json_option<RememberUserArgs>(string::into_bytes(args_json));
             if (!option::is_some(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for remember_user action"));
-                return
+                return err_str(b"Invalid arguments for remember_user action")
             };
             let args = option::destroy_some(args_opt);
-            let current_user = agent_input::get_sender_from_info(agent_input);
+            let current_user = agent_input::get_sender_from_info_v2(agent_input);
             memory::add_memory(store, current_user, args.content, args.context, args.is_long_term);
+            ok(true)
         }
         else if (action_name == string::utf8(ACTION_NAME_UPDATE_SELF)) {
             // Update memory about self
             let args_opt = json::from_json_option<UpdateSelfMemoryArgs>(string::into_bytes(args_json));
             if (!option::is_some(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for update_self action"));
-                return
+                return err_str(b"Invalid arguments for update_self action")
             };
             let args = option::destroy_some(args_opt);
             memory::update_memory(
@@ -424,16 +428,16 @@ module nuwa_framework::memory_action {
                 option::some(args.new_context),
                 args.is_long_term
             );
+            ok(true)
         }
         else if (action_name == string::utf8(ACTION_NAME_UPDATE_USER)) {
             // Update memory about current user
             let args_opt = json::from_json_option<UpdateUserMemoryArgs>(string::into_bytes(args_json));
             if (!option::is_some(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for update_user action"));
-                return
+                return err_str(b"Invalid arguments for update_user action")
             };
             let args = option::destroy_some(args_opt);
-            let current_user = agent_input::get_sender_from_info(agent_input);
+            let current_user = agent_input::get_sender_from_info_v2(agent_input);
             memory::update_memory(
                 store,
                 current_user,
@@ -442,24 +446,27 @@ module nuwa_framework::memory_action {
                 option::some(args.new_context),
                 args.is_long_term
             );
+            ok(true)
         }
         else if (action_name == string::utf8(ACTION_NAME_NONE)) {
             // This action is just a marker - no actual operation is needed
             let none_args = json::from_json_option<NoneArgs>(string::into_bytes(args_json));
             
-
             if (!option::is_some(&none_args)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for none action"));
-                return
+                return err_str(b"Invalid arguments for none action")
             };
 
             // We don't need to do anything with the args, just validate them
             let none_args = option::destroy_some(none_args);
             if (option::is_some(&none_args.reason)) {
-                let reason = option::destroy_some(none_args.reason);
-                std::debug::print(&reason);
-            }
-        };
+                let _reason = option::destroy_some(none_args.reason);
+                //std::debug::print(_reason);
+            };
+            ok(false)
+        }
+        else {
+            err_str(b"Unsupported action")
+        }
     }
 
     #[test]
@@ -468,6 +475,8 @@ module nuwa_framework::memory_action {
         use nuwa_framework::agent;
         use nuwa_framework::agent_input;
         use nuwa_framework::memory;
+        use moveos_std::result;
+
         action::init_for_test();
         
         let (agent_obj, cap) = agent::create_test_agent();
@@ -481,11 +490,11 @@ module nuwa_framework::memory_action {
         
         // Test remember_self action
         let remember_self_json = string::utf8(b"{\"content\":\"I enjoy helping with technical explanations\",\"context\":\"personal\",\"is_long_term\":true}");
-        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
+        execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
 
         // Test remember_user action
         let remember_user_json = string::utf8(b"{\"content\":\"User likes detailed explanations\",\"context\":\"preference\",\"is_long_term\":true}");
-        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
+        execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
         
         let store = agent::borrow_memory_store(agent_obj);
        
@@ -502,11 +511,12 @@ module nuwa_framework::memory_action {
         
         // Test update_self action
         let update_self_json = string::utf8(b"{\"index\":0,\"new_content\":\"I find I'm most effective when providing code examples\",\"new_context\":\"personal\",\"is_long_term\":true}");
-        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_SELF), update_self_json);
-        
+        let result = execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_SELF), update_self_json);
+        assert!(result::is_ok(&result), 5);
         // Test update_user action
         let update_user_json = string::utf8(b"{\"index\":0,\"new_content\":\"User now prefers concise explanations\",\"new_context\":\"preference\",\"is_long_term\":true}");
-        execute_v2(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_USER), update_user_json);
+        let result = execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_USER), update_user_json);
+        assert!(result::is_ok(&result), 6);
         
         store = agent::borrow_memory_store(agent_obj);
         self_memories = memory::get_context_memories(store, agent_address);

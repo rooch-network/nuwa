@@ -4,10 +4,16 @@ module nuwa_framework::response_action {
     use std::vector;
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::json;
+    use moveos_std::result::{ok,err_str, Result};
+    use moveos_std::copyable_any;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action;
     use nuwa_framework::channel;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
+    use nuwa_framework::agent_input::{Self, AgentInputInfoV2};
+    use nuwa_framework::message::{Self, MessageInputV3};
+
+    friend nuwa_framework::action_dispatcher;
 
     // Action names
     const ACTION_NAME_CHANNEL_MESSAGE: vector<u8> = b"response::channel_message";
@@ -170,39 +176,59 @@ module nuwa_framework::response_action {
         descriptions
     }
 
+    public fun execute(_agent: &mut Object<Agent>, _action_name: String, _args_json: String) : Result<bool, String> {
+        abort 0
+    }
+
     /// Execute a response action
-    public fun execute(agent: &mut Object<Agent>, action_name: String, args_json: String) {
+    public fun execute_v3(agent: &mut Object<Agent>, _agent_input: &AgentInputInfoV2, action_name: String, args_json: String) : Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_CHANNEL_MESSAGE)) {
             // Handle channel message action
             let args_opt = json::from_json_option<ChannelMessageArgsV2>(string::into_bytes(args_json));
             if (option::is_none(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for channel message action"));
-                return
+                return err_str(b"Invalid arguments for channel message action")
             };
             let args = option::destroy_some(args_opt);
             send_channel_message(agent, args.channel_id, args.content);
+            ok(true)
         } else if (action_name == string::utf8(ACTION_NAME_DIRECT_MESSAGE)) {
             // Handle direct message action
             let args_opt = json::from_json_option<DirectMessageArgs>(string::into_bytes(args_json)); 
             if (option::is_none(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for direct message action"));
-                return
+                return err_str(b"Invalid arguments for direct message action")
             };
             let args = option::destroy_some(args_opt);
             send_direct_message(agent, args.recipient, args.content);
-        };
+            ok(true)
+        } else {
+            err_str(b"Unsupported action")
+        }
     }
 
     /// Send a message to a channel
-    fun send_channel_message(agent: &mut Object<Agent>, channel_id: ObjectID, content: String) {
+    fun send_channel_message(agent: &mut Object<Agent>, channel_id: ObjectID, content: String) : ObjectID {
         let channel = object::borrow_mut_object_shared<channel::Channel>(channel_id);
         let agent_addr = agent::get_agent_address(agent);
         channel::add_ai_response(channel, content, agent_addr);
+        channel_id
     }
 
     /// Send a direct message to a specific user
-    fun send_direct_message(agent: &mut Object<Agent>, recipient: address, content: String) {
-        channel::send_ai_direct_message(agent, recipient, content);
+    fun send_direct_message(agent: &mut Object<Agent>, recipient: address, content: String) : ObjectID {
+        channel::send_ai_direct_message(agent, recipient, content)
+    }
+
+    public(friend) fun get_default_channel_id_from_input(agent_input: &AgentInputInfoV2): ObjectID {
+        let message_input_any = *agent_input::get_input_data_from_info_v2(agent_input);
+        //TODO add a try unpack function
+        let message_input = copyable_any::unpack<MessageInputV3>(message_input_any);
+        message::get_channel_id_from_input(&message_input)
+    }
+
+    public(friend) fun send_event_to_channel(agent: &mut Object<Agent>, channel_id: ObjectID, event: String) {
+        let channel = object::borrow_mut_object_shared<channel::Channel>(channel_id);
+        let agent_addr = agent::get_agent_address(agent);
+        channel::add_ai_event(channel, event, agent_addr);
     }
 
     #[test]

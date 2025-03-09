@@ -11,8 +11,11 @@ module nuwa_framework::message {
     friend nuwa_framework::channel;
 
     /// Message types
-    const MESSAGE_TYPE_USER: u8 = 0;
-    const MESSAGE_TYPE_AI: u8 = 1;
+    const MESSAGE_TYPE_NORMAL: u8 = 0;
+    public fun type_normal(): u8 { MESSAGE_TYPE_NORMAL }
+    //TODO change this to 1 after
+    const MESSAGE_TYPE_ACTION_EVENT: u8 = 2;
+    public fun type_action_event(): u8 { MESSAGE_TYPE_ACTION_EVENT }
 
     /// The message object structure
     /// The message object is owned by the sender
@@ -51,7 +54,7 @@ module nuwa_framework::message {
     }
 
     /// Message Input Description
-    const MESSAGE_INPUT_DESCRIPTION: vector<u8> = b"Message Input structure: A MessageInput contains a history of previous messages and the current message to process. | Message fields: | - index: message sequence number | - sender: sender's address | - content: message text | - timestamp: creation time in milliseconds | - message_type: 0=user message, 1=AI message | Use message history to maintain conversation context and respond appropriately to the current message.";
+    const MESSAGE_INPUT_DESCRIPTION: vector<u8> = b"Message Input structure: A MessageInput contains a history of previous messages and the current message to process. | Message fields: | - index: message sequence number | - sender: sender's address | - content: message text | - timestamp: creation time in milliseconds | - message_type: 0=normal message, 2=action event message | Use message history to maintain conversation context and respond appropriately to the current message.";
 
     struct MessageInput has copy, drop {
         history: vector<MessageForAgent>,
@@ -60,6 +63,12 @@ module nuwa_framework::message {
 
     struct MessageInputV2 has copy, drop {
         history: vector<MessageForAgentV2>,
+        current: MessageForAgentV2,
+    }
+
+    struct MessageInputV3 has copy, drop, store {
+        history: vector<MessageForAgentV2>,
+        channel_id: ObjectID,
         current: MessageForAgentV2,
     }
 
@@ -154,26 +163,34 @@ module nuwa_framework::message {
         )
     }
 
-    public fun new_agent_input(messages: vector<Message>) : AgentInput<MessageInput> {
+    public fun new_agent_input(_messages: vector<Message>) : AgentInput<MessageInput> {
+        abort 0
+    }
+
+    public fun new_agent_input_v3(messages: vector<Message>, _is_direct_channel: bool) : AgentInput<MessageInputV3> {
+        let channel_id = vector::borrow(&messages,0).channel_id;
         let messages_for_agent = vector::empty();
         vector::for_each(messages, |msg| {
             let msg: Message = msg;
-            vector::push_back(&mut messages_for_agent, MessageForAgent {
-                id: msg.id,
-                channel_id: channel_id_to_string(msg.channel_id),
+            vector::push_back(&mut messages_for_agent, MessageForAgentV2 {
+                index: msg.id,
                 sender: msg.sender,
                 content: msg.content,
                 timestamp: msg.timestamp,
                 message_type: msg.message_type,
-                mentions: msg.mentions,
             });
         });
         let current = vector::pop_back(&mut messages_for_agent);
+        let description = string::utf8(b"Receive a message from a channel(");
+        string::append(&mut description, channel_id_to_string(channel_id));
+        string::append(&mut description, string::utf8(b")\n"));
+        string::append(&mut description, string::utf8(MESSAGE_INPUT_DESCRIPTION));
         agent_input::new_agent_input(
             current.sender,
-            string::utf8(MESSAGE_INPUT_DESCRIPTION),
-            MessageInput {
+            description,
+            MessageInputV3 {
                 history: messages_for_agent,
+                channel_id,
                 current,
             }
         )
@@ -210,8 +227,13 @@ module nuwa_framework::message {
     }
 
     // Constants
-    public fun type_user(): u8 { MESSAGE_TYPE_USER }
-    public fun type_ai(): u8 { MESSAGE_TYPE_AI }
+    public fun type_user(): u8 { abort 0 }
+    public fun type_ai(): u8 { abort 0 }
+
+
+    public fun get_channel_id_from_input(input: &MessageInputV3): ObjectID {
+        input.channel_id
+    }
 
     // =============== Tests helper functions ===============
     
@@ -238,7 +260,7 @@ module nuwa_framework::message {
             test_channel_id, 
             @0x42, 
             string::utf8(b"test content"), 
-            type_user(),
+            type_normal(),
             mentions
         );
         let msg_obj = object::borrow_object<Message>(msg_id);
@@ -247,7 +269,7 @@ module nuwa_framework::message {
         assert!(get_id(msg) == 1, 0);
         assert!(get_channel_id(msg) == test_channel_id, 1);
         assert!(get_content(msg) == string::utf8(b"test content"), 2);
-        assert!(get_type(msg) == type_user(), 3);
+        assert!(get_type(msg) == type_normal(), 3);
         assert!(get_sender(msg) == @0x42, 4);
         assert!(object::owner(msg_obj) == @0x42, 5);
     }

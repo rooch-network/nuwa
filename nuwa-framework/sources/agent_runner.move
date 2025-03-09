@@ -36,6 +36,15 @@ module nuwa_framework::agent_runner {
     }
 
     public fun process_input<I: copy + drop>(
+        _caller: &signer,
+        _agent_obj: &mut Object<Agent>,
+        _input: AgentInput<I>,
+        _fee: Coin<RGas>,
+    ) {
+       abort 0
+    }
+
+    public fun process_input_v2<I: copy + drop + store>(
         caller: &signer,
         agent_obj: &mut Object<Agent>,
         input: AgentInput<I>,
@@ -46,7 +55,7 @@ module nuwa_framework::agent_runner {
         let agent_id = object::id(agent_obj);
         let model_provider = *agent::get_agent_model_provider(agent_obj);
         
-        let input_info = agent_input::to_agent_input_info(&input);
+        let input_info = agent_input::to_agent_input_info_v2(input);
         // Generate system prompt with context
         let system_prompt = generate_system_prompt(
             agent_obj,

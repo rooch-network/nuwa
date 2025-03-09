@@ -53,12 +53,12 @@ module nuwa_framework::agent_tests {
             channel_id,
             test_user,
             string::utf8(b"Hi, I'm Alex. I prefer learning with real code examples and practical projects. I'm very interested in Move smart contracts and blockchain development. Could you help me learn?"),
-            message::type_user(),
+            message::type_normal(),
             vector::empty()
         );
         
         
-        let agent_input = message::new_agent_input(vector[test_message]);
+        let agent_input = message::new_agent_input_v3(vector[test_message], false);
         std::debug::print(&agent_input);
         // Get first prompt
         let prompt = agent_runner::generate_system_prompt(agent, agent_input);

@@ -5,10 +5,13 @@ module nuwa_framework::transfer_action {
     use moveos_std::object::{Object};
     use moveos_std::json;
     use moveos_std::type_info;
+    use moveos_std::result::{ok,err_str, Result};
     use rooch_framework::transfer;
     use rooch_framework::gas_coin::RGas;
+    use rooch_framework::account_coin_store;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
+    use nuwa_framework::agent_input::{AgentInputInfoV2};
 
     // Action names
     const ACTION_NAME_TRANSFER: vector<u8> = b"transfer::coin";
@@ -80,23 +83,27 @@ module nuwa_framework::transfer_action {
         descriptions
     }
     
+    public fun execute(_agent: &mut Object<Agent>, _action_name: String, _args_json: String){
+        abort 0
+    }
 
     /// Execute a transfer action
-    public fun execute(agent: &mut Object<Agent>, action_name: String, args_json: String) {
+    public fun execute_v3(agent: &mut Object<Agent>, _agent_input: &AgentInputInfoV2, action_name: String, args_json: String) :Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_TRANSFER)) {
             let args_opt = json::from_json_option<TransferActionArgs>(string::into_bytes(args_json));
             if (option::is_none(&args_opt)) {
-                std::debug::print(&string::utf8(b"Invalid arguments for transfer action"));
-                return
+                return err_str(b"Invalid arguments for transfer action")
             };
 
             let args = option::destroy_some(args_opt);
-            execute_transfer(agent, args.to, args.amount, args.coin_type);
-        };
+            execute_transfer(agent, args.to, args.amount, args.coin_type)
+        } else {
+            err_str(b"Unsupported action")
+        }
     }
 
     /// Execute the transfer operation with dynamic coin type support
-    fun execute_transfer(agent: &mut Object<Agent>, to: address, amount_str: String, coin_type_str: String) {
+    fun execute_transfer(agent: &mut Object<Agent>, to: address, amount_str: String, coin_type_str: String) :Result<bool, String> {
         
         let signer = agent::create_agent_signer(agent);
         
@@ -105,17 +112,18 @@ module nuwa_framework::transfer_action {
             let decimal = 8;
             let amount_opt = moveos_std::string_utils::parse_decimal_option(&amount_str, decimal);
             if (option::is_none(&amount_opt)) {
-                std::debug::print(&string::utf8(b"Invalid amount for transfer"));
-                return
+                return err_str(b"Invalid amount for transfer")
             };
             let amount = option::destroy_some(amount_opt);
+            let agent_address = agent::get_agent_address(agent);
+            let balance = account_coin_store::balance<RGas>(agent_address);
+            if (balance < amount) {
+                return err_str(b"Insufficient balance for transfer")
+            };
             transfer::transfer_coin<RGas>(&signer, to, amount);
+            ok(true)
         } else {
-            // For handling other coin types, you would need to implement a 
-            // more sophisticated type resolution mechanism
-            // This is a placeholder for demonstration
-            std::debug::print(&string::utf8(b"Unsupported coin type: "));
-            std::debug::print(&coin_type_str);
+            err_str(b"Unsupported coin type")
         }
     }
 

@@ -31,15 +31,11 @@ module nuwa_framework::channel_entry {
             let message_limit: u64 = 11;
             let messages = channel::get_last_messages(channel_obj, message_limit);
             
-            let message_input = if (is_direct_channel) {
-                message::new_direct_message_input(messages)
-            } else {
-                message::new_channel_message_input(messages)
-            };
+            let message_input = message::new_agent_input_v3(messages, is_direct_channel);
             vector::for_each(mentioned_ai_agents, |ai_addr| {
                 let agent = agent::borrow_mut_agent_by_address(ai_addr);
                 let fee = coin::zero<RGas>();
-                agent_runner::process_input(caller, agent, message_input, fee);
+                agent_runner::process_input_v2(caller, agent, message_input, fee);
             });
         }
     }

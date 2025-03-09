@@ -86,7 +86,7 @@ module nuwa_framework::channel_tests {
         let msg = vector::borrow(&messages, 0);
         assert!(message::get_content(msg) == msg_content, 1);
         assert!(message::get_sender(msg) == signer::address_of(&user), 2);
-        assert!(message::get_type(msg) == message::type_user(), 3);
+        assert!(message::get_type(msg) == message::type_normal(), 3);
 
         channel::delete_channel_for_testing(channel_id);
         agent::destroy_agent_cap(cap);

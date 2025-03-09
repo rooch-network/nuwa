@@ -2,14 +2,15 @@ module nuwa_framework::action_dispatcher {
     use std::string::{Self, String};
     use std::vector;
     use moveos_std::json;
-    use moveos_std::object::Object;
+    use moveos_std::object::{Object, ObjectID};
+    use moveos_std::result::{Self, is_ok, is_err, err_str, Result};
     use nuwa_framework::memory_action;
     use nuwa_framework::response_action;
     use nuwa_framework::transfer_action;
     use nuwa_framework::agent::Agent;
     use nuwa_framework::string_utils;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
-    use nuwa_framework::agent_input::AgentInputInfo;
+    use nuwa_framework::agent_input::{AgentInputInfo, AgentInputInfoV2};
 
     /// Error codes
     const ERROR_INVALID_RESPONSE: u64 = 1;
@@ -30,6 +31,13 @@ module nuwa_framework::action_dispatcher {
     /// - "args": contains a JSON object string with action-specific parameters
     struct ActionResponse has copy, drop {
         actions: vector<ActionCall>
+    }
+
+    struct ActionEvent has copy, drop, store{
+        action: String,
+        args: String,
+        success: bool,
+        error: String,
     }
 
     fun init() {
@@ -72,31 +80,57 @@ module nuwa_framework::action_dispatcher {
         abort 0
     }
 
-    public fun dispatch_actions_v2(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
+    public fun dispatch_actions_v2(_agent: &mut Object<Agent>, _agent_input: AgentInputInfo, _response: String) {
+        abort 0
+    }
+
+    public fun dispatch_actions_v3(agent: &mut Object<Agent>, agent_input: AgentInputInfoV2, response: String) {
         let action_response = parse_line_based_response(&response);
         let actions = action_response.actions;
         let i = 0;
         let len = vector::length(&actions);
+        //TODO the AgentInput always has a response channel?
+        let default_channel_id = response_action::get_default_channel_id_from_input(&agent_input);
         while (i < len) {
             let action_call = vector::borrow(&actions, i);
-            execute_action(agent, &agent_input, action_call);
+            execute_action(agent, &agent_input, default_channel_id, action_call);
             i = i + 1;
         };
     }
 
     /// Execute a single action call
-    fun execute_action(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_call: &ActionCall) {
+    fun execute_action(agent: &mut Object<Agent>, agent_input: &AgentInputInfoV2, default_channel_id: ObjectID, action_call: &ActionCall) {
         let action_name = &action_call.action;
         let args = &action_call.args;
-
-        if (string_utils::starts_with(action_name, &b"memory::")) {
-            memory_action::execute_v2(agent,agent_input, *action_name, *args);
+        let skip_event = false;
+        let result: Result<bool,String> = if (string_utils::starts_with(action_name, &b"memory::")) {
+            let result = memory_action::execute_v3(agent, agent_input, *action_name, *args);
+            if(is_ok(&result)){
+                //if the memory action is none, skip the event
+                let updated_memory:bool = result::unwrap(result);
+                if(!updated_memory){
+                    skip_event = true;
+                };
+            };
+            result
         } else if (string_utils::starts_with(action_name, &b"response::")) {
-            response_action::execute(agent, *action_name, *args);
+            //skip all response actions
+            skip_event = true;
+            response_action::execute_v3(agent, agent_input, *action_name, *args)
         } else if (string_utils::starts_with(action_name, &b"transfer::")) {
-            transfer_action::execute(agent, *action_name, *args);
+            transfer_action::execute_v3(agent, agent_input, *action_name, *args)
+        } else {
+            err_str(b"Unsupported action")
         };
-        // Add other action types here
+        if (!skip_event) {
+            let event = ActionEvent {
+                action: *action_name,
+                args: *args,
+                success: is_ok(&result),
+                error: if (is_err(&result)) { result::unwrap_err(result) } else { string::utf8(b"") },
+            };
+            response_action::send_event_to_channel(agent, default_channel_id, string::utf8(json::to_json(&event)));
+        };
     }
 
     /// Parse JSON response into ActionResponse
@@ -243,6 +277,7 @@ module nuwa_framework::action_dispatcher {
         use nuwa_framework::transfer_action;
         use nuwa_framework::channel;
         use nuwa_framework::agent_input;
+        use nuwa_framework::message;
 
         // Initialize
         action::init_for_test();
@@ -282,10 +317,20 @@ module nuwa_framework::action_dispatcher {
         add_action(&mut mut_response, response_action);
         let test_response = response_to_str(&mut_response);
 
-        let agent_input_info = agent_input::new_agent_input_info_for_test(test_addr, string::utf8(b"{}"));
+        let message = message::new_message_for_test(
+            1,
+            channel_id,
+            test_addr,
+            string::utf8(b"Hi, I'm Alex. I prefer learning with real code examples and practical projects. I'm very interested in Move smart contracts and blockchain development. Could you help me learn?"),
+            message::type_normal(),
+            vector::empty()
+        );
+        
+        let agent_input = message::new_agent_input_v3(vector[message], false);
+        let agent_input_info = agent_input::to_agent_input_info_v2(agent_input);
 
         // Execute actions
-        dispatch_actions_v2(agent, agent_input_info, test_response);
+        dispatch_actions_v3(agent, agent_input_info, test_response);
 
         // Verify memory was added
         let store = agent::borrow_memory_store(agent);

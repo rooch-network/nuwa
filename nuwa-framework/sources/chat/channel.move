@@ -217,7 +217,7 @@ module nuwa_framework::channel {
         member.last_active = now;
         channel.last_active = now;
 
-        add_message(channel_obj, sender, content, message::type_user(), mentions);
+        add_message(channel_obj, sender, content, message::type_normal(), mentions);
     }
 
     /// Add AI response to the channel
@@ -226,20 +226,29 @@ module nuwa_framework::channel {
         response_message: String, 
         ai_agent_address: address
     ){
-        add_message(channel_obj, ai_agent_address, response_message, message::type_ai(), vector::empty());
+        add_message(channel_obj, ai_agent_address, response_message, message::type_normal(), vector::empty());
+    }
+
+    public(friend) fun add_ai_event(
+        channel_obj: &mut Object<Channel>, 
+        event: String, 
+        ai_agent_address: address
+    ){
+        add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty());
     }
 
     public(friend) fun send_ai_direct_message(
         agent: &mut Object<Agent>,
         user_address: address,
         content: String,
-    ){
+    ) : ObjectID {
         let channel_id = generate_ai_peer_channel_id(agent, user_address);
         if (!object::exists_object(channel_id)) {
             create_ai_peer_channel_internal(user_address, agent);            
         };
         let channel_obj = object::borrow_mut_object_shared<Channel>(channel_id);
-        add_message(channel_obj, agent::get_agent_address(agent), content, message::type_ai(), vector::empty());
+        add_message(channel_obj, agent::get_agent_address(agent), content, message::type_normal(), vector::empty());
+        channel_id
     }
 
     /// Get all messages in the channel

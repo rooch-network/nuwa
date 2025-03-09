@@ -15,10 +15,10 @@ module nuwa_framework::ai_callback {
 
     /// AI Oracle response processing callback, this function must be entry and no arguments
     public entry fun process_response() {
-        let pending_requests = ai_service::get_pending_requests_v2();
+        let pending_requests = ai_service::get_pending_requests_v3();
         
         vector::for_each(pending_requests, |pending_request| {
-            let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request_v2(pending_request);
+            let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request_v3(pending_request);
             let response_status = oracles::get_response_status(&request_id);
             
             if (response_status != 0) {
@@ -38,7 +38,7 @@ module nuwa_framework::ai_callback {
                         let message_content = ai_response::get_message_content(&chat_completion);
 
                         let agent = object::borrow_mut_object_shared<Agent>(agent_id);
-                        action_dispatcher::dispatch_actions_v2(agent, agent_input_info, message_content);
+                        action_dispatcher::dispatch_actions_v3(agent, agent_input_info, message_content);
                         let refusal = ai_response::get_refusal(&chat_completion);
                         if(option::is_some(&refusal)){
                             let refusal_reason = option::destroy_some(refusal);
