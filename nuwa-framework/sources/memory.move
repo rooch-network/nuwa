@@ -134,10 +134,6 @@ module nuwa_framework::memory {
             table_vec::push_back(&mut meta_memory.long_term, memory);
         } else {
             table_vec::push_back(&mut meta_memory.short_term, memory);
-            // Keep short term memory size under control
-            if (table_vec::length(&meta_memory.short_term) > 10) {
-                table_vec::pop_back(&mut meta_memory.short_term);
-            };
         };
         meta_memory.last_interaction = timestamp::now_milliseconds();
     }
