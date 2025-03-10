@@ -293,7 +293,7 @@ export function ChannelPage() {
     }
   };
   
-  // Update the handleSendMessage function to accept payment data
+  // Update the handleSendMessage function to properly handle payment messages
   const handleSendMessage = async (content: string, payment?: { amount: string }) => {
     if (!client || !session || !channelId || !packageId || content.trim() === '') return;
     
@@ -305,8 +305,9 @@ export function ChannelPage() {
       const hasExplicitAiMention = content.includes('@AI') || content.toLowerCase().startsWith('/ai');
       
       // In AI PEER channels, always mention the AI
-      // In AI HOME channels, only mention if explicitly asked
-      const mentionAI = isAiPeerChannel || hasExplicitAiMention || payment;
+      // In AI HOME channels, mention if explicitly asked or if payment is included
+      // Always mention AI when payment is included
+      const mentionAI = isAiPeerChannel || hasExplicitAiMention || (payment && !!payment.amount);
       
       // Prepare mentions array
       const mentions = [];
@@ -316,9 +317,10 @@ export function ChannelPage() {
       
       // Only set AI thinking state if we're actually mentioning the AI
       if (mentionAI && aiAddress) {
-        setIsAiThinking(true);
+                setIsAiThinking(true);
         setLastMessageSentByAi(false);
-        console.log('AI thinking state activated for:', agentInfo.name || 'AI Agent');
+        console.log('AI thinking state activated for:', agentInfo.name || 'AI Agent', 
+          payment ? `with payment of ${payment.amount}` : 'without payment');
       }
       
       // Clean up the content if it starts with /ai
@@ -330,7 +332,10 @@ export function ChannelPage() {
       const tx = new Transaction();
       
       // Check if this is a payment message
-      if (payment && aiAddress && payment.amount && parseInt(payment.amount) > 0) {
+      if (payment && aiAddress && payment.amount) {
+          
+        console.log(`Sending payment message with ${payment.amount} RGas`);
+        
         // Use send_message_with_coin function
         tx.callFunction({
           target: `${packageId}::channel_entry::send_message_with_coin`,
@@ -338,7 +343,7 @@ export function ChannelPage() {
             Args.objectId(channelId),
             Args.string(finalContent),
             Args.address(aiAddress), // AI address as recipient
-            Args.u256(payment.amount), // Payment amount
+            Args.u256(payment.amount), // Payment amount as raw value
           ],
           typeArgs: ['0x3::gas_coin::RGas'], // Add RGas as coin type
         });
@@ -367,11 +372,18 @@ export function ChannelPage() {
 
       // Refetch messages after sending
       refetchMessages();
-      setTimeout(() => refetchMessages(), 1000);
+      
+      // Set up multiple refetches to ensure we get the AI's response
+      const refetchTimes = [1000, 3000, 6000, 10000]; // Try at 1s, 3s, 6s, and 10s
+      refetchTimes.forEach(delay => {
+        setTimeout(() => refetchMessages(), delay);
+      });
       
     } catch (error) {
       console.error('Error sending message:', error);
       setErrorMessage('Failed to send message. Please try again.');
+      // Reset AI thinking state on error
+      setIsAiThinking(false);
     } finally {
       setIsSending(false);
     }
@@ -388,7 +400,7 @@ export function ChannelPage() {
     return () => clearTimeout(timeoutId);
   }, [isAiThinking]);
 
-  // Update the message tracking effect to work
+  // Let's also fix the message tracking effect to properly detect AI responses
   useEffect(() => {
     if (!messages || messages.length === 0 || !aiAddress) return;
     
@@ -413,34 +425,43 @@ export function ChannelPage() {
       return;
     }
     
-    // If the last message is from a user and there's a potential AI mention
+    // If the last message is from the current user
     const isFromCurrentUser = lastMessage.sender === session?.getRoochAddress().toHexAddress();
-    if (isFromCurrentUser && lastMessage.message_type === 0) { // 0 is normal message type
+    if (isFromCurrentUser) {
       const isAiPeerChannel = channel?.channel_type === 1;
       
-      // For AI_PEER channels, always consider AI mentioned
-      // For other channels, check message content or mentions field if available
-      const isAiMentioned = isAiPeerChannel || 
-        (messages.length > 0 && 
-         messages.some(msg => {
-           if (msg.id !== lastMessage.id) return false;
-           
-           // First check for mentions field if available
-           if (msg.mentions && Array.isArray(msg.mentions) && aiAddress && msg.mentions.includes(aiAddress)) {
-             return true;
-           }
-           
-           // Fallback to content check if mentions not available
-           return msg.content.includes('@AI') || msg.content.toLowerCase().startsWith('/ai');
-         }));
-      
-      // If this is the latest user message and AI was mentioned, show the typing indicator
-      if (isAiMentioned && !lastMessageSentByAi) {
-        console.log('AI thinking state activated based on user message');
+      // In AI_PEER channels, always show thinking indicator after user message
+      if (isAiPeerChannel) {
+        console.log('AI PEER channel: Setting thinking state after user message');
         setIsAiThinking(true);
+        setLastMessageSentByAi(false);
+        return;
+      }
+      
+      // In other channels, check if AI is mentioned
+      const messageContent = lastMessage.content.toLowerCase();
+      const isAiMentioned = messageContent.includes('@ai') || messageContent.startsWith('/ai');
+      
+      if (isAiMentioned) {
+        console.log('AI mentioned: Setting thinking state');
+        setIsAiThinking(true);
+        setLastMessageSentByAi(false);
       }
     }
-  }, [messages, channel?.channel_type, aiAddress, session, lastMessageSentByAi]);
+  }, [messages, channel?.channel_type, aiAddress, session]);
+
+  // Update the AI thinking timeout to use a longer duration
+  useEffect(() => {
+    if (!isAiThinking) return;
+    
+    // If AI has been "thinking" for more than 2 minutes, reset the state
+    const timeoutId = setTimeout(() => {
+      console.log('AI thinking timeout reached - resetting state');
+      setIsAiThinking(false);
+    }, 120000); // 2 minute timeout
+    
+    return () => clearTimeout(timeoutId);
+  }, [isAiThinking]);
   
   // Loading state
   if (isChannelLoading) {
