@@ -1,12 +1,19 @@
 module nuwa_framework::agent_input{
     use std::string::{Self, String};
     use moveos_std::json;
+    use moveos_std::decimal_value::{DecimalValue};
     use moveos_std::copyable_any::{Self, Any};
     
     struct AgentInput<I> has copy, drop, store {
         sender: address,
         input_description: String,
         input_data: I,
+    }
+
+    struct CoinInputInfo has copy, drop, store {
+        coin_symbol: String,
+        coin_type: String,
+        amount: DecimalValue,
     }
 
     struct AgentInputInfo has copy, drop, store {
@@ -17,6 +24,7 @@ module nuwa_framework::agent_input{
     struct AgentInputInfoV2 has copy, drop, store {
         sender: address,
         input_data: Any,
+        //TODO add input coin info
     }
 
     public fun new_agent_input<I>(
@@ -28,6 +36,18 @@ module nuwa_framework::agent_input{
             sender,
             input_description,
             input_data,
+        }
+    }
+
+    public fun new_coin_input_info(
+        coin_symbol: String,
+        coin_type: String,
+        amount: DecimalValue,
+    ): CoinInputInfo {
+        CoinInputInfo {
+            coin_symbol,
+            coin_type,
+            amount,
         }
     }
 

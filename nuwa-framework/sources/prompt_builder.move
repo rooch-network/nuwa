@@ -5,7 +5,7 @@ module nuwa_framework::prompt_builder {
     use nuwa_framework::character::{Self, Character};
     use nuwa_framework::memory::{Self, Memory, MemoryStore};
     use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
-    use nuwa_framework::agent_input::{Self, AgentInput};
+    use nuwa_framework::agent_input::{Self, AgentInput, CoinInputInfo};
     use nuwa_framework::address_utils::{address_to_string};
     use nuwa_framework::agent_state::{AgentStates};
     use nuwa_framework::agent_info::{Self, AgentInfo};
@@ -68,6 +68,7 @@ module nuwa_framework::prompt_builder {
         agent_info: AgentInfo,
         memory_store: &MemoryStore,
         input: AgentInput<D>,
+        input_coin: CoinInputInfo,
         available_actions: vector<ActionGroup>,
         agent_states: AgentStates,
     ): String {
@@ -115,7 +116,8 @@ module nuwa_framework::prompt_builder {
             InputContext { 
                 description: input_description,
                 data: input_data,
-            }
+            },
+            input_coin,
         ));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
         
@@ -175,16 +177,17 @@ module nuwa_framework::prompt_builder {
         agent_address: address,
         user: address,
         input: InputContext<D>,
+        input_coin: CoinInputInfo,
     ): String {
         // Get both self and user memories - these now directly return Memory objects
         let self_memories = memory::get_context_memories(store, agent_address);
         let user_memories = memory::get_context_memories(store, user);
         
-        format_context_info<D>(agent_address, self_memories, user, user_memories, input)
+        format_context_info<D>(agent_address, self_memories, user, user_memories, input, input_coin)
     }
 
 
-    fun format_context_info<D: drop>(agent_address: address, self_memories: vector<Memory>, user: address, user_memories: vector<Memory>, input: InputContext<D>): String {
+    fun format_context_info<D: drop>(agent_address: address, self_memories: vector<Memory>, user: address, user_memories: vector<Memory>, input: InputContext<D>, input_coin: CoinInputInfo): String {
         let result = string::utf8(b"");
         string::append(&mut result, string::utf8(b"Self-Memories (Your address: "));
         string::append(&mut result, address_to_string(agent_address));
@@ -198,6 +201,8 @@ module nuwa_framework::prompt_builder {
         string::append(&mut result, input.description);
         string::append(&mut result, string::utf8(b"\n\n"));
         string::append(&mut result, build_json_section(&input.data));
+        string::append(&mut result, string::utf8(b"\nReceived Coin:\n"));
+        string::append(&mut result, build_json_section(&input_coin));
         result
     }
 
