@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
-import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { PaperAirplaneIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { SessionKeyGuard } from '@roochnetwork/rooch-sdk-kit';
 
 interface ChatInputProps {
-  onSend: (message: string) => Promise<void>;
+  onSend: (message: string, payment?: { amount: string }) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
   value?: string;
   onChange?: (value: string) => void;
+  showPaymentOption?: boolean;
 }
 
 export function ChatInput({ 
@@ -16,10 +17,13 @@ export function ChatInput({
   placeholder = "Type a message...", 
   disabled = false,
   value,
-  onChange 
+  onChange,
+  showPaymentOption = false
 }: ChatInputProps) {
   const [localValue, setLocalValue] = useState(value || '');
   const [showWarning, setShowWarning] = useState(true);
+  const [paymentMode, setPaymentMode] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('0.1'); // Default to 0.1 RGas
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -39,10 +43,21 @@ export function ChatInput({
     const message = localValue.trim();
     if (message && !disabled) {
       try {
-        await onSend(message);
+        if (paymentMode && paymentAmount) {
+          // Convert the decimal amount to the correct integer representation
+          // RGas has 8 decimal places, so multiply by 10^8
+          const rawAmount = (parseFloat(paymentAmount) * 100000000).toString();
+          await onSend(message, { amount: rawAmount });
+        } else {
+          await onSend(message);
+        }
         // Only clear input if message was sent successfully
         if (value === undefined) {
           setLocalValue('');
+        }
+        // Reset payment mode and amount after sending
+        if (paymentMode) {
+          setPaymentMode(false);
         }
       } catch (error) {
         // Keep the input value if sending failed
@@ -51,13 +66,29 @@ export function ChatInput({
     }
   };
   
-  // New: Handle AI trigger
+  // Format the input to ensure valid decimal
+  const handlePaymentAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Allow empty string for user to clear input
+    if (value === '') {
+      setPaymentAmount('');
+      return;
+    }
+    
+    // Validate that input is a valid decimal number
+    const regex = /^\d*\.?\d{0,8}$/; // Allow up to 8 decimal places
+    if (regex.test(value)) {
+      setPaymentAmount(value);
+    }
+  };
+  
+  // Handle AI trigger
   const handleAITrigger = () => {
     const cursorPos = textareaRef.current?.selectionStart || 0;
     const textBeforeCursor = localValue.slice(0, cursorPos);
     const textAfterCursor = localValue.slice(cursorPos);
     
-    // If input is empty, add "/ai ", otherwise add "@AI " if not already present
     const newValue = localValue.trim() === '' 
       ? '/ai ' 
       : (localValue.toLowerCase().startsWith('/ai') || localValue.includes('@AI')) 
@@ -69,7 +100,6 @@ export function ChatInput({
       onChange(newValue);
     }
     
-    // Focus the input and place cursor at end
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -79,15 +109,21 @@ export function ChatInput({
     }, 0);
   };
   
+  // Handle payment toggle
+  const handleTogglePayment = () => {
+    setPaymentMode(!paymentMode);
+    if (!paymentMode && !paymentAmount) {
+      setPaymentAmount('0.1'); // Default payment amount
+    }
+  };
+  
   // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Support Ctrl+Enter or Command+Enter to send
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleSubmit();
     }
     
-    // Support Alt+A/Option+A to add AI trigger
     if ((e.altKey) && e.key === 'a') {
       e.preventDefault();
       handleAITrigger();
@@ -111,7 +147,29 @@ export function ChatInput({
         </div>
       )}
       
-      <div className="relative w-full flex justify-center">
+      <div className="relative w-full flex flex-col justify-center">
+        {paymentMode && (
+          <div className="w-full max-w-3xl mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
+            <CurrencyDollarIcon className="h-5 w-5 text-blue-500 mr-2" />
+            <span className="text-blue-700 text-sm mr-2">Payment amount:</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={paymentAmount}
+              onChange={handlePaymentAmountChange}
+              className="w-24 p-1 border border-blue-300 rounded"
+              placeholder="0.1"
+            />
+            <span className="text-blue-600 text-xs ml-2">RGas will be sent with your message</span>
+            <button
+              onClick={() => setPaymentMode(false)}
+              className="ml-auto p-1 text-blue-500 hover:text-blue-700"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+        
         <div className="relative w-full max-w-3xl">
             <textarea
               ref={textareaRef}
@@ -143,11 +201,23 @@ export function ChatInput({
                 </svg>
               </button>
               
+              {/* Payment toggle button */}
+              {showPaymentOption && (
+                <button
+                  type="button"
+                  onClick={handleTogglePayment}
+                  className={`p-2 ${paymentMode ? 'text-green-600' : 'text-gray-400'} hover:text-green-700 focus:outline-none`}
+                  title="Add payment to message"
+                >
+                  <CurrencyDollarIcon className="h-5 w-5" />
+                </button>
+              )}
+              
               {/* Send message button */}
               <SessionKeyGuard onClick={handleSubmit}>
                 <button
                   type="button"
-                  disabled={disabled || !localValue.trim()}
+                  disabled={disabled || !localValue.trim() || (paymentMode && (!paymentAmount || isNaN(parseFloat(paymentAmount))))}
                   className="p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-400 focus:outline-none"
                   title="Send message (Ctrl+Enter)"
                 >

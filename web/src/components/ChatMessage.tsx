@@ -30,9 +30,10 @@ interface ChatMessageProps {
   isAI: boolean;
   agentName?: string;
   agentId?: string;
+  hasPaidContent?: boolean; // Add this prop to your ChatMessage component
 }
 
-export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }: ChatMessageProps) {
+export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId, hasPaidContent }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const timestamp = message.timestamp;
   const isActionEvent = message.message_type === MESSAGE_TYPE_ACTION_EVENT;
@@ -247,6 +248,11 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId }
             <span>
               {formatTimestamp(timestamp)}
             </span>
+            {hasPaidContent && (
+              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                Paid Message
+              </span>
+            )}
           </div>
           <div className="relative group">
             <div

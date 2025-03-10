@@ -293,24 +293,22 @@ export function ChannelPage() {
     }
   };
   
-  // Update handleSendMessage function to define the mentions array
-  const handleSendMessage = async (content: string) => {
+  // Update the handleSendMessage function to accept payment data
+  const handleSendMessage = async (content: string, payment?: { amount: string }) => {
     if (!client || !session || !channelId || !packageId || content.trim() === '') return;
     
     try {
-      setIsSending(true); // This is for UI button disable, not for typing indicator
+      setIsSending(true);
       setErrorMessage('');
       
-      // Check if this is an AI PEER channel (always include AI in mentions)
-      // or if message contains an explicit AI mention
       const isAiPeerChannel = channel?.channel_type === 1; // CHANNEL_TYPE_AI_PEER
       const hasExplicitAiMention = content.includes('@AI') || content.toLowerCase().startsWith('/ai');
       
       // In AI PEER channels, always mention the AI
       // In AI HOME channels, only mention if explicitly asked
-      const mentionAI = isAiPeerChannel || hasExplicitAiMention;
+      const mentionAI = isAiPeerChannel || hasExplicitAiMention || payment;
       
-      // Prepare mentions array - DEFINE THIS VARIABLE HERE
+      // Prepare mentions array
       const mentions = [];
       if (mentionAI && aiAddress) {
         mentions.push(aiAddress);
@@ -326,19 +324,36 @@ export function ChannelPage() {
       // Clean up the content if it starts with /ai
       let finalContent = content;
       if (hasExplicitAiMention && content.toLowerCase().startsWith('/ai')) {
-        // Remove the /ai prefix for cleaner message display
         finalContent = content.substring(3).trim();
       }
       
       const tx = new Transaction();
-      tx.callFunction({
-        target: `${packageId}::channel_entry::send_message`,
-        args: [
-          Args.objectId(channelId), 
-          Args.string(finalContent),
-          Args.vec('address', mentions) // Pass mentions array - NOW PROPERLY DEFINED
-        ],
-      });
+      
+      // Check if this is a payment message
+      if (payment && aiAddress && payment.amount && parseInt(payment.amount) > 0) {
+        // Use send_message_with_coin function
+        tx.callFunction({
+          target: `${packageId}::channel_entry::send_message_with_coin`,
+          args: [
+            Args.objectId(channelId),
+            Args.string(finalContent),
+            Args.address(aiAddress), // AI address as recipient
+            Args.u256(payment.amount), // Payment amount
+          ],
+          typeArgs: ['0x3::gas_coin::RGas'], // Add RGas as coin type
+        });
+      } else {
+        // Use regular send_message function
+        tx.callFunction({
+          target: `${packageId}::channel_entry::send_message`,
+          args: [
+            Args.objectId(channelId), 
+            Args.string(finalContent),
+            Args.vec('address', mentions)
+          ],
+        });
+      }
+      
       tx.setMaxGas(5_00000000);
       
       const result = await client.signAndExecuteTransaction({
@@ -350,13 +365,9 @@ export function ChannelPage() {
         throw new Error('Failed to send message'+JSON.stringify(result.execution_info));
       }
 
-      // Refetch messages after sending - use multiple refreshes to ensure we get the latest data
-      // First immediate refetch
+      // Refetch messages after sending
       refetchMessages();
-
-      // Then follow-up refetches to catch any delayed updates
       setTimeout(() => refetchMessages(), 1000);
-      setTimeout(() => refetchMessages(), 3000);
       
     } catch (error) {
       console.error('Error sending message:', error);
@@ -602,6 +613,7 @@ export function ChannelPage() {
                     ? "Type your message... (Use @AI or /ai to interact with AI)" 
                     : "Type your message to the AI..."
                 }
+                showPaymentOption={isMember && isChannelActive && aiAddress !== null} // Only show payment option when AI exists
               />
             </>
           )}
