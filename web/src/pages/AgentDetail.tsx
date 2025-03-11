@@ -12,6 +12,10 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { shortenAddress } from '../utils/address';
+import { TaskSpecification, deserializeTaskSpecifications } from '../types/task';
+import { createEmptyTaskSpec } from '../utils/task';
+import { TaskSpecForm } from '../components/TaskSpecForm';
+import { TaskSpecificationEditor } from '../components/TaskSpecificationEditor';
 
 export function AgentDetail() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -33,6 +37,10 @@ export function AgentDetail() {
   const [isSaving, setIsSaving] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  
+  const [isEditingTasks, setIsEditingTasks] = useState(false);
+  const [taskSpecs, setTaskSpecs] = useState<TaskSpecification[]>([]);
+  const [isLoadingTaskSpecs, setIsLoadingTaskSpecs] = useState(true);
   
   const navigate = useNavigate();
   const packageId = useNetworkVariable('packageId');
@@ -70,7 +78,7 @@ export function AgentDetail() {
     'executeViewFunction',
     {
       target: `${packageId}::channel::get_agent_home_channel_id`,
-      args: agentId ? [Args.objectId(agentId)] : [],
+      args: [Args.objectId(agentId)],
     },
     {
       enabled: !!client && !!packageId && !!agentId,
@@ -90,6 +98,18 @@ export function AgentDetail() {
     },
     {
       enabled: !!client && !!packageId && !!wallet?.wallet,
+    }
+  );
+
+  // Query task specifications
+  const { data: taskSpecsResponse, isLoading: isTaskSpecsQueryLoading } = useRoochClientQuery(
+    'executeViewFunction',
+    {
+      target: `${packageId}::agent::get_agent_task_specs_json`,
+      args: [Args.objectId(agentId)],
+    },
+    {
+      enabled: !!client && !!packageId && !!agentId,
     }
   );
 
@@ -120,6 +140,7 @@ export function AgentDetail() {
     }
   }, [agentId, agentCapsResponse, isAgentCapsLoading]);
 
+
   // Effect to process agent data and fetch character
   useEffect(() => {
     if (isAgentLoading) {
@@ -137,19 +158,19 @@ export function AgentDetail() {
     const processAgentData = async () => {
       try {
         if (agentResponse?.data && agentResponse.data.length > 0) {
-          
-          // Get the first agent from the array
           const agentObj = agentResponse.data[0];
-          const agentData = agentObj.decoded_value.value;
+          const agentData = agentObj.decoded_value?.value;
           
-          // Get the character ID from the agent data
+          if (!agentData) {
+            throw new Error('Invalid agent data format');
+          }
+
           const characterId = agentData.character?.value?.id;
           const agentAddress = new RoochAddress(agentData.agent_address).toBech32Address();
           
-          // Create the agent object
           const processedAgent: Agent = {
             id: agentObj.id,
-            name: 'Loading...', // Will be updated when character is loaded
+            name: 'Loading...',
             agent_address: agentAddress,
             characterId: characterId,
             modelProvider: agentData.model_provider || 'Unknown',
@@ -158,10 +179,8 @@ export function AgentDetail() {
           
           setAgent(processedAgent);
           
-          // If we have a character ID, fetch the character details
           if (characterId && client) {
             try {
-              // Use queryObjectStates instead of getObject
               const characterResponse = await client.queryObjectStates({
                 filter: {
                   object_id: characterId,
@@ -169,8 +188,7 @@ export function AgentDetail() {
               });
               
               if (characterResponse?.data?.[0]?.decoded_value?.value) {
-                const characterObj = characterResponse.data[0];
-                const characterData = characterObj.decoded_value.value;
+                const characterData = characterResponse.data[0].decoded_value.value;
                 
                 const characterDetails: Character = {
                   id: characterId,
@@ -180,12 +198,9 @@ export function AgentDetail() {
                 };
                 
                 setCharacter(characterDetails);
-                
-                // Initialize edit form with current values
                 setEditName(characterDetails.name);
                 setEditDescription(characterDetails.description);
                 
-                // Update agent with character name and description
                 setAgent(prev => prev ? {
                   ...prev,
                   name: characterDetails.name,
@@ -194,7 +209,6 @@ export function AgentDetail() {
               }
             } catch (err) {
               console.error('Failed to fetch character details:', err);
-              // We don't set an error here as the agent was still loaded
             }
           }
         } else {
@@ -451,6 +465,94 @@ export function AgentDetail() {
     if (!value) {
       // Clear search results when the input is cleared
       setSearchResults([]);
+    }
+  };
+
+  // Effect to process task specifications
+  useEffect(() => {
+    console.log('taskSpecsResponse', taskSpecsResponse);
+    if (!taskSpecsResponse?.return_values?.[0]?.decoded_value) {
+      setIsLoadingTaskSpecs(false);
+      return;
+    }
+
+    
+    try {
+      const json_str = taskSpecsResponse.return_values[0].decoded_value;
+      const specs = JSON.parse(json_str)?.task_specs;
+      console.log('specs', specs);
+      setTaskSpecs(specs);
+    } catch (error) {
+      console.error('Error processing task specifications:', error);
+      setTaskSpecs([]);
+    } finally {
+      setIsLoadingTaskSpecs(false);
+    }
+  }, [taskSpecsResponse]);
+
+  // Modify handleSaveTaskSpecs function
+  const handleSaveTaskSpecs = async (newSpecs: TaskSpecification[]) => {
+    console.log('Saving task specs:', newSpecs);
+    if (!client || !packageId || !session) {
+      setUpdateError('Missing required data for update');
+      return;
+    }
+    
+    const matchingCap = agentCaps.find(cap => cap.agentId === agentId);
+    
+    if (!matchingCap) {
+      setUpdateError('You do not have the required authorization to update this agent');
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      setUpdateError(null);
+      setUpdateSuccess(false);
+
+      // Convert TaskSpecification[] to Move format JSON
+      const moveFormatSpecs = {
+        task_specs: newSpecs.map(spec => ({
+          name: spec.name,
+          description: spec.description,
+          arguments: spec.arguments.map(arg => ({
+            name: arg.name,
+            type_desc: arg.type_desc,
+            description: arg.description,
+            required: arg.required,
+          })),
+          resolver: spec.resolver,
+          on_chain: spec.on_chain,
+          price: spec.price,
+        }))
+      };
+
+      const tx = new Transaction();
+      tx.callFunction({
+        target: `${packageId}::agent::update_agent_task_specs_entry`,
+        args: [
+          Args.objectId(matchingCap.id), 
+          Args.string(JSON.stringify(moveFormatSpecs))
+        ],
+      });
+            
+      const result = await client.signAndExecuteTransaction({
+        transaction: tx,
+        signer: session,
+      });
+      
+      if (result.execution_info.status.type !== 'executed') {
+        throw new Error('Failed to update task specifications'+ JSON.stringify(result.execution_info));
+      }
+      
+      setUpdateSuccess(true);
+      setIsEditingTasks(false);
+      refetchAgent();
+    } catch (error: any) {
+      console.error('Error updating task specifications:', error);
+      setUpdateError(error.message || 'Failed to update task specifications');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -791,6 +893,80 @@ export function AgentDetail() {
                         </>
                       ) : (
                         <span className="text-gray-500">No home channel found</span>
+                      )}
+                    </dd>
+                  </div>
+
+                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500 flex items-center">
+                      Task Specifications
+                      {isUserAuthorized && !isEditingTasks && (
+                        <SessionKeyGuard onClick={() => setIsEditingTasks(true)}>
+                          <button className="ml-2 text-xs text-blue-600 hover:text-blue-800">
+                            ✎ Edit
+                          </button>
+                        </SessionKeyGuard>
+                      )}
+                    </dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      {isLoadingTaskSpecs ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin mr-2 h-4 w-4 border-t-2 border-blue-500 border-r-2 rounded-full"></div>
+                          <span className="text-gray-500">Loading task specifications...</span>
+                        </div>
+                      ) : isEditingTasks ? (
+                        <TaskSpecificationEditor
+                          taskSpecs={taskSpecs}
+                          onSave={handleSaveTaskSpecs}
+                          onCancel={() => setIsEditingTasks(false)}
+                        />
+                      ) : taskSpecs.length === 0 ? (
+                        <p className="text-gray-500">No task specifications available</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {taskSpecs.map((task, index) => (
+                            <div key={index} className="border rounded-lg p-4 bg-white">
+                              <h4 className="font-medium text-gray-900">{task.name}</h4>
+                              <p className="text-gray-600 mt-1">{task.description}</p>
+                              
+                              {/* Price and Chain Type */}
+                              <div className="flex gap-2 mt-2">
+                                <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-full">
+                                  {task.price} RGas
+                                </span>
+                                <span className="px-2 py-1 bg-gray-50 text-gray-700 text-xs rounded-full">
+                                  {task.on_chain ? 'On-chain' : 'Off-chain'}
+                                </span>
+                              </div>
+                              
+                              {/* Arguments */}
+                              {task.arguments.length > 0 && (
+                                <div className="mt-3">
+                                  <h5 className="text-sm font-medium text-gray-700">Arguments:</h5>
+                                  <div className="mt-2 space-y-2">
+                                    {task.arguments.map((arg, argIndex) => (
+                                      <div key={argIndex} className="flex items-start space-x-2 text-sm">
+                                        <span className="font-mono text-gray-600">{arg.name}</span>
+                                        <span className="text-gray-400">|</span>
+                                        <span className="text-gray-600">{arg.type_desc}</span>
+                                        {arg.required && (
+                                          <span className="text-red-500 text-xs">*required</span>
+                                        )}
+                                        <span className="text-gray-500">{arg.description}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Resolver */}
+                              <div className="mt-2 text-sm">
+                                <span className="text-gray-500">Resolver: </span>
+                                <code className="font-mono text-gray-700">{shortenAddress(task.resolver)}</code>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </dd>
                   </div>

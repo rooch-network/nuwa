@@ -46,7 +46,7 @@ export function ChatInput({
         if (paymentMode && paymentAmount) {
           // Convert the decimal amount to the correct integer representation
           // RGas has 8 decimal places, so multiply by 10^8
-          const rawAmount = (parseFloat(paymentAmount) * 100000000).toString();
+          const rawAmount = (parseFloat(paymentAmount) * 100000000).toFixed(0);
           await onSend(message, { amount: rawAmount });
         } else {
           await onSend(message);
