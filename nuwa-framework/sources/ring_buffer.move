@@ -5,6 +5,7 @@ module nuwa_framework::ring_buffer {
 
     const ErrorEmptyBuffer: u64 = 1;
     const ErrorZeroCapacity: u64 = 2;
+    const ErrorInvalidIndex: u64 = 3;
 
     /// A ring buffer implementation that reuses the underlying vector
     /// when it reaches its capacity.
@@ -134,6 +135,44 @@ module nuwa_framework::ring_buffer {
         ring_buffer.tail = 0;
     }
 
+    /// Returns a vector containing all elements in the ring buffer in FIFO order.
+    /// The ring buffer remains unchanged.
+    public fun to_vector<E: copy + drop>(ring_buffer: &RingBuffer<E>): vector<E> {
+        let result = vector::empty();
+        if (is_empty(ring_buffer)) {
+            return result
+        };
+        
+        let count = 0;
+        let current = ring_buffer.head;
+        
+        while (count < ring_buffer.size) {
+            vector::push_back(&mut result, *vector::borrow(&ring_buffer.buffer, current));
+            current = if (current + 1 == ring_buffer.capacity) {
+                0
+            } else {
+                current + 1
+            };
+            count = count + 1;
+        };
+        
+        result
+    }
+
+    /// Get a reference to the element at the specified index.
+    /// Index 0 refers to the oldest element (head), and index size-1 refers to the newest element.
+    /// Aborts if the index is out of bounds.
+    public fun get<E: copy + drop>(ring_buffer: &RingBuffer<E>, index: u64): &E {
+        assert!(index < ring_buffer.size, ErrorInvalidIndex);
+        let actual_index = if (ring_buffer.head + index >= ring_buffer.capacity) {
+            // Wrap around if we exceed capacity
+            ring_buffer.head + index - ring_buffer.capacity
+        } else {
+            ring_buffer.head + index
+        };
+        vector::borrow(&ring_buffer.buffer, actual_index)
+    }
+
     #[test]
     fun test_new_ring_buffer() {
         let buffer = new<u64>(5, 0);
@@ -187,9 +226,9 @@ module nuwa_framework::ring_buffer {
         assert!(size(&buffer) == 0, 0);
         assert!(is_empty(&buffer), 0);
         
-        // // Pop from empty buffer
-        // popped = pop(&mut buffer);
-        // assert!(option::is_none(&popped), 0);
+        // Pop from empty buffer
+        popped = pop(&mut buffer);
+        assert!(option::is_none(&popped), 0);
     }
 
     #[test]
@@ -347,5 +386,79 @@ module nuwa_framework::ring_buffer {
         assert!(option::extract(&mut popped) == 70, 0);
         
         assert!(is_empty(&buffer), 0);
+    }
+
+    #[test]
+    fun test_to_vector() {
+        let buffer = new<u64>(3, 0);
+        
+        // Test empty buffer
+        let elements = to_vector(&buffer);
+        assert!(vector::is_empty(&elements), 0);
+        
+        // Test partially filled buffer
+        push(&mut buffer, 10);
+        push(&mut buffer, 20);
+        elements = to_vector(&buffer);
+        assert!(vector::length(&elements) == 2, 0);
+        assert!(*vector::borrow(&elements, 0) == 10, 0);
+        assert!(*vector::borrow(&elements, 1) == 20, 0);
+        
+        // Test full buffer
+        push(&mut buffer, 30);
+        elements = to_vector(&buffer);
+        assert!(vector::length(&elements) == 3, 0);
+        assert!(*vector::borrow(&elements, 0) == 10, 0);
+        assert!(*vector::borrow(&elements, 1) == 20, 0);
+        assert!(*vector::borrow(&elements, 2) == 30, 0);
+        
+        // Test after wraparound
+        push(&mut buffer, 40);
+        elements = to_vector(&buffer);
+        assert!(vector::length(&elements) == 3, 0);
+        assert!(*vector::borrow(&elements, 0) == 20, 0);
+        assert!(*vector::borrow(&elements, 1) == 30, 0);
+        assert!(*vector::borrow(&elements, 2) == 40, 0);
+    }
+
+    #[test]
+    fun test_get() {
+        let buffer = new<u64>(3, 0);
+        
+        // Push some elements
+        push(&mut buffer, 10);
+        push(&mut buffer, 20);
+        push(&mut buffer, 30);
+        
+        // Test accessing elements by index
+        let item = get(&buffer, 0);
+        assert!(*item == 10, 0); // oldest element
+        
+        item = get(&buffer, 1);
+        assert!(*item == 20, 0); // middle element
+        
+        item = get(&buffer, 2);
+        assert!(*item == 30, 0); // newest element
+        
+        // Test after wraparound
+        push(&mut buffer, 40);
+        
+        item = get(&buffer, 0);
+        assert!(*item == 20, 0); // oldest element after wraparound
+        
+        item = get(&buffer, 1);
+        assert!(*item == 30, 0); // middle element after wraparound
+        
+        item = get(&buffer, 2);
+        assert!(*item == 40, 0); // newest element after wraparound
+    }
+
+    #[test]
+    #[expected_failure(abort_code = ErrorInvalidIndex)]
+    fun test_get_out_of_bounds() {
+        let buffer = new<u64>(3, 0);
+        push(&mut buffer, 10);
+        // This should abort with ErrorInvalidIndex
+        let _ = get(&buffer, 1);
     }
 }
