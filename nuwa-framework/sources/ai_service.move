@@ -1,7 +1,7 @@
 module nuwa_framework::ai_service {
     use std::string;
     use std::vector;
-    use std::option;
+    use std::option::{Self, Option};
     use std::signer;
     use std::u256;
     use moveos_std::object::ObjectID;
@@ -19,7 +19,7 @@ module nuwa_framework::ai_service {
     friend nuwa_framework::agent_runner;
 
     const ORACLE_ADDRESS: address = @0x694cbe655b126e9e6a997e86aaab39e538abf30a8c78669ce23a98740b47b65d;
-    const NOTIFY_CALLBACK: vector<u8> = b"ai_callback::process_response";
+    const NOTIFY_CALLBACK: vector<u8> = b"ai_callback::process_response_v2";
     /// Default gas allocation for notification callbacks 0.6 RGas
     const DEFAULT_NOTIFICATION_GAS: u256 = 200000000;
     const DEFAULT_ORACLE_FEE: u256 = 3200000000;
@@ -122,6 +122,8 @@ module nuwa_framework::ai_service {
             assert!(gas_balance >= pay_mee, ErrorInsufficientBalance);
             oracles::deposit_to_escrow(from, pay_mee);
         };
+
+        oracles::update_notification_gas_allocation(from, @nuwa_framework, string::utf8(NOTIFY_CALLBACK), DEFAULT_NOTIFICATION_GAS);
         
         let request_id = oracles::new_request(
             http_request, 
@@ -137,7 +139,7 @@ module nuwa_framework::ai_service {
             agent_obj_id,
             agent_input_info,
         });
-        oracles::update_notification_gas_allocation(from, @nuwa_framework, string::utf8(NOTIFY_CALLBACK), DEFAULT_NOTIFICATION_GAS);
+        
     }
 
     public fun get_pending_requests(): vector<PendingRequest> {
@@ -165,6 +167,20 @@ module nuwa_framework::ai_service {
 
     public fun unpack_pending_request_v3(request: PendingRequestV3): (ObjectID, ObjectID, AgentInputInfoV2) {
         (request.request_id, request.agent_obj_id, request.agent_input_info)
+    }
+
+    public fun take_pending_request_by_id(request_id: ObjectID): Option<PendingRequestV3> {
+        //TODO use a key-value store to optimize the lookup
+        let requests = account::borrow_mut_resource<RequestsV3>(@nuwa_framework);
+        let i = 0;
+        let len = vector::length(&requests.pending);
+        while (i < len) {
+            if (vector::borrow(&requests.pending, i).request_id == request_id) {
+                return option::some(vector::remove(&mut requests.pending, i))
+            };
+            i = i + 1;
+        };
+        option::none()
     }
 
     public(friend) fun remove_request(request_id: ObjectID) {
