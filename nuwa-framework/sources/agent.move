@@ -243,6 +243,10 @@ module nuwa_framework::agent {
         update_agent_character(cap, new_name, new_description);
     }
 
+    public fun get_agent_task_specs_json(agent_obj: &Object<Agent>): String {
+        let task_specs = get_agent_task_specs(agent_obj);
+        task_spec::task_specs_to_json(&task_specs)
+    }
 
     public fun get_agent_task_specs(agent_obj: &Object<Agent>): TaskSpecifications {
         if (object::contains_field(agent_obj, TASK_SPEC_PROPERTY_NAME)) {

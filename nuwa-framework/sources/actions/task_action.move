@@ -3,7 +3,6 @@ module nuwa_framework::task_action {
     use std::option;
     use moveos_std::object::{Object};
     use moveos_std::result::{ok, err_str, Result};
-    use nuwa_framework::string_utils;
     use nuwa_framework::task;
     use nuwa_framework::task_spec;
     use nuwa_framework::agent::{Self, Agent};
@@ -15,7 +14,7 @@ module nuwa_framework::task_action {
     const TASK_ACTION_NAMESPACE: vector<u8> = b"task";
     
     public(friend) fun execute(agent: &mut Object<Agent>, agent_input: &AgentInputInfoV2, action_name: String, args_json: String) :Result<bool, String> {
-        let task_name = string_utils::strip_prefix(action_name, &TASK_ACTION_NAMESPACE);
+        let task_name = action_name;
         let agent_address = agent::get_agent_address(agent);
         let response_channel_id = response_action::get_default_channel_id_from_input(agent_input);
         let task_spec = agent::get_agent_task_spec(agent, task_name);

@@ -236,8 +236,9 @@ module nuwa_framework::task_spec{
         if (vector::length(&task_specs.task_specs) == 0) {
             return string::utf8(b"")
         };
-        let prompt = string::utf8(b"You can perform the following tasks, the task is same as the action, but it executed async:\n");
-        string::append(&mut prompt, string::utf8(b"The price is the user need to pay for the task. The price is in the unit of RGas.\n"));
+        let prompt = string::utf8(b"You can perform the following tasks, the task is a specific type of action, it will be executed async:\n");
+        string::append(&mut prompt, string::utf8(b"You can call the task same as the action.\n"));
+        string::append(&mut prompt, string::utf8(b"The task price is the price of the task, in the unit of RGas.\n"));
         let task_spec_json = build_json_section(task_specs);
         string::append(&mut prompt, task_spec_json);
         prompt
