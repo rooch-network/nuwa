@@ -1,5 +1,6 @@
 module nuwa_framework::agent {
     use std::string::{Self, String};
+    use std::option::{Option};
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::account::{Self, Account};
     use moveos_std::signer;
@@ -10,11 +11,13 @@ module nuwa_framework::agent {
     use nuwa_framework::agent_input::{AgentInput};
     use nuwa_framework::agent_state::{AgentStates};
     use nuwa_framework::agent_info;
-
+    use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
     friend nuwa_framework::memory_action;
     friend nuwa_framework::transfer_action;
     friend nuwa_framework::action_dispatcher;
     friend nuwa_framework::agent_runner;
+
+    const TASK_SPEC_PROPERTY_NAME: vector<u8> = b"task_specs";
 
     const ErrorDeprecatedFunction: u64 = 1;
 
@@ -238,6 +241,39 @@ module nuwa_framework::agent {
         new_description: String,
     ) {
         update_agent_character(cap, new_name, new_description);
+    }
+
+
+    public fun get_agent_task_specs(agent_obj: &Object<Agent>): TaskSpecifications {
+        if (object::contains_field(agent_obj, TASK_SPEC_PROPERTY_NAME)) {
+            let task_specs = *object::borrow_field(agent_obj, TASK_SPEC_PROPERTY_NAME);
+            task_specs
+        } else {
+            task_spec::empty_task_specifications()
+        }
+    }
+
+    public fun get_agent_task_spec(agent_obj: &Object<Agent>, task_name: String): Option<TaskSpecification> {
+        let task_specs = get_agent_task_specs(agent_obj);
+        task_spec::get_task_spec_by_name(&task_specs, task_name)
+    }
+
+    public fun update_agent_task_specs(
+        cap: &mut Object<AgentCap>,
+        task_specs: TaskSpecifications,
+    ) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(cap);
+        let agent_obj = borrow_mut_agent(agent_obj_id);
+        task_spec::validate_task_specifications(&task_specs);
+        object::upsert_field(agent_obj, TASK_SPEC_PROPERTY_NAME, task_specs);
+    }
+
+    public entry fun update_agent_task_specs_entry(
+        cap: &mut Object<AgentCap>,
+        task_specs_json: String,
+    ) {
+        let task_specs = task_spec::task_specs_from_json(task_specs_json);
+        update_agent_task_specs(cap, task_specs);
     }
 
 

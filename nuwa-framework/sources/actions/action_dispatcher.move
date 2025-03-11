@@ -7,6 +7,7 @@ module nuwa_framework::action_dispatcher {
     use nuwa_framework::memory_action;
     use nuwa_framework::response_action;
     use nuwa_framework::transfer_action;
+    use nuwa_framework::task_action;
     use nuwa_framework::agent::Agent;
     use nuwa_framework::string_utils;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
@@ -119,6 +120,8 @@ module nuwa_framework::action_dispatcher {
             response_action::execute_v3(agent, agent_input, *action_name, *args)
         } else if (string_utils::starts_with(action_name, &b"transfer::")) {
             transfer_action::execute_v3(agent, agent_input, *action_name, *args)
+        } else if (string_utils::starts_with(action_name, &b"task::")) {
+            task_action::execute(agent, agent_input, *action_name, *args)
         } else {
             err_str(b"Unsupported action")
         };

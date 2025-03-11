@@ -14,6 +14,7 @@ module nuwa_framework::response_action {
     use nuwa_framework::message::{Self, MessageInputV3};
 
     friend nuwa_framework::action_dispatcher;
+    friend nuwa_framework::task_action;
 
     // Action names
     const ACTION_NAME_CHANNEL_MESSAGE: vector<u8> = b"response::channel_message";

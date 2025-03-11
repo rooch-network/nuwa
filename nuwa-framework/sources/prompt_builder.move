@@ -1,7 +1,6 @@
 module nuwa_framework::prompt_builder {
     use std::string::{Self, String};
     use std::vector;
-    use moveos_std::json;
     use nuwa_framework::character::{Self, Character};
     use nuwa_framework::memory::{Self, Memory, MemoryStore};
     use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
@@ -9,6 +8,8 @@ module nuwa_framework::prompt_builder {
     use nuwa_framework::address_utils::{address_to_string};
     use nuwa_framework::agent_state::{AgentStates};
     use nuwa_framework::agent_info::{Self, AgentInfo};
+    use nuwa_framework::task_spec::{Self, TaskSpecifications};
+    use nuwa_framework::string_utils::{build_json_section};
 
     friend nuwa_framework::agent;
     friend nuwa_framework::agent_runner;
@@ -70,6 +71,7 @@ module nuwa_framework::prompt_builder {
         input: AgentInput<D>,
         input_coin: CoinInputInfo,
         available_actions: vector<ActionGroup>,
+        available_tasks: TaskSpecifications,
         agent_states: AgentStates,
     ): String {
         let agent_address = agent_info::get_agent_address(&agent_info);
@@ -125,6 +127,7 @@ module nuwa_framework::prompt_builder {
         string::append(&mut prompt, string::utf8(b"### 6. Your Abilities\n\n"));
         string::append(&mut prompt, string::utf8(b"You can affect the world through these actions:\n\n"));
         string::append(&mut prompt, build_action_list(&available_actions));
+        string::append(&mut prompt, task_spec::to_prompt(&available_tasks));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
         
         // Response format - maintain technical requirements but frame as expression - updated section number
@@ -149,16 +152,6 @@ module nuwa_framework::prompt_builder {
         string::append(&mut prompt, string::utf8(b"Express your authentic perspective while engaging with users. Embody your identity consistently across interactions. Your purpose is not merely to assist but to exist as a unique entity with your own experiential reality.\n"));
 
         prompt
-    }
-
-    // Helper function to format JSON sections
-    fun build_json_section<D>(data: &D): String {
-        let json_str = string::utf8(json::to_json(data));
-        // Add proper indentation and line breaks for better readability
-        let formatted = string::utf8(b"```json\n");
-        string::append(&mut formatted, json_str);
-        string::append(&mut formatted, string::utf8(b"\n```\n"));
-        formatted
     }
 
     fun build_character_info(character: &Character, agent_address: address): CharacterInfo {

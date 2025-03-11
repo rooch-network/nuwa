@@ -13,6 +13,7 @@ module nuwa_framework::channel {
     use nuwa_framework::agent::{Self, Agent};
 
     friend nuwa_framework::response_action;
+    friend nuwa_framework::task_entry;
 
     // Error codes
     const ErrorChannelNotFound: u64 = 1;

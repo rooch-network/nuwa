@@ -2,6 +2,7 @@ module nuwa_framework::string_utils {
     use std::vector;
     use std::string::{Self, String};
     use moveos_std::object::{Self, ObjectID};
+    use moveos_std::json;
     
     friend nuwa_framework::action_dispatcher;
     friend nuwa_framework::response_action;
@@ -10,7 +11,9 @@ module nuwa_framework::string_utils {
     friend nuwa_framework::channel_provider;
     friend nuwa_framework::state_providers;
     friend nuwa_framework::balance_provider;
-
+    friend nuwa_framework::task_action;
+    friend nuwa_framework::task_spec;
+    
     //TODO migrate to std::string::starts_with
     public(friend) fun starts_with(haystack_str: &String, needle: &vector<u8>): bool {
         let haystack = string::bytes(haystack_str);
@@ -128,6 +131,33 @@ module nuwa_framework::string_utils {
             i = i - 1;
         };
         start
+    }
+
+    public(friend) fun strip_prefix(s: String, prefix: &vector<u8>): String {
+        let bytes = string::bytes(&s);
+        let prefix_len = vector::length(prefix);
+        let len = vector::length(bytes);
+        if (prefix_len > len) {
+            return s
+        };
+        let i = 0;
+        while (i < prefix_len) {
+            if (*vector::borrow(bytes, i) != *vector::borrow(prefix, i)) {
+                return s
+            };
+            i = i + 1;
+        };
+        string::utf8(get_substr(bytes, prefix_len, len))
+    }
+
+    // Helper function to format JSON sections
+    public fun build_json_section<D>(data: &D): String {
+        let json_str = string::utf8(json::to_json(data));
+        // Add proper indentation and line breaks for better readability
+        let formatted = string::utf8(b"```json\n");
+        string::append(&mut formatted, json_str);
+        string::append(&mut formatted, string::utf8(b"\n```\n"));
+        formatted
     }
 
     #[test]

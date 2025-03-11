@@ -37,12 +37,14 @@ module nuwa_framework::agent_runner {
         let available_actions = get_available_actions(&input);
         let agent_info = agent::get_agent_info_v2(agent);
         let memory_store = agent::borrow_memory_store(agent);
+        let task_specs = agent::get_agent_task_specs(agent);
         prompt_builder::build_complete_prompt_v3(
             agent_info,
             memory_store,
             input,
             input_coin,
             available_actions,
+            task_specs,
             states,
         )
     }
