@@ -1,31 +1,59 @@
-# Rooch Task Handler
+# Webpage Summary Task Example
 
-A Python-based task handler for processing Rooch tasks.
+This is a web page summary task agent example based on the Rooch Nuwa framework, demonstrating how to build an AI-driven off-chain task processor. The agent can automatically fetch web content and generate multilingual summaries.
+
+## Features
+
+- Multi-language summary generation (English, Chinese, Japanese, Korean, Spanish, French, German)
+- Automatic monitoring and processing of on-chain task requests
+- High-quality summaries using OpenAI GPT models
+- Built-in security checks to prevent internal network access
+- Debug mode for single task testing
 
 ## Environment Setup
 
-1. Create a Python virtual environment (Python 3.11+ recommended):
+### Prerequisites
+
+- Python 3.11+
+- Rooch CLI tool
+- OpenAI API key
+- Playwright (for web content scraping)
+
+### Python Environment Setup
+
+1. Create Python virtual environment:
 ```bash
 python3 -m venv venv
 ```
 
-2. Activate the virtual environment:
+2. Activate virtual environment:
 ```bash
-# On macOS/Linux
+# macOS/Linux
 source venv/bin/activate
 
-# On Windows
+# Windows
 .\venv\Scripts\activate
 ```
 
-## Dependencies Installation
+### Dependencies Installation
 
-Install Python packages:
+1. Install Python packages:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Init rooch CLI
+2. Install Playwright:
+```bash
+pip install playwright
+playwright install
+```
+
+Main dependencies include:
+- browser-use: Browser automation and AI control
+- langchain-openai: LLM integration
+- openai: Content processing
+
+### Rooch CLI Initialization
 
 ```bash
 rooch init
@@ -33,7 +61,11 @@ rooch env switch --alias test
 rooch account list
 ```
 
-## Create a AI Agent and Add task specific config
+## Configuration
+
+### AI Agent Configuration
+
+Create AI Agent and add task configuration:
 
 ```json
 [
@@ -56,74 +88,76 @@ rooch account list
     ],
     "resolver": "Your local rooch account address",
     "on_chain": false,
-    "price": "10"
+    "price": "0"
   }
 ]
 ```
 
-## Configuration
+### Program Configuration
 
-Create a `config.json` file in the same directory:
+Create `config.json` file:
 
 ```json
 {
     "package_id": "0xb5ee31dafd362db98685b17aaf3fb8b20f36746cd0b34a4086fbdf39f13a1c3b",
     "agent_address": "YOUR_AGENT_ADDRESS",
-    "poll_interval": 1,
-    "debug": true,
-    "openai_api_key": "your-api-key",
-    "model_name": "gpt-4o"
+    "openai_api_key": "YOUR_OPENAI_API_KEY",
+    "model_name": "gpt-4o",
+    "poll_interval": 10,
+    "debug": false
 }
 ```
 
-## Requirements
-
-- Python 3.11+
-- Rooch CLI installed and configured
-- OpenAI API key (for content processing)
-
-## Dependencies
-
-Main dependencies include:
-- browser-use: For browser automation and AI control (uses Playwright internally)
-- langchain-openai: For LLM integration
-- openai: For content processing
-- tiktoken: For token counting
-- readability-lxml: For webpage content extraction
-- html2text: For HTML to text conversion
-
-For a complete list of dependencies, see `requirements.txt`.
-
 ## Usage
 
-1. Make sure your virtual environment is activated:
-```bash
-source venv/bin/activate  # On macOS/Linux
-```
+### Debug Mode
 
-2. Run the task handler:
+For testing single URL summary generation:
 
-Normal mode (monitors tasks from blockchain):
-```bash
-python main.py
-```
-
-Debug mode (manual task testing):
 ```bash
 python main.py --debug
 ```
 
-In debug mode, you can:
-- Select task type from available options
-- Input task parameters manually
-- See task execution results directly in the console
-- Test tasks without blockchain interaction
+The program will prompt for:
+- URL: The webpage to summarize
+- Language: Output summary language (default is English)
 
-## Features
+### Normal Mode
 
-- Monitors pending tasks for specified AI agent
-- Supports task lifecycle management (start, resolve, fail)
-- Configurable polling interval
-- Debug mode for command logging and manual task testing
-- Browser automation for web content processing
-- LLM integration for content analysis
+Run as a task processing agent:
+
+```bash
+python main.py
+```
+
+The agent will automatically monitor and process on-chain task requests.
+
+
+## Task Processing Flow
+
+1. Monitor on-chain tasks
+2. Validate URL security
+3. Fetch webpage content
+4. Generate AI summary
+5. Submit results back to chain
+
+## Development Extension
+
+This example demonstrates how to:
+
+1. Build an off-chain task processor
+2. Integrate AI capabilities
+3. Handle on-chain state
+4. Implement security checks
+5. Manage asynchronous resources
+
+You can use this example as a base to develop other types of AI agent task processors.
+
+
+## Contributing
+
+Issues and Pull Requests are welcome to improve this example.
+
+## License
+
+Apache License 2.0 

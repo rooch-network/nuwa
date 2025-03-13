@@ -1,0 +1,8 @@
+{
+    "package_id": "0xb5ee31dafd362db98685b17aaf3fb8b20f36746cd0b34a4086fbdf39f13a1c3b",
+    "openai_api_key": "sk-proj-",
+    "agent_address": "Your local rooch account address",
+    "poll_interval": 10,
+    "debug": true,
+    "model_name": "gpt-4o"
+}
