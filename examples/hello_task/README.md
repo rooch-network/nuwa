@@ -25,6 +25,42 @@ Install Python packages:
 pip install -r requirements.txt
 ```
 
+## Init rooch CLI
+
+```bash
+rooch init
+rooch env switch --alias test
+rooch account list
+```
+
+## Create a AI Agent and Add task specific config
+
+```json
+[
+  {
+    "name": "task::webpage_summary",
+    "description": "Get a summary of a URL",
+    "arguments": [
+      {
+        "name": "url",
+        "type_desc": "string",
+        "description": "The URL to summarize",
+        "required": true
+      },
+      {
+        "name": "lang",
+        "type_desc": "string",
+        "description": "The language to output summary in: en,zh,ja,ko,es,fr,de",
+        "required": true
+      }
+    ],
+    "resolver": "Your local rooch account address",
+    "on_chain": false,
+    "price": "10"
+  }
+]
+```
+
 ## Configuration
 
 Create a `config.json` file in the same directory:
@@ -36,7 +72,7 @@ Create a `config.json` file in the same directory:
     "poll_interval": 1,
     "debug": true,
     "openai_api_key": "your-api-key",
-    "model_name": "gpt-4"
+    "model_name": "gpt-4o"
 }
 ```
 
