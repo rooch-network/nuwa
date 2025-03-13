@@ -174,8 +174,8 @@ class TaskHandler:
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             
             # Print raw output in debug mode
-            if self.config.get('debug', False):
-                print(result.stdout)
+            # if self.config.get('debug', False):
+            #     print(result.stdout)
             
             # If command output contains JSON data
             if result.stdout and '{' in result.stdout:
@@ -218,20 +218,25 @@ class TaskHandler:
                     decoded_value = obj.get('decoded_value', {})
                     if decoded_value.get('type', '').endswith('::task::Task'):
                         task_data = decoded_value.get('value', {})
-                        if task_data.get('status') == 0:
+                        status = task_data.get('status')
+                        if status == 0 or status == 1:
+                            task_id = obj['id']
                             # Parse task name and arguments
                             task_name = task_data.get('name', '')
                             
+                            if self.config.get('debug', False):
+                                print(f"Find Task {task_id} is pending")
+
                             # Parse arguments
                             arguments = task_data.get('arguments', '{}')
                             
-                            pending_tasks.append({
-                                'task_id': obj['id'],
+                            pending_tasks.append({    
+                                'task_id': task_id,
                                 'name': task_name,
                                 'args': arguments,
                                 'resolver': task_data.get('resolver', ''),
                                 'creator': task_data.get('response_channel_id', ''),
-                                'status': task_data.get('status', 0)
+                                'status': status
                             })
             
             return pending_tasks
@@ -311,8 +316,9 @@ class TaskHandler:
             
             if task_id:
                 # Mark task start in non-debug mode
-                start_message = f"Processing webpage: {url}"
-                self.start_task(task_id, start_message)
+                if task.get('status') == 0:
+                    start_message = f"Processing webpage: {url}"
+                    self.start_task(task_id, start_message)
             
             try:
                 # Create a new agent for this specific task

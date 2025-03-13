@@ -115,7 +115,7 @@ Create `config.json` file:
 For testing single URL summary generation:
 
 ```bash
-python main.py --debug
+python3 main.py --debug
 ```
 
 The program will prompt for:
@@ -127,7 +127,7 @@ The program will prompt for:
 Run as a task processing agent:
 
 ```bash
-python main.py
+python3 main.py
 ```
 
 The agent will automatically monitor and process on-chain task requests.
