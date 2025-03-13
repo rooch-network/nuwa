@@ -6,7 +6,10 @@ import time
 import asyncio
 import os
 import signal
-from typing import List, Optional, Dict
+import ipaddress
+from urllib.parse import urlparse
+import socket
+from typing import List, Optional, Dict, Tuple
 from browser_use import Agent, Browser, BrowserConfig
 from langchain_openai import ChatOpenAI
 from openai import AsyncOpenAI
@@ -16,6 +19,47 @@ import sys
 # Global variables for cleanup
 browser = None
 shutdown_event = None
+
+class SecurityError(Exception):
+    """Exception raised for security-related issues."""
+    pass
+
+def is_private_ip(ip_str: str) -> bool:
+    """Check if an IP address is private."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except ValueError:
+        return False
+
+def is_url_safe(url: str) -> Tuple[bool, str]:
+    """
+    Check if a URL is safe to visit.
+    Returns a tuple of (is_safe, reason).
+    """
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme in ['http', 'https']:
+            return False, "Only HTTP and HTTPS protocols are allowed"
+        
+        if not parsed.netloc:
+            return False, "Invalid URL format"
+            
+        # Get IP addresses for the hostname
+        try:
+            ip_addresses = [addr[4][0] for addr in socket.getaddrinfo(parsed.hostname, None)]
+        except socket.gaierror:
+            return False, f"Could not resolve hostname: {parsed.hostname}"
+            
+        # Check each IP address
+        for ip in ip_addresses:
+            if is_private_ip(ip):
+                return False, f"Access to internal network addresses is not allowed: {ip}"
+                
+        return True, "URL is safe"
+        
+    except Exception as e:
+        return False, f"URL validation error: {str(e)}"
 
 async def cleanup():
     """Cleanup resources before exit"""
@@ -254,6 +298,16 @@ class TaskHandler:
             args = json.loads(task['args'])
             url = args['url']
             lang = args.get('lang', 'en')  # Default to English if not specified
+            
+            # Check URL safety
+            is_safe, reason = is_url_safe(url)
+            if not is_safe:
+                error_message = f"Security Error: {reason}"
+                if task_id:
+                    self.fail_task(task_id, error_message)
+                else:
+                    print(f"\nError: {error_message}")
+                raise SecurityError(error_message)
             
             if task_id:
                 # Mark task start in non-debug mode
