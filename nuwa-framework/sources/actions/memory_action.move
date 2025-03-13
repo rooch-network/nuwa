@@ -79,6 +79,7 @@ module nuwa_framework::memory_action {
     struct UpdateMemoryArgs has copy, drop {
         target: address,     // Target address
         index: u64,          // Memory index
+        //TODO rename new_content to content new_context to context
         new_content: String, // New memory content
         new_context: String, // New context tag (optional)
         is_long_term: bool,  // Whether this is a long-term memory
