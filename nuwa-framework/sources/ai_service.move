@@ -192,7 +192,11 @@ module nuwa_framework::ai_service {
         (request.request_id, request.agent_obj_id, request.agent_input_info)
     }
 
-    public fun take_pending_request_by_id(request_id: ObjectID): Option<PendingRequestV4> {
+    public fun take_pending_request_by_id(_request_id: ObjectID): Option<PendingRequestV3> {
+        abort 0
+    }
+
+    public(friend) fun take_pending_request_by_id_v2(request_id: ObjectID): Option<PendingRequestV4> {
         //TODO use a key-value store to optimize the lookup
         let requests = account::borrow_mut_resource<RequestsV4>(@nuwa_framework);
         let i = 0;

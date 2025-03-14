@@ -92,7 +92,7 @@ module nuwa_framework::ai_callback {
     }
 
     public entry fun process_response_v2(request_id: ObjectID) {
-        let pending_request = ai_service::take_pending_request_by_id(request_id);
+        let pending_request = ai_service::take_pending_request_by_id_v2(request_id);
         if(option::is_some(&pending_request)){
             let pending_request = option::destroy_some(pending_request);
             let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request_v4(pending_request);
