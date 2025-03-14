@@ -2,7 +2,6 @@ import { ReactNode } from 'react';
 import { ConnectButton } from '@roochnetwork/rooch-sdk-kit';
 import { ErrorGuard } from '../ErrorGuard';
 import { Link } from 'react-router-dom';
-import { OracleBalance } from './OracleBalance';
 
 interface LayoutProps {
   children: ReactNode;
@@ -53,7 +52,6 @@ export function Layout({ children, showRoomList = false }: LayoutProps) {
         </main>
       </div>
       
-      <OracleBalance />
     </div>
   );
 }

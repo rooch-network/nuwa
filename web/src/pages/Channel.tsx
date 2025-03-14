@@ -609,6 +609,9 @@ export function ChannelPage() {
                           <div className="mt-2 text-xs text-gray-500">
                             Example: "/ai Tell me more about blockchain technology?" or "Hey @AI, how's the weather today?"
                           </div>
+                          <div className="mt-2 text-xs bg-yellow-50 p-2 rounded border border-yellow-100 text-yellow-700">
+                            <span className="font-medium">Note:</span> Each AI interaction requires a base fee of 5 RGas. You can also add extra tips to prioritize your request.
+                          </div>
                         </>
                       ) : (
                         // AI PEER instruction
@@ -618,6 +621,9 @@ export function ChannelPage() {
                           </p>
                           <div className="mt-2 text-xs text-gray-500">
                             You can simply type your message and send it - no need to use @AI or /ai in this channel.
+                          </div>
+                          <div className="mt-2 text-xs bg-yellow-50 p-2 rounded border border-yellow-100 text-yellow-700">
+                            <span className="font-medium">Note:</span> Each message requires a base fee of 5 RGas. You can also add extra tips to prioritize your request.
                           </div>
                         </>
                       )}
