@@ -35,7 +35,8 @@ module nuwa_framework::channel {
 
     // Channel type constants with built-in visibility
     const CHANNEL_TYPE_AI_HOME: u8 = 0;   // AI's home channel, always public
-    const CHANNEL_TYPE_AI_PEER: u8 = 1;   // 1:1 AI-User channel, always private
+    const CHANNEL_TYPE_AI_PEER: u8 = 1;   // 1:1 AI-User channel, other users cannot join
+    const CHANNEL_TYPE_TOPIC: u8 = 2;     // Topic channel, other users can join
 
     // Public functions to expose channel types
     public fun channel_type_ai_home(): u8 { CHANNEL_TYPE_AI_HOME }
@@ -148,6 +149,41 @@ module nuwa_framework::channel {
         agent: &mut Object<Agent>,
     ) {
         let _id = create_ai_peer_channel(user_account, agent);
+    }
+
+    public fun create_topic_channel(
+        user_account: &signer,
+        agent: &mut Object<Agent>,
+        parent_channel_obj: &mut Object<Channel>,
+        topic: String,
+    ): ObjectID {
+        //TODO validate topic
+        let agent_address = agent::get_agent_address(agent);
+        let user_address = signer::address_of(user_account);
+        //Only parent channel members can create topic channel
+        assert!(is_channel_member(parent_channel_obj, user_address), ErrorNotMember);
+        let parent_channel = object::borrow_mut(parent_channel_obj);
+        //Only AI_HOME channel can create topic channel
+        assert!(parent_channel.channel_type == CHANNEL_TYPE_AI_HOME, ErrorInvalidChannelType);
+        let now = timestamp::now_milliseconds();
+        //TODO maybe we need to add parent_channel_id to topic channel
+        let channel = Channel {
+            title: topic,
+            creator: agent_address,
+            members: table::new(),
+            messages: table::new(),
+            message_counter: 0,
+            created_at: now,
+            last_active: now,
+            status: CHANNEL_STATUS_ACTIVE,
+            channel_type: CHANNEL_TYPE_TOPIC,
+        };
+        add_member_internal(&mut channel, user_address, now);
+        add_member_internal(&mut channel, agent_address, now);
+        let channel_obj = object::new(channel);
+        let channel_id = object::id(&channel_obj);
+        object::to_shared(channel_obj);
+        channel_id
     }
 
     public fun get_ai_peer_channel_id(agent: &Object<Agent>, user_address: address): Option<ObjectID> {

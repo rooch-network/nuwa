@@ -105,6 +105,7 @@ module nuwa_framework::agent {
         object::borrow_mut_object_shared(agent_obj_id)
     }
 
+    //TODO check if this function have security issue for public access
     public fun borrow_mut_agent_by_address(agent_addr: address): &mut Object<Agent> {
         let agent_obj_id = object::account_named_object_id<Agent>(agent_addr);
         object::borrow_mut_object_shared(agent_obj_id)
