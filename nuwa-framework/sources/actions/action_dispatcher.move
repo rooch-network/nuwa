@@ -91,6 +91,7 @@ module nuwa_framework::action_dispatcher {
         abort 0
     }
 
+    //TODO return result
     public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
         let action_response = parse_line_based_response(&response);
         let actions = action_response.actions;
@@ -194,6 +195,7 @@ module nuwa_framework::action_dispatcher {
     }
 
     /// Parse a line-based response string into an ActionResponse
+    //TODO handle no line break case
     public fun parse_line_based_response(response: &String): ActionResponse {
         let actions = vector::empty<ActionCall>();
         let lines = string_utils::split(response, &string::utf8(b"\n"));
