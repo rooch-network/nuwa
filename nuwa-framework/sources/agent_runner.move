@@ -19,6 +19,8 @@ module nuwa_framework::agent_runner {
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action_dispatcher;
     use nuwa_framework::state_providers;
+    use nuwa_framework::task_spec::{Self, TaskSpecifications};
+    use nuwa_framework::agent_cap::{AgentCap};
 
     friend nuwa_framework::channel_entry;
 
@@ -40,12 +42,14 @@ module nuwa_framework::agent_runner {
     public fun generate_system_prompt_v3(
         agent: &Object<Agent>,
         agent_input_info: AgentInputInfo,
+        app_task_specs: TaskSpecifications,
     ): String {
         let states = state_providers::get_agent_state(agent);
         let available_actions = get_available_actions();
         let agent_info = agent::get_agent_info_v2(agent);
         let memory_store = agent::borrow_memory_store(agent);
         let task_specs = agent::get_agent_task_specs(agent);
+        task_spec::merge_task_specifications(&mut task_specs, app_task_specs);
         prompt_builder::build_complete_prompt_internal(
             agent_info,
             memory_store,
@@ -75,10 +79,10 @@ module nuwa_framework::agent_runner {
     }
 
     public(friend) fun process_input_internal<I: copy + drop + store>(
-        caller: &signer,
         agent_obj: &mut Object<Agent>,
         input: AgentInput<I>,
         fee: Coin<RGas>,
+        app_task_specs: TaskSpecifications,
     ) {
         //keep a fee argument for future usage.
         
@@ -103,6 +107,7 @@ module nuwa_framework::agent_runner {
         let system_prompt = generate_system_prompt_v3(
             agent_obj,
             input_info,
+            app_task_specs,
         );
 
         // Create chat messages
@@ -117,10 +122,23 @@ module nuwa_framework::agent_runner {
             messages,
         );
 
+        //Use the agent signer to call the AI service
+        let agent_signer = agent::create_agent_signer(agent_obj);
         // Call AI service
-        ai_service::request_ai(caller, agent_id, input_info, chat_request);
+        ai_service::request_ai(&agent_signer, agent_id, input_info, chat_request);
 
         agent::update_last_active_timestamp(agent_obj);
+    }
+
+    public fun process_input_by_cap<I: copy + drop + store>(
+        agent_obj: &mut Object<Agent>,
+        input: AgentInput<I>,
+        fee: Coin<RGas>,
+        app_task_specs: TaskSpecifications,
+        _agent_cap: &mut Object<AgentCap>,
+    ) {
+        
+        process_input_internal(agent_obj, input, fee, app_task_specs);
     }
 
     fun get_available_actions(): vector<ActionGroup> {

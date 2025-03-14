@@ -46,6 +46,10 @@ module nuwa_framework::task_spec{
         }
     }
 
+    public fun merge_task_specifications(first: &mut TaskSpecifications, second: TaskSpecifications) {
+        vector::append(&mut first.task_specs, second.task_specs);
+    }
+
     public fun new_task_spec(name: String, description: String, arguments: vector<TaskArgument>, resolver: address, on_chain: bool, price: DecimalValue): TaskSpecification {
         TaskSpecification {
             name,

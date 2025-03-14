@@ -10,6 +10,7 @@ module nuwa_framework::channel_entry {
     use nuwa_framework::channel::{Self, Channel};
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
+    use nuwa_framework::task_spec;
 
     const ErrorInvalidCoinType: u64 = 1;
     const ErrorInvalidToAddress: u64 = 2;
@@ -58,13 +59,14 @@ module nuwa_framework::channel_entry {
         call_agent(caller, channel_obj, to, coin);
     }
 
-    fun call_agent(caller: &signer, channel_obj: &mut Object<Channel>, ai_addr: address, fee: Coin<RGas>) {
+    fun call_agent(_caller: &signer, channel_obj: &mut Object<Channel>, ai_addr: address, fee: Coin<RGas>) {
         //TODO make the number of messages to fetch configurable
         let message_limit: u64 = 11;
         let messages = channel::get_last_messages(channel_obj, message_limit);
         
         let message_input = message::new_agent_input_v4(messages);
         let agent = agent::borrow_mut_agent_by_address(ai_addr);
-        agent_runner::process_input_internal(caller, agent, message_input, fee);
+        let app_task_specs = task_spec::empty_task_specifications();
+        agent_runner::process_input_internal(agent, message_input, fee, app_task_specs);
     }
 }

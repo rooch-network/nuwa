@@ -13,7 +13,8 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::channel;
     use nuwa_framework::message;
     use nuwa_framework::agent_input_info;
-
+    use nuwa_framework::task_spec;
+    
     #[test]
     fun test_prompt_builder() {
         rooch_framework::genesis::init_for_test();
@@ -65,8 +66,10 @@ module nuwa_framework::agent_tests {
         std::debug::print(&agent_input);
         
         let agent_input_info = agent_input_v2::into_agent_input_info(agent_input, coin_input);
+        
+        let app_task_specs = task_spec::empty_task_specifications();
         // Get first prompt
-        let prompt = agent_runner::generate_system_prompt_v3(agent, agent_input_info);
+        let prompt = agent_runner::generate_system_prompt_v3(agent, agent_input_info, app_task_specs);
 
         // Print first prompt for debugging
         debug::print(&string::utf8(b"First Prompt:"));

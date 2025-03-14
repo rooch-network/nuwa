@@ -18,6 +18,7 @@ module nuwa_framework::agent_cap {
         agent_obj_id: ObjectID,
     }
 
+    //TODO Remove this cap
     /// A cap for managing the memory of an agent.
     struct MemoryCap has store, key {
         agent_obj_id: ObjectID,
@@ -44,15 +45,6 @@ module nuwa_framework::agent_cap {
         object::new(cap)
     }
 
-    public(friend) fun new_memory_cap(agent_obj_id: ObjectID, create: bool, remove: bool, update: bool) : Object<MemoryCap> {
-        let cap = MemoryCap {
-            agent_obj_id,
-            create,
-            remove,
-            update,
-        };
-        object::new(cap)
-    }
 
     public(friend) fun destroy_agent_cap(cap: Object<AgentCap>) {
         let agent_cap = object::remove(cap);
@@ -60,10 +52,8 @@ module nuwa_framework::agent_cap {
         event::emit(AgentCapDestroyedEvent { agent_obj_id });
     }
 
-    public entry fun destroy_memory_cap(cap: Object<MemoryCap>) {
-        let memory_cap = object::remove(cap);
-        let MemoryCap { agent_obj_id, create, remove, update } = memory_cap;
-        event::emit(MemoryCapDestroyedEvent { agent_obj_id, create, remove, update });
+    public entry fun destroy_memory_cap(_cap: Object<MemoryCap>) {
+        abort 0
     }
 
     public fun borrow_mut_agent_cap(caller: &signer, agent_obj_id: ObjectID) : &mut Object<AgentCap> {
@@ -71,27 +61,20 @@ module nuwa_framework::agent_cap {
         object::borrow_mut_object<AgentCap>(caller, agent_obj_id)
     }
 
-    public fun check_agent_cap(cap: &mut Object<AgentCap>) : ObjectID {
-        let cap = object::borrow(cap);
-        cap.agent_obj_id
+    public fun check_agent_cap(_cap: &mut Object<AgentCap>) : ObjectID {
+        abort 0
     }
 
-    public fun check_memory_create_cap(cap: &mut Object<MemoryCap>) : ObjectID {
-        let cap = object::borrow(cap);
-        assert!(cap.create, ErrorCallerHasNoMemoryCreateCap);
-        cap.agent_obj_id
+    public fun check_memory_create_cap(_cap: &mut Object<MemoryCap>) : ObjectID {
+        abort 0
     }
 
-    public fun check_memory_remove_cap(cap: &mut Object<MemoryCap>) : ObjectID {
-        let cap = object::borrow(cap);
-        assert!(cap.remove, ErrorCallerHasNoMemoryDeleteCap);
-        cap.agent_obj_id
+    public fun check_memory_remove_cap(_cap: &mut Object<MemoryCap>) : ObjectID {
+        abort 0
     }
 
-    public fun check_memory_update_cap(cap: &mut Object<MemoryCap>) : ObjectID {
-        let cap = object::borrow(cap);
-        assert!(cap.update, ErrorCallerHasNoMemoryUpdateCap);
-        cap.agent_obj_id
+    public fun check_memory_update_cap(_cap: &mut Object<MemoryCap>) : ObjectID {
+        abort 0
     }
 
     public fun get_agent_obj_id(cap: &Object<AgentCap>) : ObjectID {
@@ -104,9 +87,5 @@ module nuwa_framework::agent_cap {
         new_agent_cap(agent_obj_id)
     }
 
-    #[test_only]
-    public fun issue_memory_cap_for_test(agent_obj_id: ObjectID, create: bool, remove: bool, update: bool) : Object<MemoryCap> {
-        new_memory_cap(agent_obj_id, create, remove, update)
-    }
 
 }
