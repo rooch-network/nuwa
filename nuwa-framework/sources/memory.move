@@ -248,21 +248,28 @@ module nuwa_framework::memory {
         } else {
             &mut meta_memory.short_term
         };
-
-        assert!(table_vec::length(memories) > index, ErrorMemoryNotFound);
-        let memory = table_vec::borrow_mut(memories, index);
-        
-        // Update content
-        memory.content = new_content;
-        // Update context if provided
-        if (option::is_some(&new_context)) {
-            memory.context = option::destroy_some(new_context);
-        };
-        // Update timestamp
-        memory.timestamp = timestamp::now_milliseconds();
-        
-        // Update last interaction time
-        meta_memory.last_interaction = timestamp::now_milliseconds();
+        if (table_vec::length(memories) <= index) {
+            let context = if (option::is_some(&new_context)) {
+                option::destroy_some(new_context)
+            } else {
+                string::utf8(b"unknown")
+            };
+            add_memory(store, user, new_content, context, is_long_term);
+        }else{
+            let memory = table_vec::borrow_mut(memories, index);
+            
+            // Update content
+            memory.content = new_content;
+            // Update context if provided
+            if (option::is_some(&new_context)) {
+                memory.context = option::destroy_some(new_context);
+            };
+            // Update timestamp
+            memory.timestamp = timestamp::now_milliseconds();
+            
+            // Update last interaction time
+            meta_memory.last_interaction = timestamp::now_milliseconds();
+        }
     }
 
     /// Find memory index by content and context
