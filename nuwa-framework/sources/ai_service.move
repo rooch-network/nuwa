@@ -99,6 +99,13 @@ module nuwa_framework::ai_service {
         });
     }
 
+    entry fun init_v4() {
+        let signer = moveos_std::signer::module_signer<RequestsV4>();
+        account::move_resource_to(&signer, RequestsV4 { 
+            pending: vector::empty() 
+        });
+    }
+
     public(friend) fun request_ai(
         from: &signer,
         agent_obj_id: ObjectID,

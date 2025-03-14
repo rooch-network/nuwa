@@ -116,7 +116,6 @@ module nuwa_framework::agent_runner {
             input_info,
             app_task_specs,
         );
-
         // Create chat messages
         let messages = vector::empty();
         
@@ -128,9 +127,8 @@ module nuwa_framework::agent_runner {
             model_provider,
             messages,
         );
-
         //Use the agent signer to call the AI service
-        let agent_signer = agent::create_agent_signer(agent_obj);
+        let agent_signer = agent::create_agent_signer(agent_obj);  
         // Call AI service
         let result = ai_service::request_ai(&agent_signer, agent_id, input_info, chat_request);
 
@@ -145,7 +143,6 @@ module nuwa_framework::agent_runner {
         app_task_specs: TaskSpecifications,
         _agent_cap: &mut Object<AgentCap>,
     ) : Result<ObjectID, String> {
-        
         process_input_internal(agent_obj, input, fee, app_task_specs)
     }
 

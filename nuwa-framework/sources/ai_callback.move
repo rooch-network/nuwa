@@ -25,12 +25,12 @@ module nuwa_framework::ai_callback {
     }
 
     public fun need_to_process_request(): bool {
-        let pending_requests = ai_service::get_pending_requests_v3();
+        let pending_requests = ai_service::get_pending_requests_v4();
         let len = vector::length(&pending_requests);
         let i = 0;
         while (i < len) {
             let pending_request = vector::borrow(&pending_requests, i);
-            let (request_id, _agent_id, _agent_input_info) = ai_service::unpack_pending_request_v3(*pending_request);
+            let (request_id, _agent_id, _agent_input_info) = ai_service::unpack_pending_request_v4(*pending_request);
             let response_status = oracles::get_response_status(&request_id);
             if (response_status != 0) {
                 return true
