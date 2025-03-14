@@ -3,19 +3,16 @@ module nuwa_framework::agent_tests {
     use std::debug;
     use std::string;
     use std::vector;
-    use moveos_std::type_info;
-    use moveos_std::decimal_value;
-    use rooch_framework::coin;
     use rooch_framework::gas_coin::RGas;
     use nuwa_framework::character;
     use nuwa_framework::action;
     use nuwa_framework::action_dispatcher;
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
-    use nuwa_framework::agent_input;
+    use nuwa_framework::agent_input_v2;
     use nuwa_framework::channel;
     use nuwa_framework::message;
-
+    use nuwa_framework::agent_input_info;
 
     #[test]
     fun test_prompt_builder() {
@@ -62,21 +59,14 @@ module nuwa_framework::agent_tests {
             vector::empty()
         );
         
-        
-        let agent_input = message::new_agent_input_v3(vector[test_message], false);
+        let coin_input = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000u256);
+
+        let agent_input = message::new_agent_input_v4(vector[test_message]);
         std::debug::print(&agent_input);
         
-        let coin_type = type_info::type_name<RGas>();
-        let coin_symbol = coin::symbol_by_type<RGas>();
-        let decimals = coin::decimals_by_type<RGas>();
-        
-        let coin_input = agent_input::new_coin_input_info(
-            coin_type,
-            coin_symbol,
-            decimal_value::new(1000000000, decimals)
-        );
+        let agent_input_info = agent_input_v2::into_agent_input_info(agent_input, coin_input);
         // Get first prompt
-        let prompt = agent_runner::generate_system_prompt_v2(agent, agent_input, coin_input);
+        let prompt = agent_runner::generate_system_prompt_v3(agent, agent_input_info);
 
         // Print first prompt for debugging
         debug::print(&string::utf8(b"First Prompt:"));

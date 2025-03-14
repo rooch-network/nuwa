@@ -11,7 +11,8 @@ module nuwa_framework::agent_runner {
     use rooch_framework::account_coin_store;
 
     use nuwa_framework::action::ActionGroup;
-    use nuwa_framework::agent_input::{Self, AgentInput, CoinInputInfo};
+    use nuwa_framework::agent_input_v2::{Self, AgentInput};
+    use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
     use nuwa_framework::ai_request;
     use nuwa_framework::ai_service;
     use nuwa_framework::prompt_builder;
@@ -19,30 +20,36 @@ module nuwa_framework::agent_runner {
     use nuwa_framework::action_dispatcher;
     use nuwa_framework::state_providers;
 
+    friend nuwa_framework::channel_entry;
 
     public fun generate_system_prompt<I: copy + drop>(
         _agent: &Object<Agent>,
-        _input: AgentInput<I>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
     ): String {
         abort 0
     }
 
     public fun generate_system_prompt_v2<I: copy + drop>(
+        _agent: &Object<Agent>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
+        _input_coin: nuwa_framework::agent_input::CoinInputInfo,
+    ): String {
+        abort 0
+    }
+
+    public fun generate_system_prompt_v3(
         agent: &Object<Agent>,
-        input: AgentInput<I>,
-        input_coin: CoinInputInfo,
+        agent_input_info: AgentInputInfo,
     ): String {
         let states = state_providers::get_agent_state(agent);
-        std::debug::print(&states);
-        let available_actions = get_available_actions(&input);
+        let available_actions = get_available_actions();
         let agent_info = agent::get_agent_info_v2(agent);
         let memory_store = agent::borrow_memory_store(agent);
         let task_specs = agent::get_agent_task_specs(agent);
-        prompt_builder::build_complete_prompt_v3(
+        prompt_builder::build_complete_prompt_internal(
             agent_info,
             memory_store,
-            input,
-            input_coin,
+            agent_input_info,
             available_actions,
             task_specs,
             states,
@@ -52,13 +59,22 @@ module nuwa_framework::agent_runner {
     public fun process_input<I: copy + drop>(
         _caller: &signer,
         _agent_obj: &mut Object<Agent>,
-        _input: AgentInput<I>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
         _fee: Coin<RGas>,
     ) {
        abort 0
     }
 
     public fun process_input_v2<I: copy + drop + store>(
+        _caller: &signer,
+        _agent_obj: &mut Object<Agent>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
+        _fee: Coin<RGas>,
+    ) {
+        abort 0
+    }
+
+    public(friend) fun process_input_internal<I: copy + drop + store>(
         caller: &signer,
         agent_obj: &mut Object<Agent>,
         input: AgentInput<I>,
@@ -68,8 +84,7 @@ module nuwa_framework::agent_runner {
         
         let agent_id = object::id(agent_obj);
         let model_provider = *agent::get_agent_model_provider(agent_obj);
-        
-        let input_info = agent_input::to_agent_input_info_v2(input);
+         
         
         let coin_type = type_info::type_name<RGas>();
         let coin_symbol = coin::symbol_by_type<RGas>();
@@ -77,16 +92,17 @@ module nuwa_framework::agent_runner {
         let amount = coin::value(&fee);
         let agent_addr = agent::get_agent_address(agent_obj);
         account_coin_store::deposit<RGas>(agent_addr, fee);
-        let coin_input_info = agent_input::new_coin_input_info(
+        let coin_input_info = agent_input_info::new_coin_input_info(
             coin_symbol,
             coin_type,
             decimal_value::new(amount, decimals),
         );
+
+        let input_info = agent_input_v2::into_agent_input_info(input, coin_input_info);
         // Generate system prompt with context
-        let system_prompt = generate_system_prompt_v2(
+        let system_prompt = generate_system_prompt_v3(
             agent_obj,
-            input,
-            coin_input_info,
+            input_info,
         );
 
         // Create chat messages
@@ -107,7 +123,7 @@ module nuwa_framework::agent_runner {
         agent::update_last_active_timestamp(agent_obj);
     }
 
-    fun get_available_actions<I: drop>(_input: &AgentInput<I>): vector<ActionGroup> {
+    fun get_available_actions(): vector<ActionGroup> {
         action_dispatcher::get_action_groups()
     }
 }

@@ -5,13 +5,11 @@ module nuwa_framework::response_action {
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::json;
     use moveos_std::result::{ok,err_str, Result};
-    use moveos_std::copyable_any;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action;
     use nuwa_framework::channel;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
-    use nuwa_framework::agent_input::{Self, AgentInputInfoV2};
-    use nuwa_framework::message::{Self, MessageInputV3};
+    use nuwa_framework::agent_input_info::{AgentInputInfo};
 
     friend nuwa_framework::action_dispatcher;
     friend nuwa_framework::task_action;
@@ -181,8 +179,12 @@ module nuwa_framework::response_action {
         abort 0
     }
 
+    public fun execute_v3(_agent: &mut Object<Agent>, _agent_input: &nuwa_framework::agent_input::AgentInputInfoV2, _action_name: String, _args_json: String) : Result<bool, String> {
+        abort 0
+    }
+
     /// Execute a response action
-    public fun execute_v3(agent: &mut Object<Agent>, _agent_input: &AgentInputInfoV2, action_name: String, args_json: String) : Result<bool, String> {
+    public(friend) fun execute_internal(agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, action_name: String, args_json: String) : Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_CHANNEL_MESSAGE)) {
             // Handle channel message action
             let args_opt = json::from_json_option<ChannelMessageArgsV2>(string::into_bytes(args_json));
@@ -217,14 +219,7 @@ module nuwa_framework::response_action {
     /// Send a direct message to a specific user
     fun send_direct_message(agent: &mut Object<Agent>, recipient: address, content: String) : ObjectID {
         channel::send_ai_direct_message(agent, recipient, content)
-    }
-
-    public(friend) fun get_default_channel_id_from_input(agent_input: &AgentInputInfoV2): ObjectID {
-        let message_input_any = *agent_input::get_input_data_from_info_v2(agent_input);
-        //TODO add a try unpack function
-        let message_input = copyable_any::unpack<MessageInputV3>(message_input_any);
-        message::get_channel_id_from_input(&message_input)
-    }
+    } 
 
     public(friend) fun send_event_to_channel(agent: &mut Object<Agent>, channel_id: ObjectID, event: String) {
         let channel = object::borrow_mut_object_shared<channel::Channel>(channel_id);

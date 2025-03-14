@@ -8,7 +8,6 @@ module nuwa_framework::agent {
     use nuwa_framework::character::{Self, Character};
     use nuwa_framework::agent_cap::{Self, AgentCap};
     use nuwa_framework::memory::{Self, MemoryStore};
-    use nuwa_framework::agent_input::{AgentInput};
     use nuwa_framework::agent_state::{AgentStates};
     use nuwa_framework::agent_info;
     use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
@@ -71,7 +70,7 @@ module nuwa_framework::agent {
     /// Generate system prompt based on Character attributes
     public fun generate_system_prompt<I: copy + drop>(
         _agent: &Agent,
-        _input: AgentInput<I>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
     ): String {
         abort ErrorDeprecatedFunction
     }
@@ -79,7 +78,7 @@ module nuwa_framework::agent {
     public fun generate_system_prompt_v2<I: copy + drop>(
         _agent: &Agent,
         _states: AgentStates,
-        _input: AgentInput<I>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
     ): String {
         abort ErrorDeprecatedFunction
     }
@@ -87,7 +86,7 @@ module nuwa_framework::agent {
     public fun process_input<I: copy + drop>(
         _caller: &signer,
         _agent_obj: &mut Object<Agent>,
-        _input: AgentInput<I>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
     ) {
         abort ErrorDeprecatedFunction
     }
@@ -96,7 +95,7 @@ module nuwa_framework::agent {
         _caller: &signer,
         _agent_obj: &mut Object<Agent>,
         _states: AgentStates,
-        _input: AgentInput<I>,
+        _input: nuwa_framework::agent_input::AgentInput<I>,
     ) {
         abort ErrorDeprecatedFunction
     }

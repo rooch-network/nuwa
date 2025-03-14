@@ -59,13 +59,12 @@ module nuwa_framework::channel_entry {
     }
 
     fun call_agent(caller: &signer, channel_obj: &mut Object<Channel>, ai_addr: address, fee: Coin<RGas>) {
-        let is_direct_channel = channel::get_channel_type(channel_obj) == channel::channel_type_ai_peer();
         //TODO make the number of messages to fetch configurable
         let message_limit: u64 = 11;
         let messages = channel::get_last_messages(channel_obj, message_limit);
         
-        let message_input = message::new_agent_input_v3(messages, is_direct_channel);
+        let message_input = message::new_agent_input_v4(messages);
         let agent = agent::borrow_mut_agent_by_address(ai_addr);
-        agent_runner::process_input_v2(caller, agent, message_input, fee);
+        agent_runner::process_input_internal(caller, agent, message_input, fee);
     }
 }

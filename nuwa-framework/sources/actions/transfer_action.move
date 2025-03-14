@@ -11,7 +11,9 @@ module nuwa_framework::transfer_action {
     use rooch_framework::account_coin_store;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
-    use nuwa_framework::agent_input::{AgentInputInfoV2};
+    use nuwa_framework::agent_input_info::{AgentInputInfo};
+
+    friend nuwa_framework::action_dispatcher;
 
     // Action names
     const ACTION_NAME_TRANSFER: vector<u8> = b"transfer::coin";
@@ -87,8 +89,12 @@ module nuwa_framework::transfer_action {
         abort 0
     }
 
+    public fun execute_v3(_agent: &mut Object<Agent>, _agent_input: &nuwa_framework::agent_input::AgentInputInfoV2, _action_name: String, _args_json: String) :Result<bool, String> {
+        abort 0
+    }
+
     /// Execute a transfer action
-    public fun execute_v3(agent: &mut Object<Agent>, _agent_input: &AgentInputInfoV2, action_name: String, args_json: String) :Result<bool, String> {
+    public(friend) fun execute_internal(agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, action_name: String, args_json: String) :Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_TRANSFER)) {
             let args_opt = json::from_json_option<TransferActionArgs>(string::into_bytes(args_json));
             if (option::is_none(&args_opt)) {

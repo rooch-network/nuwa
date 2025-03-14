@@ -6,17 +6,16 @@ module nuwa_framework::task_action {
     use nuwa_framework::task;
     use nuwa_framework::task_spec;
     use nuwa_framework::agent::{Self, Agent};
-    use nuwa_framework::response_action;
-    use nuwa_framework::agent_input::{AgentInputInfoV2};
+    use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
 
     friend nuwa_framework::action_dispatcher;
     
     const TASK_ACTION_NAMESPACE: vector<u8> = b"task";
     
-    public(friend) fun execute(agent: &mut Object<Agent>, agent_input: &AgentInputInfoV2, action_name: String, args_json: String) :Result<bool, String> {
+    public(friend) fun execute_internal(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_name: String, args_json: String) :Result<bool, String> {
         let task_name = action_name;
         let agent_address = agent::get_agent_address(agent);
-        let response_channel_id = response_action::get_default_channel_id_from_input(agent_input);
+        let response_channel_id = agent_input_info::get_response_channel_id(agent_input);
         let task_spec = agent::get_agent_task_spec(agent, task_name);
         if (option::is_none(&task_spec)) {
             return err_str(b"Task not found")

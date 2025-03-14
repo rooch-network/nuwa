@@ -10,7 +10,9 @@ module nuwa_framework::memory_action {
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::memory;
     use nuwa_framework::action::{Self, ActionGroup};
-    use nuwa_framework::agent_input::{Self, AgentInputInfo, AgentInputInfoV2};
+    use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
+
+    friend nuwa_framework::action_dispatcher;
 
     /// Memory action names using more intuitive namespacing
     const ACTION_NAME_REMEMBER_SELF: vector<u8> = b"memory::remember_self";
@@ -384,12 +386,16 @@ module nuwa_framework::memory_action {
         //TODO deprecated, remove this
     }
 
-    public fun execute_v2(_agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, _action_name: String, _args_json: String) {
+    public fun execute_v2(_agent: &mut Object<Agent>, _agent_input: &nuwa_framework::agent_input::AgentInputInfo, _action_name: String, _args_json: String) {
+        abort 0
+    }
+
+    public fun execute_v3(_agent: &mut Object<Agent>, _agent_input: &nuwa_framework::agent_input::AgentInputInfoV2, _action_name: String, _args_json: String) :Result<bool, String> {
         abort 0
     }
 
     /// Execute memory actions
-    public fun execute_v3(agent: &mut Object<Agent>, agent_input: &AgentInputInfoV2, action_name: String, args_json: String) :Result<bool, String> {
+    public(friend) fun execute_internal(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_name: String, args_json: String) :Result<bool, String> {
         let agent_address = agent::get_agent_address(agent);
         let store = agent::borrow_mut_memory_store(agent);
         
@@ -410,7 +416,7 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for remember_user action")
             };
             let args = option::destroy_some(args_opt);
-            let current_user = agent_input::get_sender_from_info_v2(agent_input);
+            let current_user = agent_input_info::get_sender(agent_input);
             memory::add_memory(store, current_user, args.content, args.context, args.is_long_term);
             ok(true)
         }
@@ -438,7 +444,7 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for update_user action")
             };
             let args = option::destroy_some(args_opt);
-            let current_user = agent_input::get_sender_from_info_v2(agent_input);
+            let current_user = agent_input_info::get_sender(agent_input);
             memory::update_memory(
                 store,
                 current_user,
@@ -470,33 +476,45 @@ module nuwa_framework::memory_action {
         }
     }
 
+    #[test_only]
+    struct TestInput has copy, drop, store{
+
+    }
+
     #[test]
     fun test_memory_actions() {
         use std::vector;
         use nuwa_framework::agent;
-        use nuwa_framework::agent_input;
+        use nuwa_framework::agent_input_info;
         use nuwa_framework::memory;
         use moveos_std::result;
+        use moveos_std::object;
 
+        rooch_framework::genesis::init_for_test();
         nuwa_framework::character_registry::init_for_test();
         action::init_for_test();
         
         let (agent_obj, cap) = agent::create_test_agent();
         let agent_address = agent::get_agent_address(agent_obj);
         let test_addr = @0x42;
+
+        let response_channel_id = object::derive_object_id_for_test();
     
-        let agent_input_info = agent_input::new_agent_input_info_for_test(
+        let agent_input_info = agent_input_info::new_agent_input_info_for_test(
             test_addr,
-            string::utf8(b"{}")
+            response_channel_id,
+            string::utf8(b"Test input"),
+            TestInput{},
+            1000000000000000000u256
         );
         
         // Test remember_self action
         let remember_self_json = string::utf8(b"{\"content\":\"I enjoy helping with technical explanations\",\"context\":\"personal\",\"is_long_term\":true}");
-        execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
+        execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
 
         // Test remember_user action
         let remember_user_json = string::utf8(b"{\"content\":\"User likes detailed explanations\",\"context\":\"preference\",\"is_long_term\":true}");
-        execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
+        execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
         
         let store = agent::borrow_memory_store(agent_obj);
        
@@ -513,11 +531,11 @@ module nuwa_framework::memory_action {
         
         // Test update_self action
         let update_self_json = string::utf8(b"{\"index\":0,\"new_content\":\"I find I'm most effective when providing code examples\",\"new_context\":\"personal\",\"is_long_term\":true}");
-        let result = execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_SELF), update_self_json);
+        let result = execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_SELF), update_self_json);
         assert!(result::is_ok(&result), 5);
         // Test update_user action
         let update_user_json = string::utf8(b"{\"index\":0,\"new_content\":\"User now prefers concise explanations\",\"new_context\":\"preference\",\"is_long_term\":true}");
-        let result = execute_v3(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_USER), update_user_json);
+        let result = execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_UPDATE_USER), update_user_json);
         assert!(result::is_ok(&result), 6);
         
         store = agent::borrow_memory_store(agent_obj);

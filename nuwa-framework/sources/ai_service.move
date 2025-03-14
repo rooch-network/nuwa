@@ -12,7 +12,7 @@ module nuwa_framework::ai_service {
     use rooch_framework::gas_coin::RGas;
 
     use nuwa_framework::ai_request::{Self, ChatRequest};
-    use nuwa_framework::agent_input::{AgentInputInfo, AgentInputInfoV2};
+    use nuwa_framework::agent_input_info::{AgentInputInfo};
 
     friend nuwa_framework::ai_callback;
     friend nuwa_framework::agent;
@@ -45,13 +45,19 @@ module nuwa_framework::ai_service {
     struct PendingRequestV2 has copy, drop, store {
         request_id: ObjectID,
         agent_obj_id: ObjectID,
-        agent_input_info: AgentInputInfo,
+        agent_input_info: nuwa_framework::agent_input::AgentInputInfo,
     }
 
     struct PendingRequestV3 has copy, drop, store {
         request_id: ObjectID,
         agent_obj_id: ObjectID,
-        agent_input_info: AgentInputInfoV2,
+        agent_input_info: nuwa_framework::agent_input::AgentInputInfoV2,
+    }
+
+    struct PendingRequestV4 has copy, drop, store {
+        request_id: ObjectID,
+        agent_obj_id: ObjectID,
+        agent_input_info: AgentInputInfo,
     }
 
     struct Requests has key {
@@ -64,6 +70,10 @@ module nuwa_framework::ai_service {
 
     struct RequestsV3 has key {
         pending: vector<PendingRequestV3>,
+    }
+
+    struct RequestsV4 has key {
+        pending: vector<PendingRequestV4>,
     }
 
     fun init() {
@@ -91,7 +101,7 @@ module nuwa_framework::ai_service {
     public(friend) fun request_ai(
         from: &signer,
         agent_obj_id: ObjectID,
-        agent_input_info: AgentInputInfoV2,
+        agent_input_info: AgentInputInfo,
         request: ChatRequest,
     ) {
         let url = string::utf8(AI_ORACLE_URL);
@@ -133,8 +143,8 @@ module nuwa_framework::ai_service {
         );
 
         // Store request information with agent ID
-        let requests = account::borrow_mut_resource<RequestsV3>(@nuwa_framework);
-        vector::push_back(&mut requests.pending, PendingRequestV3 { 
+        let requests = account::borrow_mut_resource<RequestsV4>(@nuwa_framework);
+        vector::push_back(&mut requests.pending, PendingRequestV4 { 
             request_id,
             agent_obj_id,
             agent_input_info,
@@ -156,7 +166,7 @@ module nuwa_framework::ai_service {
         *&requests.pending
     }
 
-    public fun unpack_pending_request_v2(request: PendingRequestV2): (ObjectID, ObjectID, AgentInputInfo) {
+    public fun unpack_pending_request_v2(request: PendingRequestV2): (ObjectID, ObjectID, nuwa_framework::agent_input::AgentInputInfo) {
         (request.request_id, request.agent_obj_id, request.agent_input_info)
     }
 
@@ -165,13 +175,22 @@ module nuwa_framework::ai_service {
         *&requests.pending
     }
 
-    public fun unpack_pending_request_v3(request: PendingRequestV3): (ObjectID, ObjectID, AgentInputInfoV2) {
+    public fun unpack_pending_request_v3(request: PendingRequestV3): (ObjectID, ObjectID, nuwa_framework::agent_input::AgentInputInfoV2) {
         (request.request_id, request.agent_obj_id, request.agent_input_info)
     }
 
-    public fun take_pending_request_by_id(request_id: ObjectID): Option<PendingRequestV3> {
+    public fun get_pending_requests_v4(): vector<PendingRequestV4> {
+        let requests = account::borrow_resource<RequestsV4>(@nuwa_framework);
+        *&requests.pending
+    }
+
+    public fun unpack_pending_request_v4(request: PendingRequestV4): (ObjectID, ObjectID, AgentInputInfo) {
+        (request.request_id, request.agent_obj_id, request.agent_input_info)
+    }
+
+    public fun take_pending_request_by_id(request_id: ObjectID): Option<PendingRequestV4> {
         //TODO use a key-value store to optimize the lookup
-        let requests = account::borrow_mut_resource<RequestsV3>(@nuwa_framework);
+        let requests = account::borrow_mut_resource<RequestsV4>(@nuwa_framework);
         let i = 0;
         let len = vector::length(&requests.pending);
         while (i < len) {
@@ -184,7 +203,7 @@ module nuwa_framework::ai_service {
     }
 
     public(friend) fun remove_request(request_id: ObjectID) {
-        let requests = account::borrow_mut_resource<RequestsV3>(@nuwa_framework);
+        let requests = account::borrow_mut_resource<RequestsV4>(@nuwa_framework);
         let i = 0;
         let len = vector::length(&requests.pending);
         while (i < len) {

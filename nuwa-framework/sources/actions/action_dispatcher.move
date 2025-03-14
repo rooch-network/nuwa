@@ -11,8 +11,10 @@ module nuwa_framework::action_dispatcher {
     use nuwa_framework::agent::Agent;
     use nuwa_framework::string_utils;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
-    use nuwa_framework::agent_input::{AgentInputInfo, AgentInputInfoV2};
+    use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
 
+    friend nuwa_framework::ai_callback;
+    
     /// Error codes
     const ERROR_INVALID_RESPONSE: u64 = 1;
     const ERROR_MISSING_ACTION_NAME: u64 = 2;
@@ -81,17 +83,20 @@ module nuwa_framework::action_dispatcher {
         abort 0
     }
 
-    public fun dispatch_actions_v2(_agent: &mut Object<Agent>, _agent_input: AgentInputInfo, _response: String) {
+    public fun dispatch_actions_v2(_agent: &mut Object<Agent>, _agent_input: nuwa_framework::agent_input::AgentInputInfo, _response: String) {
         abort 0
     }
 
-    public fun dispatch_actions_v3(agent: &mut Object<Agent>, agent_input: AgentInputInfoV2, response: String) {
+    public fun dispatch_actions_v3(_agent: &mut Object<Agent>, _agent_input: nuwa_framework::agent_input::AgentInputInfoV2, _response: String) {
+        abort 0
+    }
+
+    public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
         let action_response = parse_line_based_response(&response);
         let actions = action_response.actions;
         let i = 0;
         let len = vector::length(&actions);
-        //TODO the AgentInput always has a response channel?
-        let default_channel_id = response_action::get_default_channel_id_from_input(&agent_input);
+        let default_channel_id = agent_input_info::get_response_channel_id(&agent_input);
         while (i < len) {
             let action_call = vector::borrow(&actions, i);
             execute_action(agent, &agent_input, default_channel_id, action_call);
@@ -100,12 +105,12 @@ module nuwa_framework::action_dispatcher {
     }
 
     /// Execute a single action call
-    fun execute_action(agent: &mut Object<Agent>, agent_input: &AgentInputInfoV2, default_channel_id: ObjectID, action_call: &ActionCall) {
+    fun execute_action(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, default_channel_id: ObjectID, action_call: &ActionCall) {
         let action_name = &action_call.action;
         let args = &action_call.args;
         let skip_event = false;
         let result: Result<bool,String> = if (string_utils::starts_with(action_name, &b"memory::")) {
-            let result = memory_action::execute_v3(agent, agent_input, *action_name, *args);
+            let result = memory_action::execute_internal(agent, agent_input, *action_name, *args);
             if(is_ok(&result)){
                 //if the memory action is none, skip the event
                 let updated_memory:bool = result::unwrap(result);
@@ -117,11 +122,11 @@ module nuwa_framework::action_dispatcher {
         } else if (string_utils::starts_with(action_name, &b"response::")) {
             //skip all response actions
             skip_event = true;
-            response_action::execute_v3(agent, agent_input, *action_name, *args)
+            response_action::execute_internal(agent, agent_input, *action_name, *args)
         } else if (string_utils::starts_with(action_name, &b"transfer::")) {
-            transfer_action::execute_v3(agent, agent_input, *action_name, *args)
+            transfer_action::execute_internal(agent, agent_input, *action_name, *args)
         } else if (string_utils::starts_with(action_name, &b"task::")) {
-            task_action::execute(agent, agent_input, *action_name, *args)
+            task_action::execute_internal(agent, agent_input, *action_name, *args)
         } else {
             err_str(b"Unsupported action")
         };
@@ -277,22 +282,22 @@ module nuwa_framework::action_dispatcher {
         use nuwa_framework::memory;
         use nuwa_framework::memory_action;
         use nuwa_framework::response_action;
-        use nuwa_framework::transfer_action;
         use nuwa_framework::channel;
-        use nuwa_framework::agent_input;
         use nuwa_framework::message;
+        use nuwa_framework::agent_input_v2;
+        use rooch_framework::gas_coin::RGas;
 
         // Initialize
+        rooch_framework::genesis::init_for_test();
         nuwa_framework::character_registry::init_for_test();
         action::init_for_test();
-        memory_action::register_actions();
-        response_action::register_actions();
-        transfer_action::register_actions();
 
         let (agent, cap) = agent::create_test_agent();
         let test_addr = @0x42;
+       
 
         let channel_id = channel::create_ai_home_channel(agent);
+       
         // Using type-specific constructors with serialization
         let memory_args = memory_action::create_remember_user_args(
             string::utf8(b"User prefers detailed explanations"), 
@@ -329,12 +334,12 @@ module nuwa_framework::action_dispatcher {
             message::type_normal(),
             vector::empty()
         );
-        
-        let agent_input = message::new_agent_input_v3(vector[message], false);
-        let agent_input_info = agent_input::to_agent_input_info_v2(agent_input);
+        let coin_input_info = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000000000000u256);
+        let agent_input = message::new_agent_input_v4(vector[message]);
+        let agent_input_info = agent_input_v2::into_agent_input_info(agent_input, coin_input_info);
 
         // Execute actions
-        dispatch_actions_v3(agent, agent_input_info, test_response);
+        dispatch_actions_internal(agent, agent_input_info, test_response);
 
         // Verify memory was added
         let store = agent::borrow_memory_store(agent);

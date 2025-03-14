@@ -42,10 +42,10 @@ module nuwa_framework::ai_callback {
 
     /// AI Oracle response processing callback, this function must be entry and no arguments
     public entry fun process_response() {
-        let pending_requests = ai_service::get_pending_requests_v3();
+        let pending_requests = ai_service::get_pending_requests_v4();
         
         vector::for_each(pending_requests, |pending_request| {
-            let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request_v3(pending_request);
+            let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request_v4(pending_request);
             let response_status = oracles::get_response_status(&request_id);
             
             if (response_status != 0) {
@@ -65,7 +65,7 @@ module nuwa_framework::ai_callback {
                         let message_content = ai_response::get_message_content(&chat_completion);
 
                         let agent = object::borrow_mut_object_shared<Agent>(agent_id);
-                        action_dispatcher::dispatch_actions_v3(agent, agent_input_info, message_content);
+                        action_dispatcher::dispatch_actions_internal(agent, agent_input_info, message_content);
                         let refusal = ai_response::get_refusal(&chat_completion);
                         if(option::is_some(&refusal)){
                             let refusal_reason = option::destroy_some(refusal);
@@ -95,7 +95,7 @@ module nuwa_framework::ai_callback {
         let pending_request = ai_service::take_pending_request_by_id(request_id);
         if(option::is_some(&pending_request)){
             let pending_request = option::destroy_some(pending_request);
-            let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request_v3(pending_request);
+            let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request_v4(pending_request);
             let response_status = oracles::get_response_status(&request_id);
             if (response_status != 0) {
                 let response = oracles::get_response(&request_id);
@@ -114,7 +114,7 @@ module nuwa_framework::ai_callback {
                         let message_content = ai_response::get_message_content(&chat_completion);
 
                         let agent = object::borrow_mut_object_shared<Agent>(agent_id);
-                        action_dispatcher::dispatch_actions_v3(agent, agent_input_info, message_content);
+                        action_dispatcher::dispatch_actions_internal(agent, agent_input_info, message_content);
                         let refusal = ai_response::get_refusal(&chat_completion);
                         if(option::is_some(&refusal)){
                             option::destroy_some(refusal)

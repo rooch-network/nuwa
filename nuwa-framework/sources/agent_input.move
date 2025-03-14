@@ -98,11 +98,4 @@ module nuwa_framework::agent_input{
         &info.input_data
     }
 
-    #[test_only]
-    public fun new_agent_input_info_for_test<I: copy + drop + store>(sender: address, input_data: I) : AgentInputInfoV2 {
-        AgentInputInfoV2 {
-            sender,
-            input_data: copyable_any::pack(input_data),
-        }
-    }
 }

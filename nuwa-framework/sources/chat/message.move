@@ -4,9 +4,8 @@ module nuwa_framework::message {
     use moveos_std::timestamp;
     use moveos_std::object::{Self, ObjectID};
 
-    use nuwa_framework::agent_input::{Self, AgentInput};
+    use nuwa_framework::agent_input_v2::{Self, AgentInput};
     use nuwa_framework::string_utils::{channel_id_to_string};
-    use nuwa_framework::address_utils;
 
     friend nuwa_framework::channel;
 
@@ -107,67 +106,24 @@ module nuwa_framework::message {
         }
     }
 
-    public fun new_direct_message_input(messages: vector<Message>): AgentInput<MessageInputV2>{
-        let messages_for_agent = vector::empty();
-        vector::for_each(messages, |msg| {
-            let msg: Message = msg;
-            vector::push_back(&mut messages_for_agent, MessageForAgentV2 {
-                index: msg.id,
-                sender: msg.sender,
-                content: msg.content,
-                timestamp: msg.timestamp,
-                message_type: msg.message_type,
-            });
-        });
-        let current = vector::pop_back(&mut messages_for_agent);
-        let from = current.sender;
-        let description = string::utf8(b"Receive a direct message from a user(");
-        string::append(&mut description, address_utils::address_to_string(from));
-        string::append(&mut description, string::utf8(b")\n"));
-        string::append(&mut description, string::utf8(MESSAGE_INPUT_DESCRIPTION));
-        agent_input::new_agent_input(
-            from,
-            description,
-            MessageInputV2 {
-                history: messages_for_agent,
-                current,
-            }
-        )
-    }
-
-    public fun new_channel_message_input(messages: vector<Message>) : AgentInput<MessageInputV2> {
-        let channel_id = vector::borrow(&messages,0).channel_id;
-        let messages_for_agent = vector::empty();
-        vector::for_each(messages, |msg| {
-            let msg: Message = msg;
-            vector::push_back(&mut messages_for_agent, MessageForAgentV2 {
-                index: msg.id,
-                sender: msg.sender,
-                content: msg.content,
-                timestamp: msg.timestamp,
-                message_type: msg.message_type,
-            });
-        });
-        let current = vector::pop_back(&mut messages_for_agent);
-        let description = string::utf8(b"Receive a message from a channel(");
-        string::append(&mut description, channel_id_to_string(channel_id));
-        string::append(&mut description, string::utf8(b")\n"));
-        string::append(&mut description, string::utf8(MESSAGE_INPUT_DESCRIPTION));
-        agent_input::new_agent_input(
-            current.sender,
-            description,
-            MessageInputV2 {
-                history: messages_for_agent,
-                current,
-            }
-        )
-    }
-
-    public fun new_agent_input(_messages: vector<Message>) : AgentInput<MessageInput> {
+    public fun new_direct_message_input(_messages: vector<Message>): nuwa_framework::agent_input::AgentInput<MessageInputV2>{
         abort 0
     }
 
-    public fun new_agent_input_v3(messages: vector<Message>, _is_direct_channel: bool) : AgentInput<MessageInputV3> {
+    public fun new_channel_message_input(_messages: vector<Message>) : nuwa_framework::agent_input::AgentInput<MessageInputV2> {
+        abort 0
+    }
+
+    public fun new_agent_input(_messages: vector<Message>) : nuwa_framework::agent_input::AgentInput<MessageInput> {
+        abort 0
+    }
+
+    public fun new_agent_input_v3(_messages: vector<Message>, _is_direct_channel: bool) : nuwa_framework::agent_input::AgentInput<MessageInputV3> {
+        abort 0
+    }
+
+
+    public fun new_agent_input_v4(messages: vector<Message>) : AgentInput<MessageInputV3> {
         let channel_id = vector::borrow(&messages,0).channel_id;
         let messages_for_agent = vector::empty();
         vector::for_each(messages, |msg| {
@@ -185,8 +141,9 @@ module nuwa_framework::message {
         string::append(&mut description, channel_id_to_string(channel_id));
         string::append(&mut description, string::utf8(b")\n"));
         string::append(&mut description, string::utf8(MESSAGE_INPUT_DESCRIPTION));
-        agent_input::new_agent_input(
+        agent_input_v2::new_agent_input(
             current.sender,
+            channel_id,
             description,
             MessageInputV3 {
                 history: messages_for_agent,
