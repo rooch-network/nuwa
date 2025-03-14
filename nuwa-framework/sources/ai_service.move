@@ -1,11 +1,12 @@
 module nuwa_framework::ai_service {
-    use std::string;
+    use std::string::{Self, String};
     use std::vector;
     use std::option::{Self, Option};
     use std::signer;
     use std::u256;
     use moveos_std::object::ObjectID;
     use moveos_std::account;
+    use moveos_std::result::{ok, err_str, Result};
     use verity::oracles;
     use verity::registry;
     use rooch_framework::account_coin_store;
@@ -103,7 +104,7 @@ module nuwa_framework::ai_service {
         agent_obj_id: ObjectID,
         agent_input_info: AgentInputInfo,
         request: ChatRequest,
-    ) {
+    ) : Result<ObjectID, String> {
         let url = string::utf8(AI_ORACLE_URL);
         let method = string::utf8(AI_ORACLE_METHOD);
         let headers = string::utf8(AI_ORACLE_HEADERS);
@@ -129,13 +130,16 @@ module nuwa_framework::ai_service {
         if(oracle_balance < oracle_fee) {
             let pay_mee = oracle_fee - oracle_balance;
             let gas_balance = account_coin_store::balance<RGas>(from_addr);
-            assert!(gas_balance >= pay_mee, ErrorInsufficientBalance);
+            if (gas_balance < pay_mee) {
+                return err_str(b"The Agent has insufficient balance")
+            };
             oracles::deposit_to_escrow(from, pay_mee);
         };
 
         oracles::update_notification_gas_allocation(from, @nuwa_framework, string::utf8(NOTIFY_CALLBACK), DEFAULT_NOTIFICATION_GAS);
         
-        let request_id = oracles::new_request(
+        let request_id = oracles::new_request_by_signer(
+            from,
             http_request, 
             pick, 
             ORACLE_ADDRESS, 
@@ -149,7 +153,7 @@ module nuwa_framework::ai_service {
             agent_obj_id,
             agent_input_info,
         });
-        
+        ok(request_id)
     }
 
     public fun get_pending_requests(): vector<PendingRequest> {

@@ -7,7 +7,7 @@ MoveStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "framewo
 MoveosStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/moveos-stdlib", rev = "c8a69360e786579d9c5bfcca273419d88b30e14e" }
 RoochFramework = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/rooch-framework", rev = "c8a69360e786579d9c5bfcca273419d88b30e14e" }
 BitcoinMove = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/bitcoin-move", rev = "c8a69360e786579d9c5bfcca273419d88b30e14e" }
-VerityMoveOracles = { git = "https://github.com/usherlabs/verity-move-oracles", subdir = "rooch", rev = "5053cb6563eca20f2c1c38784e8b20e9e3bb617f"}
+VerityMoveOracles = { git = "https://github.com/usherlabs/verity-move-oracles", subdir = "rooch", rev = "6850988a66151749f713a2496942c09885167a82"}
 
 [addresses]
 nuwa_framework = "_"

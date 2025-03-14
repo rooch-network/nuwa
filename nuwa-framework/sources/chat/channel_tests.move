@@ -18,7 +18,7 @@ module nuwa_framework::channel_tests {
 
     #[test]
     fun test_create_ai_home_channel() {
-        nuwa_framework::character_registry::init_for_test();
+        nuwa_framework::genesis::init_for_test();
         let (agent, cap) = agent::create_test_agent();
         let ai_account = agent::get_agent_address(agent);
         timestamp::update_global_time_for_test(1000);
@@ -44,7 +44,7 @@ module nuwa_framework::channel_tests {
 
     #[test]
     fun test_create_ai_peer_channel() {
-        nuwa_framework::character_registry::init_for_test();
+        nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
         // Create a test agent instead of just using an address
         let (agent, cap) = agent::create_test_agent();
@@ -64,7 +64,7 @@ module nuwa_framework::channel_tests {
 
     #[test]
     fun test_message_sending() {
-        nuwa_framework::character_registry::init_for_test();
+        nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
         // Create a test agent
         let (agent, cap) = agent::create_test_agent();
@@ -98,7 +98,7 @@ module nuwa_framework::channel_tests {
     #[test]
     #[expected_failure(abort_code = channel::ErrorNotMember)]
     fun test_unauthorized_message() {
-        nuwa_framework::character_registry::init_for_test();
+        nuwa_framework::genesis::init_for_test();
         let user1 = create_account_with_address(@0x42);
         let user2 = create_account_with_address(@0x44);
         // Create a test agent
@@ -121,7 +121,7 @@ module nuwa_framework::channel_tests {
 
     #[test]
     fun test_message_pagination() {
-        nuwa_framework::character_registry::init_for_test();
+        nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
         // Create a test agent
         let (agent, cap) = agent::create_test_agent();
@@ -155,7 +155,7 @@ module nuwa_framework::channel_tests {
 
     #[test]
     fun test_member_info() {
-        nuwa_framework::character_registry::init_for_test();
+        nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
         // Create a test agent
         let (agent, cap) = agent::create_test_agent();

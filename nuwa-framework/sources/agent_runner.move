@@ -2,9 +2,10 @@ module nuwa_framework::agent_runner {
 
     use std::string::{String};
     use std::vector;
-    use moveos_std::object::{Self, Object};
+    use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::decimal_value;
     use moveos_std::type_info;
+    use moveos_std::result::{Result};
 
     use rooch_framework::coin::{Self, Coin};
     use rooch_framework::gas_coin::RGas;
@@ -21,8 +22,11 @@ module nuwa_framework::agent_runner {
     use nuwa_framework::state_providers;
     use nuwa_framework::task_spec::{Self, TaskSpecifications};
     use nuwa_framework::agent_cap::{AgentCap};
+    use nuwa_framework::config;
 
     friend nuwa_framework::channel_entry;
+
+    const ErrorInsufficientBaseFee: u64 = 1;
 
     public fun generate_system_prompt<I: copy + drop>(
         _agent: &Object<Agent>,
@@ -83,8 +87,7 @@ module nuwa_framework::agent_runner {
         input: AgentInput<I>,
         fee: Coin<RGas>,
         app_task_specs: TaskSpecifications,
-    ) {
-        //keep a fee argument for future usage.
+    ) : Result<ObjectID, String> {
         
         let agent_id = object::id(agent_obj);
         let model_provider = *agent::get_agent_model_provider(agent_obj);
@@ -94,12 +97,16 @@ module nuwa_framework::agent_runner {
         let coin_symbol = coin::symbol_by_type<RGas>();
         let decimals = coin::decimals_by_type<RGas>();
         let amount = coin::value(&fee);
+        assert!(amount >= config::get_ai_agent_base_fee(), ErrorInsufficientBaseFee);
         let agent_addr = agent::get_agent_address(agent_obj);
         account_coin_store::deposit<RGas>(agent_addr, fee);
+
+        let amount_except_base_fee = amount - config::get_ai_agent_base_fee();
+
         let coin_input_info = agent_input_info::new_coin_input_info(
             coin_symbol,
             coin_type,
-            decimal_value::new(amount, decimals),
+            decimal_value::new(amount_except_base_fee, decimals),
         );
 
         let input_info = agent_input_v2::into_agent_input_info(input, coin_input_info);
@@ -125,9 +132,10 @@ module nuwa_framework::agent_runner {
         //Use the agent signer to call the AI service
         let agent_signer = agent::create_agent_signer(agent_obj);
         // Call AI service
-        ai_service::request_ai(&agent_signer, agent_id, input_info, chat_request);
+        let result = ai_service::request_ai(&agent_signer, agent_id, input_info, chat_request);
 
         agent::update_last_active_timestamp(agent_obj);
+        result
     }
 
     public fun process_input_by_cap<I: copy + drop + store>(
@@ -136,9 +144,9 @@ module nuwa_framework::agent_runner {
         fee: Coin<RGas>,
         app_task_specs: TaskSpecifications,
         _agent_cap: &mut Object<AgentCap>,
-    ) {
+    ) : Result<ObjectID, String> {
         
-        process_input_internal(agent_obj, input, fee, app_task_specs);
+        process_input_internal(agent_obj, input, fee, app_task_specs)
     }
 
     fun get_available_actions(): vector<ActionGroup> {
