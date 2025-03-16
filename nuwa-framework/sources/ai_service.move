@@ -18,7 +18,7 @@ module nuwa_framework::ai_service {
     friend nuwa_framework::agent_runner;
 
     const ORACLE_ADDRESS: address = @0x694cbe655b126e9e6a997e86aaab39e538abf30a8c78669ce23a98740b47b65d;
-    const NOTIFY_CALLBACK: vector<u8> = b"ai_callback::process_response_v2";
+    const NOTIFY_CALLBACK: vector<u8> = b"ai_callback::process_response";
     /// Default gas allocation for notification callbacks 0.6 RGas
     const DEFAULT_NOTIFICATION_GAS: u256 = 200000000;
     const DEFAULT_ORACLE_FEE: u256 = 3200000000;
