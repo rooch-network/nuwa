@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useNetworkVariable } from '../hooks/useNetworkVariable';
-import { useRoochClient, useCurrentSession, SessionKeyGuard, useRoochClientQuery } from '@roochnetwork/rooch-sdk-kit';
+import { useRoochClient, useCurrentSession, SessionKeyGuard } from '@roochnetwork/rooch-sdk-kit';
 import { Transaction, Args } from '@roochnetwork/rooch-sdk';
 
 export function CreateAgent() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [description, setDescription] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [instructions, setInstructions] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -51,9 +53,9 @@ export function CreateAgent() {
     try {
       setIsCheckingUsername(true);
       
-      // Call the is_username_available function from the character_registry module
+      // Call the is_username_available function from the agent module
       const result = await client.executeViewFunction({
-        target: `${packageId}::character_registry::is_username_available`,
+        target: `${packageId}::name_registry::is_username_available`,
         args: [Args.string(username)],
       });
       
@@ -99,7 +101,7 @@ export function CreateAgent() {
   
   const handleSubmit = async () => {
     if (!name.trim()) {
-      setError('Character name is required');
+      setError('Agent name is required');
       return;
     }
     
@@ -128,55 +130,48 @@ export function CreateAgent() {
       setIsCreating(true);
       setError(null);
       
-      // Create a Character object
-      const characterTx = new Transaction();
-      characterTx.callFunction({
-        target: `${packageId}::character::create_character_entry`,
+      // Create an Agent
+      const agentTx = new Transaction();
+      agentTx.callFunction({
+        target: `${packageId}::agent_entry::create_agent`,
         args: [
-          Args.string(name), 
-          Args.string(username), 
-          Args.string(description || `${name} is an autonomous AI entity with unique perspectives and capabilities.`)
+          Args.string(name),
+          Args.string(username),
+          Args.string(avatar || ''),
+          Args.string(description || ''),
+          Args.string(instructions || '')
         ],
       });
       
-      characterTx.setMaxGas(5_00000000);
+      agentTx.setMaxGas(5_00000000);
       
-      const characterResult = await client.signAndExecuteTransaction({
-        transaction: characterTx,
+      const agentResult = await client.signAndExecuteTransaction({
+        transaction: agentTx,
         signer: session,
       });
       
-      if (characterResult.execution_info.status.type !== 'executed') {
-        console.error('Character creation failed:', characterResult.execution_info);
-        
-        // Check for specific error types based on status type
-        if (characterResult.execution_info.status.type === 'moveabort' && 
-            characterResult.execution_info.status.abort_code === '1') {
-          setError('Username already exists. Please choose a different username.');
-        } else {
-          throw new Error(`Character creation failed: ${JSON.stringify(characterResult.execution_info.status)}`);
-        }
-        setIsCreating(false);
-        return;
+      if (agentResult.execution_info.status.type !== 'executed') {
+        console.error('Agent creation failed:', agentResult.execution_info);
+        throw new Error(`Agent creation failed: ${JSON.stringify(agentResult.execution_info.status)}`);
       }
       
-      // Find the Character object from changeset
-      const characterChange = characterResult.output?.changeset.changes.find(
-        change => change.metadata.object_type.endsWith('::character::Character')
+      // Find the Agent object from changeset
+      const agentChange = agentResult.output?.changeset.changes.find(
+        change => change.metadata.object_type.endsWith('::agent::Agent')
       );
       
-      if (!characterChange?.metadata.id) {
-        throw new Error('Failed to get character ID from transaction result');
+      if (!agentChange?.metadata.id) {
+        throw new Error('Failed to get agent ID from transaction result');
       }
       
-      const characterObjectId = characterChange.metadata.id;
-      console.log('Created character with ID:', characterObjectId);
+      const agentObjectId = agentChange.metadata.id;
+      console.log('Created agent with ID:', agentObjectId);
       
-      // Navigate to the characters list page after successful creation
-      navigate('/characters');
+      // Navigate to the agents list page after successful creation
+      navigate('/');
     } catch (err) {
-      console.error('Failed to create character:', err);
-      setError(`Failed to create character: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Failed to create agent:', err);
+      setError(`Failed to create agent: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsCreating(false);
     }
@@ -186,8 +181,8 @@ export function CreateAgent() {
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Create New Character</h1>
-          <p className="text-gray-600">Configure your new AI Character</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Create New AI Agent</h1>
+          <p className="text-gray-600">Configure your new AI Agent</p>
         </div>
         
         {error && (
@@ -199,7 +194,7 @@ export function CreateAgent() {
         <div className="space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Character Name*
+              Agent Name*
             </label>
             <input
               type="text"
@@ -255,6 +250,20 @@ export function CreateAgent() {
           </div>
           
           <div>
+            <label htmlFor="avatar" className="block text-sm font-medium text-gray-700 mb-1">
+              Avatar URL (Optional)
+            </label>
+            <input
+              type="text"
+              id="avatar"
+              value={avatar}
+              onChange={(e) => setAvatar(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter avatar URL..."
+            />
+          </div>
+          
+          <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
               Description (Optional)
             </label>
@@ -263,7 +272,21 @@ export function CreateAgent() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Describe what this character does and its personality..."
+              placeholder="Describe what this agent does and its personality..."
+              rows={4}
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="instructions" className="block text-sm font-medium text-gray-700 mb-1">
+              Instructions (Optional)
+            </label>
+            <textarea
+              id="instructions"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Special instructions for the agent..."
               rows={4}
             />
           </div>
@@ -271,7 +294,7 @@ export function CreateAgent() {
           <div className="flex justify-end gap-4">
             <button
               type="button"
-              onClick={() => navigate('/characters')}
+              onClick={() => navigate('/')}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
@@ -284,7 +307,7 @@ export function CreateAgent() {
                   (isCreating || !!usernameError || isUsernameAvailable === false || isCheckingUsername) ? 'opacity-75 cursor-not-allowed' : ''
                 }`}
               >
-                {isCreating ? 'Creating...' : 'Create Character'}
+                {isCreating ? 'Creating...' : 'Create Agent'}
               </button>
             </SessionKeyGuard>
           </div>

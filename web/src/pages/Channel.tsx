@@ -7,8 +7,9 @@ import { Layout } from '../components/Layout';
 import { ChatMessage } from '../components/ChatMessage';
 import { ChatInput } from '../components/ChatInput';
 import { TypingIndicator } from '../components/TypingIndicator';
-import { Channel, Message, CHANNEL_STATUS, MessageSchema } from '../types/channel'; // Add MessageSchema to imports
+import { Channel, Message, CHANNEL_STATUS, MessageSchema, CHANNEL_TYPE } from '../types/channel'; // Add MessageSchema to imports
 import { formatTimestamp } from '../utils/time';
+import { deserializeObjectIDVec, ObjectIDVecSchema } from '../types/object';
 
 export function ChannelPage() {
   const { channelId } = useParams<{ channelId: string }>();
@@ -43,6 +44,9 @@ export function ChannelPage() {
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [lastMessageSentByAi, setLastMessageSentByAi] = useState<boolean>(false);
 
+  // Add loading state for agent info
+  const [isAgentInfoLoading, setIsAgentInfoLoading] = useState(true);
+
   const logDebug = (message: string, data?: any) => {
     console.log(`[AI-DEBUG] ${message}`, data || '');
   };
@@ -52,7 +56,7 @@ export function ChannelPage() {
     'queryObjectStates',
     {
       filter: {
-        object_id: channelId,
+        object_id: channelId || '',
       },
     },
     {
@@ -73,42 +77,37 @@ export function ChannelPage() {
     if (channel) {
       const channelType = channel.channel_type;
       
-      if (channelType === 0) { // AI HOME
+      if (channelType === CHANNEL_TYPE.AI_HOME) { // AI HOME
         // In AI HOME channels, the creator is the AI
-        setAiAddress(channel.creator);
+        setAiAddress(String(channel.creator));
         console.log('AI HOME channel detected, AI address:', channel.creator);
-      } else if (channelType === 1) { // AI PEER
+      } else if (channelType === CHANNEL_TYPE.AI_PEER) { // AI PEER
         // In AI PEER channels, find the member that is not the current user
         // This assumes there are only 2 members: the user and the AI
         // We'll need to implement logic to find the AI address in the members
         
         // For now, use the channel.creator as a fallback
         // In a real implementation, you'd determine the AI address from the member list
-        const potentialAiAddress = channel.creator;
+        const potentialAiAddress = String(channel.creator);
         setAiAddress(potentialAiAddress);
         console.log('AI PEER channel detected, potential AI address:', potentialAiAddress);
       }
     }
   }, [channel]);
 
-  // Replace the current agent character info fetching useEffect with this simpler one
+  // Update the agent info handling
   useEffect(() => {
     if (channel && client && packageId) {
-      // For both AI_HOME and AI_PEER channels, we want to get the agent's name
-      
-      // Determine which agent to look up
       let agentToLookup = null;
       
-      if (channel.channel_type === 0) { // AI HOME
-        // In AI HOME, the creator is the agent
-        agentToLookup = channel.creator;
-      } else if (channel.channel_type === 1) { // AI PEER
-        // In AI PEER, the creator also is the agent
-        agentToLookup = channel.creator;
+      if (channel.channel_type === CHANNEL_TYPE.AI_HOME) {
+        agentToLookup = String(channel.creator);
+      } else if (channel.channel_type === CHANNEL_TYPE.AI_PEER) {
+        agentToLookup = String(channel.creator);
       }
       
       if (agentToLookup) {
-        // Use the get_agent_info_by_address function to get all agent info in one call
+        setIsAgentInfoLoading(true);
         client.executeViewFunction({
           target: `${packageId}::agent::get_agent_info_by_address`,
           args: [Args.address(agentToLookup)],
@@ -116,16 +115,21 @@ export function ChannelPage() {
         .then(response => {
           console.log('Agent info response:', response);
           
-          // Extract the correct agent name from the response
-          if (response?.return_values?.[0]?.decoded_value?.value) {
-            const agentInfoValue = response.return_values[0].decoded_value.value;
+          if (response?.return_values?.[0]?.decoded_value) {
+            const agentInfoValue = response.return_values[0].decoded_value.value as any;
+            
+            // Safely extract values with type checking
+            const extractValue = (value: any, defaultValue: string = '') => {
+              if (!value) return defaultValue;
+              return typeof value === 'string' ? value : String(value);
+            };
             
             setAgentInfo({
-              id: agentInfoValue.id || null,
-              name: agentInfoValue.name || null,
-              username: agentInfoValue.username || null,
-              description: agentInfoValue.description || null,
-              agent_address: agentInfoValue.agent_address || null
+              id: extractValue(agentInfoValue.id),
+              name: extractValue(agentInfoValue.name),
+              username: extractValue(agentInfoValue.username),
+              description: extractValue(agentInfoValue.description),
+              agent_address: extractValue(agentInfoValue.agent_address)
             });
             
             console.log('Agent info set:', agentInfoValue);
@@ -135,70 +139,78 @@ export function ChannelPage() {
         })
         .catch(err => {
           console.error('Failed to fetch agent info:', err);
+        })
+        .finally(() => {
+          setIsAgentInfoLoading(false);
         });
+      } else {
+        setIsAgentInfoLoading(false);
       }
     }
   }, [channel, client, packageId, session]);
   
   // Fetch channel messages
-  const { data: messagesData, isLoading: isMessagesLoading, refetch: refetchMessages } = useRoochClientQuery(
+  const { data: messageIdsData, isLoading: isMessageIdsLoading, refetch: refetchMessages } = useRoochClientQuery(
     'executeViewFunction',
     {
       target: `${packageId}::channel::get_messages`,
-      args: [Args.objectId(channelId)],
+      args: [Args.objectId(channelId || '')],
     },
     {
       enabled: !!packageId && !!channelId,
       refetchInterval: 5000,
     }
   );
+  console.log('Message IDs data response:', messageIdsData);
+
+  // Fetch message objects using the IDs
+  const messageIds = useMemo(() => {
+    if (!messageIdsData?.return_values?.[0]?.value) {
+      return [];
+    }
+    let return_bcs_hex = messageIdsData.return_values[0].value.value;
+    return deserializeObjectIDVec(return_bcs_hex);
+  }, [messageIdsData]);
+
+  // Use a single query with comma-separated object IDs
+  const { data: messagesData, isLoading: isMessagesLoading } = useRoochClientQuery(
+    'queryObjectStates',
+    {
+      filter: {
+        object_id: messageIds.join(','),
+      },
+    },
+    {
+      enabled: messageIds.length > 0,
+    }
+  );
   console.log('Messages data response:', messagesData);
-  
-  // Define function to deserialize messages
-  const deserializeMessages = useMemo(() => {
-    if (!messagesData?.return_values?.[0]?.value?.value) {
-      console.log('No message data available');
+
+  // Process message objects
+  const messages = useMemo(() => {
+    if (!messagesData?.data) {
       return [];
     }
 
-    try {
-      // Get the hex value from the response
-      const hexValue = messagesData.return_values[0].value.value;
-      console.log('Hex value:', hexValue);
-      
-      // Convert hex to bytes
-      const cleanHexValue = hexValue.startsWith('0x') ? hexValue.slice(2) : hexValue;
-      const bytes = new Uint8Array(
-        cleanHexValue.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-      );
-      
-      // Parse using BCS
-      if (!MessageSchema) {
-        console.error('MessageSchema is not defined!');
-        return [];
-      }
-      
-      console.log('Parsing bytes with BCS:', bytes);
-      const parsedMessages = bcs.vector(MessageSchema).parse(bytes);
-      console.log('Parsed messages:', parsedMessages);
-      
-      // Map to our Message interface format
-      return parsedMessages.map((message: any) => ({
-        id: message.id,
-        sender: message.sender,
-        content: message.content,
-        timestamp: message.timestamp,
-        message_type: message.message_type, 
-      }));
-    } catch (error) {
-      console.error('BCS deserialization error:', error);
-      return [];
-    }
+    return messagesData.data
+      .filter(obj => obj?.decoded_value?.value)
+      .map(obj => {
+        const value = obj?.decoded_value?.value;
+        if (!value) return null;
+        return {
+          index: Number(value.index),
+          channel_id: String(value.channel_id),
+          sender: String(value.sender),
+          content: String(value.content),
+          timestamp: Number(value.timestamp),
+          message_type: Number(value.message_type),
+          mentions: Array.isArray(value.mentions) ? value.mentions.map(String) : [],
+          reply_to: Number(value.reply_to)
+        } as Message;
+      })
+      .filter((msg): msg is Message => msg !== null)
+      .sort((a, b) => a.index - b.index);
   }, [messagesData]);
-  
-  // Use the deserialized messages
-  const messages: Message[] = deserializeMessages;
-  console.log('Processed messages:', messages);
   
   // First, extract the isMember query and refetch functionality
   const { 
@@ -221,7 +233,7 @@ export function ChannelPage() {
   );
   
   // Default to false if not a member or if session doesn't exist
-  const isMember: boolean = isMemberData?.return_values?.[0]?.decoded_value || false;
+  const isMember = Boolean(isMemberData?.return_values?.[0]?.decoded_value);
   
   // 1. First, add a ref for the messages container
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -293,7 +305,7 @@ export function ChannelPage() {
     }
   };
   
-  // Update the handleSendMessage function to properly handle payment messages
+  // Update the payment handling
   const handleSendMessage = async (content: string, payment?: { amount: string }) => {
     if (!client || !session || !channelId || !packageId || content.trim() === '') return;
     
@@ -301,29 +313,19 @@ export function ChannelPage() {
       setIsSending(true);
       setErrorMessage('');
       
-      const isAiPeerChannel = channel?.channel_type === 1; // CHANNEL_TYPE_AI_PEER
+      const isAiPeerChannel = channel?.channel_type === CHANNEL_TYPE.AI_PEER;
       const hasExplicitAiMention = content.includes('@AI') || content.toLowerCase().startsWith('/ai');
       
-      // In AI PEER channels, always mention the AI
-      // In AI HOME channels, mention if explicitly asked or if payment is included
-      // Always mention AI when payment is included
-      const mentionAI = isAiPeerChannel || hasExplicitAiMention || (payment && !!payment.amount);
-      
-      // Prepare mentions array
       const mentions = [];
-      if (mentionAI && aiAddress) {
+      if ((isAiPeerChannel || hasExplicitAiMention || (payment && !!payment.amount)) && aiAddress) {
         mentions.push(aiAddress);
       }
       
-      // Only set AI thinking state if we're actually mentioning the AI
-      if (mentionAI && aiAddress) {
-                setIsAiThinking(true);
+      if ((isAiPeerChannel || hasExplicitAiMention || (payment && !!payment.amount)) && aiAddress) {
+        setIsAiThinking(true);
         setLastMessageSentByAi(false);
-        console.log('AI thinking state activated for:', agentInfo.name || 'AI Agent', 
-          payment ? `with payment of ${payment.amount}` : 'without payment');
       }
       
-      // Clean up the content if it starts with /ai
       let finalContent = content;
       if (hasExplicitAiMention && content.toLowerCase().startsWith('/ai')) {
         finalContent = content.substring(3).trim();
@@ -331,30 +333,27 @@ export function ChannelPage() {
       
       const tx = new Transaction();
       
-      // Check if this is a payment message
       if (payment && aiAddress && payment.amount) {
-          
-        console.log(`Sending payment message with ${payment.amount} RGas`);
-        
-        // Use send_message_with_coin function
         tx.callFunction({
           target: `${packageId}::channel_entry::send_message_with_coin`,
           args: [
-            Args.objectId(channelId),
+            Args.objectId(channelId), 
             Args.string(finalContent),
-            Args.address(aiAddress), // AI address as recipient
-            Args.u256(payment.amount), // Payment amount as raw value
+            Args.vec('address', mentions),
+            Args.u64(0n),
+            Args.address(aiAddress),
+            Args.u256(BigInt(payment.amount)),
           ],
-          typeArgs: ['0x3::gas_coin::RGas'], // Add RGas as coin type
+          typeArgs: ['0x3::gas_coin::RGas'],
         });
       } else {
-        // Use regular send_message function
         tx.callFunction({
           target: `${packageId}::channel_entry::send_message`,
           args: [
             Args.objectId(channelId), 
             Args.string(finalContent),
-            Args.vec('address', mentions)
+            Args.vec('address', mentions),
+            Args.u64(0n),
           ],
         });
       }
@@ -370,11 +369,9 @@ export function ChannelPage() {
         throw new Error('Failed to send message'+JSON.stringify(result.execution_info));
       }
 
-      // Refetch messages after sending
       refetchMessages();
       
-      // Set up multiple refetches to ensure we get the AI's response
-      const refetchTimes = [1000, 3000, 6000, 10000]; // Try at 1s, 3s, 6s, and 10s
+      const refetchTimes = [1000, 3000, 6000, 10000];
       refetchTimes.forEach(delay => {
         setTimeout(() => refetchMessages(), delay);
       });
@@ -382,7 +379,6 @@ export function ChannelPage() {
     } catch (error) {
       console.error('Error sending message:', error);
       setErrorMessage('Failed to send message. Please try again.');
-      // Reset AI thinking state on error
       setIsAiThinking(false);
     } finally {
       setIsSending(false);
@@ -408,7 +404,7 @@ export function ChannelPage() {
     const lastMessage = messages[messages.length - 1];
 
     logDebug(`Checking last message:`, {
-      id: lastMessage.id,
+      index: lastMessage.index,
       sender: lastMessage.sender,
       message_type: lastMessage.message_type,
       content: lastMessage.content.substring(0, 50) + '...',
@@ -428,7 +424,7 @@ export function ChannelPage() {
     // If the last message is from the current user
     const isFromCurrentUser = lastMessage.sender === session?.getRoochAddress().toHexAddress();
     if (isFromCurrentUser) {
-      const isAiPeerChannel = channel?.channel_type === 1;
+      const isAiPeerChannel = channel?.channel_type === CHANNEL_TYPE.AI_PEER;
       
       // In AI_PEER channels, always show thinking indicator after user message
       if (isAiPeerChannel) {
@@ -463,6 +459,23 @@ export function ChannelPage() {
     return () => clearTimeout(timeoutId);
   }, [isAiThinking]);
   
+  // Update the message rendering
+  const renderMessage = (message: Message) => {
+    const isCurrentUser = message.sender === session?.getRoochAddress().toHexAddress();
+    const isAI = message.sender === aiAddress;
+
+    return (
+      <ChatMessage 
+        key={`${message.index}-${message.channel_id}`}
+        message={message} 
+        isCurrentUser={isCurrentUser}
+        isAI={isAI}
+        agentName={agentInfo.name || undefined}
+        agentId={agentInfo.id || undefined}
+      />
+    );
+  };
+
   // Loading state
   if (isChannelLoading) {
     return (
@@ -495,18 +508,18 @@ export function ChannelPage() {
         {/* Channel Header */}
         <div className="border-b pb-4 mb-4 flex-shrink-0">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">{channel.title}</h1>
+            <h1 className="text-2xl font-bold">{String(channel.title)}</h1>
             <div className={`px-3 py-1 rounded-full text-xs ${
-              channel.channel_type === 0 
+              channel.channel_type === CHANNEL_TYPE.AI_HOME 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-purple-100 text-purple-800'
             }`}>
-              {channel.channel_type === 0 ? 'AI Home' : 'AI 1:1 Chat'}
+              {channel.channel_type === CHANNEL_TYPE.AI_HOME ? 'AI Home' : 'AI 1:1 Chat'}
             </div>
           </div>
           <div className="flex justify-between items-center text-sm text-gray-500 mt-2">
             <div>
-              {channel.message_counter} messages • Created: {formatTimestamp(channel.created_at)}
+              {Number(channel.message_counter)} messages • Created: {formatTimestamp(Number(channel.created_at))}
             </div>
             <div className={`px-2 py-1 rounded-full text-xs ${
               isChannelActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -547,7 +560,7 @@ export function ChannelPage() {
           ref={messagesContainerRef}
           className="bg-gray-50 rounded-lg border border-gray-200 p-4 flex-1 flex flex-col overflow-auto"
         >
-          {isMessagesLoading ? (
+          {isMessagesLoading || (isAgentInfoLoading && messages.some(msg => msg.sender === aiAddress)) ? (
             <div className="flex justify-center items-center h-full">
               <div className="animate-spin h-8 w-8 border-t-2 border-blue-500 border-r-2 rounded-full"></div>
             </div>
@@ -557,16 +570,7 @@ export function ChannelPage() {
             </div>
           ) : (
             <div className="space-y-4 flex-1">
-              {Array.isArray(messages) && messages.map((message, index) => (
-                <ChatMessage 
-                  key={`${message.id}-${index}`}
-                  message={message} 
-                  isCurrentUser={message.sender === session?.getRoochAddress().toHexAddress()}
-                  isAI={message.sender === aiAddress}
-                  agentName={agentInfo.name} // Pass the agent name
-                  agentId={agentInfo.id || null} // Pass the agent's object ID from the channel
-                />
-              ))}
+              {Array.isArray(messages) && messages.map(renderMessage)}
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -600,7 +604,7 @@ export function ChannelPage() {
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Interact with AI</h4>
-                      {channel.channel_type === 0 ? (
+                      {channel.channel_type === CHANNEL_TYPE.AI_HOME ? (
                         // AI HOME instruction
                         <>
                           <p className="text-sm text-gray-600 mt-1">
@@ -636,7 +640,7 @@ export function ChannelPage() {
                 onSend={handleSendMessage} 
                 disabled={!isMember || isSending || !isChannelActive}
                 placeholder={
-                  channel.channel_type === 0 
+                  channel.channel_type === CHANNEL_TYPE.AI_HOME 
                     ? "Type your message... (Use @AI or /ai to interact with AI)" 
                     : "Type your message to the AI..."
                 }

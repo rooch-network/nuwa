@@ -1,20 +1,5 @@
 import { HexString,bcs } from '@roochnetwork/rooch-sdk';
 
-export interface Character {
-  id: string;
-  name: string;
-  username: string;
-  description: string;
-}
-
-export interface CharacterReference {
-  abilities: number;
-  type: string;
-  value: {
-    id: string;
-  }
-}
-
 export interface Memory {
   index: number;
   content: string;
@@ -33,11 +18,12 @@ export const MemorySchema = bcs.struct('Memory', {
 export interface Agent {
   id: string;
   name: string;
+  username: string;
   description?: string;
+  instructions?: string;
   agent_address: string;
-  characterId?: string;
-  modelProvider: string;
-  createdAt: number;
+  model_provider: string;
+  last_active_timestamp: number;
 }
 
 export interface AgentInput {

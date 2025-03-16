@@ -9,8 +9,7 @@ import { RoochProvider, WalletProvider } from '@roochnetwork/rooch-sdk-kit';
 import App from './App';
 import { Home } from './pages/Home';
 import { ChannelPage } from './pages/Channel';
-import { CreateAgent } from './pages/CreateCharacter.tsx';
-import { CharacterList } from './pages/CharacterList';
+import { CreateAgent } from './pages/CreateAgent.tsx';
 import { AgentDetail } from './pages/AgentDetail';
 import { CreateChannel } from './pages/CreateChannel';
 import { PACKAGE_ID } from './constants';
@@ -31,12 +30,8 @@ const router = createBrowserRouter([
         element: <Home />,
       },
       {
-        path: '/create-character',
+        path: '/create-agent',
         element: <CreateAgent />,
-      },
-      {
-        path: '/characters',
-        element: <CharacterList />,
       },
       {
         path: '/agent/:agentId',

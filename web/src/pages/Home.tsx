@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useNetworkVariable } from '../hooks/useNetworkVariable';
 import { useRoochClient, useRoochClientQuery, useCurrentWallet, useCurrentSession, SessionKeyGuard, WalletGuard } from '@roochnetwork/rooch-sdk-kit';
-import { Agent, CharacterReference } from '../types/agent';
+import { Agent } from '../types/agent';
+import { RoochAddress } from '@roochnetwork/rooch-sdk';
 
 export function Home() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'authorized'>('all'); // Change the filter state type
+  const [filter, setFilter] = useState<'all' | 'authorized'>('all');
   const [userAuthorizedAgentIds, setUserAuthorizedAgentIds] = useState<Set<string>>(new Set());
 
   const packageId = useNetworkVariable('packageId');
@@ -28,23 +29,6 @@ export function Home() {
     },
     {
       enabled: !!client && !!packageId,
-      // Refresh every 10 seconds
-      refetchInterval: 10000,
-      // Also refetch when window regains focus
-      refetchOnWindowFocus: true,
-    }
-  );
-
-  // Query to fetch character details for all agents
-  const { data: charactersResponse, isLoading: isCharactersLoading } = useRoochClientQuery(
-    'queryObjectStates',
-    {
-      filter: {
-        object_type: `${packageId}::character::Character`,
-      },
-    },
-    {
-      enabled: !!client && !!packageId,
       refetchInterval: 10000,
       refetchOnWindowFocus: true,
     }
@@ -57,7 +41,7 @@ export function Home() {
       filter: {
         object_type_with_owner: {
           object_type: `${packageId}::agent_cap::AgentCap`,
-          owner: wallet?.wallet?.getBitcoinAddress().toStr(),
+          owner: wallet?.wallet?.getBitcoinAddress().toStr() || '',
         },
       },
     },
@@ -68,7 +52,7 @@ export function Home() {
   );
 
   useEffect(() => {
-    if (isQueryLoading || isCharactersLoading || isAgentCapsLoading) {
+    if (isQueryLoading || isAgentCapsLoading) {
       setIsLoading(true);
       return;
     }
@@ -82,38 +66,19 @@ export function Home() {
 
     if (agentsResponse?.data) {
       try {
-        // First, create a map of character data by ID
-        const characterDataMap = new Map();
-        if (charactersResponse?.data) {
-          charactersResponse.data.forEach(obj => {
-            const characterData = obj.decoded_value.value;
-            characterDataMap.set(obj.id, {
-              id: obj.id,
-              name: characterData.name || 'Unnamed Character',
-              username: characterData.username || '',
-              description: characterData.description || ''
-            });
-          });
-        }
-        
         // Transform the agent objects
         const parsedAgents = agentsResponse.data.map(obj => {
-          const agentData = obj.decoded_value.value;
-          console.log('agentData', agentData);
-          
-          // Get the character ID from the reference
-          const characterId = agentData.character?.value?.id;
-          // Look up character data from our map
-          const characterData = characterId ? characterDataMap.get(characterId) : null;
+          const agentData = obj.decoded_value?.value || {};
+          const agentAddress = agentData.agent_address ? 
+            new RoochAddress(String(agentData.agent_address)).toBech32Address() : '';
           
           return {
             id: obj.id,
-            name: characterData?.name || 'Unnamed Agent',
-            description: characterData?.description || '',
-            characterId: characterId,
-            agent_address: agentData.agent_address, 
-            modelProvider: agentData.model_provider || 'Unknown',
-            createdAt: parseInt(agentData.last_active_timestamp) || Date.now(),
+            name: String(agentData.name || 'Unnamed Agent'),
+            description: String(agentData.description || ''),
+            agent_address: agentAddress,
+            modelProvider: String(agentData.model_provider || 'Unknown'),
+            createdAt: Number(agentData.last_active_timestamp) || Date.now(),
           };
         });
         
@@ -121,9 +86,9 @@ export function Home() {
         const newUserAuthorizedAgentIds = new Set<string>();
         if (agentCapsResponse?.data && wallet?.wallet) {
           agentCapsResponse.data.forEach(obj => {
-            const capData = obj.decoded_value.value;
+            const capData = obj.decoded_value?.value || {};
             if (capData.agent_obj_id) {
-              newUserAuthorizedAgentIds.add(capData.agent_obj_id);
+              newUserAuthorizedAgentIds.add(String(capData.agent_obj_id));
             }
           });
           console.log('User has capabilities for agents:', newUserAuthorizedAgentIds);
@@ -150,7 +115,7 @@ export function Home() {
     }
     
     setIsLoading(false);
-  }, [agentsResponse, charactersResponse, agentCapsResponse, isQueryLoading, isCharactersLoading, isAgentCapsLoading, queryError, session, filter]);
+  }, [agentsResponse, agentCapsResponse, isQueryLoading, isAgentCapsLoading, queryError, session, filter]);
 
   const handleAgentClick = (agent: Agent) => {
     navigate(`/agent/${agent.id}`);
@@ -168,9 +133,9 @@ export function Home() {
           
           {/* Create Agent Button - Always visible */}
           <div className="mt-4 sm:mt-0">
-            <SessionKeyGuard onClick={() => navigate('/characters')}>
+            <SessionKeyGuard onClick={() => navigate('/create-agent')}>
               <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                Launch AI Agent
+                Create New AI Agent
               </button>
             </SessionKeyGuard>
           </div>
@@ -220,7 +185,7 @@ export function Home() {
                 ? "You don't have authorized control of any agents yet." 
                 : "No AI agents found on the network."}
             </p>
-            <SessionKeyGuard onClick={() => navigate('/characters')}>
+            <SessionKeyGuard onClick={() => navigate('/create-agent')}>
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition-colors"
               >

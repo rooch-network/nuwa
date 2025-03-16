@@ -1,4 +1,4 @@
-import { Message } from '../types/channel';
+import { Message, MESSAGE_TYPE } from '../types/channel';
 import { UserCircleIcon } from '@heroicons/react/24/solid';
 import { formatTimestamp } from '../utils/time';
 import ReactMarkdown from 'react-markdown'
@@ -12,9 +12,6 @@ import { shortenAddress } from '../utils/address';
 import { Link } from 'react-router-dom';
 import { RoochAddress } from '@roochnetwork/rooch-sdk';
 
-// Add action type constants
-const MESSAGE_TYPE_NORMAL = 0;
-const MESSAGE_TYPE_ACTION_EVENT = 2;
 
 // Add interface for parsed action event
 interface ActionEvent {
@@ -36,7 +33,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId, hasPaidContent }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const timestamp = message.timestamp;
-  const isActionEvent = message.message_type === MESSAGE_TYPE_ACTION_EVENT;
+  const isActionEvent = message.message_type === MESSAGE_TYPE.ACTION_EVENT;
 
   //TODO use the scanUrl via the network.
   const roochscanBaseUrl = "https://test.roochscan.io";
