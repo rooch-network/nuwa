@@ -47,28 +47,7 @@ module nuwa_framework::prompt_builder {
         actions: vector<ActionDescription>,
         instructions: vector<String>,
     }
-
-    public fun build_complete_prompt<D: drop>(
-        _agent_address: address,
-        _character: &Character,
-        _memory_store: &MemoryStore,
-        _input: nuwa_framework::agent_input::AgentInput<D>,
-        _available_actions: vector<ActionDescription>,
-    ): String {
-        abort 0
-    }
-
-    public(friend) fun build_complete_prompt_v2<D: drop>(
-        _agent_address: address,
-        _character: &Character,
-        _memory_store: &MemoryStore,
-        _input: nuwa_framework::agent_input::AgentInput<D>,
-        _available_actions: vector<ActionDescription>,
-        _agent_states: AgentStates,
-    ): String {
-        abort 0
-    }
-
+ 
     public(friend) fun build_complete_prompt_internal(
         agent_info: AgentInfo,
         memory_store: &MemoryStore,

@@ -38,39 +38,10 @@ module nuwa_framework::ai_service {
     const ErrorInvalidDepositAmount: u64 = 1;
     const ErrorInsufficientBalance: u64 = 2;
 
-    struct PendingRequest has copy, drop, store {
-        request_id: ObjectID,
-        agent_obj_id: ObjectID,
-    }
-
-    struct PendingRequestV2 has copy, drop, store {
-        request_id: ObjectID,
-        agent_obj_id: ObjectID,
-        agent_input_info: nuwa_framework::agent_input::AgentInputInfo,
-    }
-
-    struct PendingRequestV3 has copy, drop, store {
-        request_id: ObjectID,
-        agent_obj_id: ObjectID,
-        agent_input_info: nuwa_framework::agent_input::AgentInputInfoV2,
-    }
-
     struct PendingRequestV4 has copy, drop, store {
         request_id: ObjectID,
         agent_obj_id: ObjectID,
         agent_input_info: AgentInputInfo,
-    }
-
-    struct Requests has key {
-        pending: vector<PendingRequest>,
-    }
-
-    struct RequestsV2 has key {
-        pending: vector<PendingRequestV2>,
-    }
-
-    struct RequestsV3 has key {
-        pending: vector<PendingRequestV3>,
     }
 
     struct RequestsV4 has key {
@@ -78,28 +49,6 @@ module nuwa_framework::ai_service {
     }
 
     fun init() {
-        let signer = moveos_std::signer::module_signer<Requests>();
-        account::move_resource_to(&signer, Requests { 
-            pending: vector::empty() 
-        });
-        init_v2();
-    }
-
-    entry fun init_v2() {
-        let signer = moveos_std::signer::module_signer<RequestsV2>();
-        account::move_resource_to(&signer, RequestsV2 { 
-            pending: vector::empty() 
-        });
-    }
-
-    entry fun init_v3() {
-        let signer = moveos_std::signer::module_signer<RequestsV3>();
-        account::move_resource_to(&signer, RequestsV3 { 
-            pending: vector::empty() 
-        });
-    }
-
-    entry fun init_v4() {
         let signer = moveos_std::signer::module_signer<RequestsV4>();
         account::move_resource_to(&signer, RequestsV4 { 
             pending: vector::empty() 
@@ -163,33 +112,6 @@ module nuwa_framework::ai_service {
         ok(request_id)
     }
 
-    public fun get_pending_requests(): vector<PendingRequest> {
-        let requests = account::borrow_resource<Requests>(@nuwa_framework);
-        *&requests.pending
-    }
-
-    public fun unpack_pending_request(request: PendingRequest): (ObjectID, ObjectID) {
-        (request.request_id, request.agent_obj_id)
-    }
-
-    public fun get_pending_requests_v2(): vector<PendingRequestV2> {
-        let requests = account::borrow_resource<RequestsV2>(@nuwa_framework);
-        *&requests.pending
-    }
-
-    public fun unpack_pending_request_v2(request: PendingRequestV2): (ObjectID, ObjectID, nuwa_framework::agent_input::AgentInputInfo) {
-        (request.request_id, request.agent_obj_id, request.agent_input_info)
-    }
-
-    public fun get_pending_requests_v3(): vector<PendingRequestV3> {
-        let requests = account::borrow_resource<RequestsV3>(@nuwa_framework);
-        *&requests.pending
-    }
-
-    public fun unpack_pending_request_v3(request: PendingRequestV3): (ObjectID, ObjectID, nuwa_framework::agent_input::AgentInputInfoV2) {
-        (request.request_id, request.agent_obj_id, request.agent_input_info)
-    }
-
     public fun get_pending_requests_v4(): vector<PendingRequestV4> {
         let requests = account::borrow_resource<RequestsV4>(@nuwa_framework);
         *&requests.pending
@@ -197,10 +119,6 @@ module nuwa_framework::ai_service {
 
     public fun unpack_pending_request_v4(request: PendingRequestV4): (ObjectID, ObjectID, AgentInputInfo) {
         (request.request_id, request.agent_obj_id, request.agent_input_info)
-    }
-
-    public fun take_pending_request_by_id(_request_id: ObjectID): Option<PendingRequestV3> {
-        abort 0
     }
 
     public(friend) fun take_pending_request_by_id_v2(request_id: ObjectID): Option<PendingRequestV4> {

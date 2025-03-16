@@ -14,28 +14,13 @@ module nuwa_framework::agent_cap {
 
     friend nuwa_framework::agent;
 
+    //TODO should we allow AgentCap to be transferred?
     struct AgentCap has store, key {
         agent_obj_id: ObjectID,
     }
 
-    //TODO Remove this cap
-    /// A cap for managing the memory of an agent.
-    struct MemoryCap has store, key {
-        agent_obj_id: ObjectID,
-        create: bool,
-        remove: bool,
-        update: bool,
-    }
-
     struct AgentCapDestroyedEvent has copy, drop, store {
         agent_obj_id: ObjectID,
-    }
-
-    struct MemoryCapDestroyedEvent has copy, drop, store {
-        agent_obj_id: ObjectID,
-        create: bool,
-        remove: bool,
-        update: bool,
     }
 
     public(friend) fun new_agent_cap(agent_obj_id: ObjectID) : Object<AgentCap> {
@@ -52,29 +37,9 @@ module nuwa_framework::agent_cap {
         event::emit(AgentCapDestroyedEvent { agent_obj_id });
     }
 
-    public entry fun destroy_memory_cap(_cap: Object<MemoryCap>) {
-        abort 0
-    }
-
     public fun borrow_mut_agent_cap(caller: &signer, agent_obj_id: ObjectID) : &mut Object<AgentCap> {
         assert!(object::exists_object(agent_obj_id), ErrorAgentCapNotFound);
         object::borrow_mut_object<AgentCap>(caller, agent_obj_id)
-    }
-
-    public fun check_agent_cap(_cap: &mut Object<AgentCap>) : ObjectID {
-        abort 0
-    }
-
-    public fun check_memory_create_cap(_cap: &mut Object<MemoryCap>) : ObjectID {
-        abort 0
-    }
-
-    public fun check_memory_remove_cap(_cap: &mut Object<MemoryCap>) : ObjectID {
-        abort 0
-    }
-
-    public fun check_memory_update_cap(_cap: &mut Object<MemoryCap>) : ObjectID {
-        abort 0
     }
 
     public fun get_agent_obj_id(cap: &Object<AgentCap>) : ObjectID {

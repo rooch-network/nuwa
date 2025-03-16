@@ -69,7 +69,7 @@ module nuwa_framework::agent_tests {
         
         let app_task_specs = task_spec::empty_task_specifications();
         // Get first prompt
-        let prompt = agent_runner::generate_system_prompt_v3(agent, agent_input_info, app_task_specs);
+        let prompt = agent_runner::generate_system_prompt(agent, agent_input_info, app_task_specs);
 
         // Print first prompt for debugging
         debug::print(&string::utf8(b"First Prompt:"));

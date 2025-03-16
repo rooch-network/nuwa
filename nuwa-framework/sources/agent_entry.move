@@ -1,18 +1,15 @@
 module nuwa_framework::agent_entry {
     use std::signer;
     use moveos_std::object::{Self, Object};
+    use rooch_framework::account_coin_store;
+    use rooch_framework::gas_coin::RGas;
+
     use nuwa_framework::character::{Character};
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::agent_cap;
     use nuwa_framework::channel;
-    use rooch_framework::account_coin_store;
     use nuwa_framework::config;
-    use rooch_framework::gas_coin::RGas;
-
-    //TODO remove this
-    public entry fun create_agent_entry(creater: &signer, character: Object<Character>) {
-        create_agent(creater, character);  
-    }
+    
 
     public entry fun create_agent(creater: &signer, character: Object<Character>) {
         let initial_fee = account_coin_store::withdraw<RGas>(creater, config::get_ai_agent_initial_fee());

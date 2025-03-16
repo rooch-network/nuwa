@@ -72,20 +72,7 @@ module nuwa_framework::action_dispatcher {
 
         descriptions
     }
-
-    /// Dispatch all actions from line-based format
-    public fun dispatch_actions(_agent: &mut Object<Agent>, _response: String) {
-        abort 0
-    }
-
-    public fun dispatch_actions_v2(_agent: &mut Object<Agent>, _agent_input: nuwa_framework::agent_input::AgentInputInfo, _response: String) {
-        abort 0
-    }
-
-    public fun dispatch_actions_v3(_agent: &mut Object<Agent>, _agent_input: nuwa_framework::agent_input::AgentInputInfoV2, _response: String) {
-        abort 0
-    }
-
+ 
     //TODO return result
     public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
         let action_response = parse_line_based_response(&response);

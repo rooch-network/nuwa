@@ -8,7 +8,6 @@ module nuwa_framework::agent {
     use nuwa_framework::character::{Self, Character};
     use nuwa_framework::agent_cap::{Self, AgentCap};
     use nuwa_framework::memory::{Self, MemoryStore};
-    use nuwa_framework::agent_state::{AgentStates};
     use nuwa_framework::agent_info;
     use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
     use rooch_framework::coin::{Self, Coin};
@@ -77,40 +76,7 @@ module nuwa_framework::agent {
         object::to_shared(agent_obj);
         let agent_cap = agent_cap::new_agent_cap(agent_obj_id);
         agent_cap
-    }
-
-    /// Generate system prompt based on Character attributes
-    public fun generate_system_prompt<I: copy + drop>(
-        _agent: &Agent,
-        _input: nuwa_framework::agent_input::AgentInput<I>,
-    ): String {
-        abort ErrorDeprecatedFunction
-    }
-
-    public fun generate_system_prompt_v2<I: copy + drop>(
-        _agent: &Agent,
-        _states: AgentStates,
-        _input: nuwa_framework::agent_input::AgentInput<I>,
-    ): String {
-        abort ErrorDeprecatedFunction
-    }
-
-    public fun process_input<I: copy + drop>(
-        _caller: &signer,
-        _agent_obj: &mut Object<Agent>,
-        _input: nuwa_framework::agent_input::AgentInput<I>,
-    ) {
-        abort ErrorDeprecatedFunction
-    }
-
-    public fun process_input_v2<I: copy + drop>(
-        _caller: &signer,
-        _agent_obj: &mut Object<Agent>,
-        _states: AgentStates,
-        _input: nuwa_framework::agent_input::AgentInput<I>,
-    ) {
-        abort ErrorDeprecatedFunction
-    }
+    } 
 
     public fun borrow_mut_agent(agent_obj_id: ObjectID): &mut Object<Agent> {
         object::borrow_mut_object_shared(agent_obj_id)

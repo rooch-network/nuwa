@@ -104,23 +104,7 @@ module nuwa_framework::message {
             message_type,
             mentions,
         }
-    }
-
-    public fun new_direct_message_input(_messages: vector<Message>): nuwa_framework::agent_input::AgentInput<MessageInputV2>{
-        abort 0
-    }
-
-    public fun new_channel_message_input(_messages: vector<Message>) : nuwa_framework::agent_input::AgentInput<MessageInputV2> {
-        abort 0
-    }
-
-    public fun new_agent_input(_messages: vector<Message>) : nuwa_framework::agent_input::AgentInput<MessageInput> {
-        abort 0
-    }
-
-    public fun new_agent_input_v3(_messages: vector<Message>, _is_direct_channel: bool) : nuwa_framework::agent_input::AgentInput<MessageInputV3> {
-        abort 0
-    }
+    } 
 
 
     public fun new_agent_input_v4(messages: vector<Message>) : AgentInput<MessageInputV3> {
