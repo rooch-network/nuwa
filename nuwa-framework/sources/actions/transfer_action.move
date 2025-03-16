@@ -85,14 +85,6 @@ module nuwa_framework::transfer_action {
         descriptions
     }
     
-    public fun execute(_agent: &mut Object<Agent>, _action_name: String, _args_json: String){
-        abort 0
-    }
-
-    public fun execute_v3(_agent: &mut Object<Agent>, _agent_input: &nuwa_framework::agent_input::AgentInputInfoV2, _action_name: String, _args_json: String) :Result<bool, String> {
-        abort 0
-    }
-
     /// Execute a transfer action
     public(friend) fun execute_internal(agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, action_name: String, args_json: String) :Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_TRANSFER)) {
