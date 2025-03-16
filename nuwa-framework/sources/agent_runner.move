@@ -36,7 +36,7 @@ module nuwa_framework::agent_runner {
     ): String {
         let states = state_providers::get_agent_state(agent);
         let available_actions = get_available_actions();
-        let agent_info = agent::get_agent_info_v2(agent);
+        let agent_info = agent::get_agent_info(agent);
         let memory_store = agent::borrow_memory_store(agent);
         let task_specs = agent::get_agent_task_specs(agent);
         task_spec::merge_task_specifications(&mut task_specs, app_task_specs);

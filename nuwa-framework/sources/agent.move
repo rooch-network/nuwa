@@ -25,7 +25,6 @@ module nuwa_framework::agent {
     const ErrorDeprecatedFunction: u64 = 1;
     const ErrorInvalidInitialFee: u64 = 2;
 
-    //TODO use a new agent_runner module to handle agent running, this module only contains agent data structure
     /// Agent represents a running instance of a Character
     struct Agent has key {
         agent_address: address,
@@ -37,22 +36,7 @@ module nuwa_framework::agent {
         model_provider: String,
     }
 
-    //TODO remove this after
-    struct AgentInfo has copy, drop, store {
-        id: ObjectID,
-        name: String,            
-        username: String,        
-        agent_address: address,  // AI's agent address
-        description: String,
-        bio: vector<String>,
-        knowledge: vector<String>,
-    }
-
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
-
-    public fun create_agent(_character: Object<Character>) : Object<AgentCap> {
-        abort ErrorDeprecatedFunction
-    }
 
     public fun create_agent_with_initial_fee(character: Object<Character>, initial_fee: Coin<RGas>) : Object<AgentCap> {
         let initial_fee_amount = coin::value(&initial_fee);
@@ -82,7 +66,6 @@ module nuwa_framework::agent {
         object::borrow_mut_object_shared(agent_obj_id)
     }
 
-    //TODO check if this function have security issue for public access
     public fun borrow_mut_agent_by_address(agent_addr: address): &mut Object<Agent> {
         let agent_obj_id = object::account_named_object_id<Agent>(agent_addr);
         object::borrow_mut_object_shared(agent_obj_id)
@@ -100,21 +83,7 @@ module nuwa_framework::agent {
         &agent_ref.memory_store
     }
 
-    public fun get_agent_info(agent: &Object<Agent>): AgentInfo {
-        let agent_ref = object::borrow(agent);
-        let character = object::borrow(&agent_ref.character);
-        AgentInfo {
-            id: object::id(agent),
-            name: *character::get_name(character),
-            username: *character::get_username(character),
-            agent_address: agent_ref.agent_address,
-            description: *character::get_description(character),
-            bio: *character::get_bio(character),
-            knowledge: *character::get_knowledge(character),
-        }
-    }
-
-    public fun get_agent_info_v2(agent: &Object<Agent>): agent_info::AgentInfo {
+    public fun get_agent_info(agent: &Object<Agent>): agent_info::AgentInfo {
         let agent_ref = object::borrow(agent);
         let character = object::borrow(&agent_ref.character);
         agent_info::new_agent_info(
@@ -130,7 +99,7 @@ module nuwa_framework::agent {
         )
     }
 
-    public fun get_agent_info_by_address(agent_addr: address): AgentInfo {
+    public fun get_agent_info_by_address(agent_addr: address): agent_info::AgentInfo {
         let agent_obj_id = object::account_named_object_id<Agent>(agent_addr);
         let agent_obj = object::borrow_object<Agent>(agent_obj_id);
         get_agent_info(agent_obj)

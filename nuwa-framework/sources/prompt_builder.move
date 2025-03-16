@@ -87,7 +87,7 @@ module nuwa_framework::prompt_builder {
         // Add agent state section - new section
         string::append(&mut prompt, string::utf8(b"### 4. Your Current State\n\n"));
         string::append(&mut prompt, string::utf8(b"This represents your current state on the blockchain:\n\n"));
-        string::append(&mut prompt, nuwa_framework::agent_state::to_prompt(agent_states));
+        string::append(&mut prompt, nuwa_framework::agent_state::to_prompt(&agent_states));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
 
         // Context section - updated section number

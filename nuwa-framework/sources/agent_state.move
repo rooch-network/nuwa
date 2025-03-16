@@ -34,8 +34,7 @@ module nuwa_framework::agent_state{
         vector::push_back(&mut agent_states.states, agent_state);
     }
 
-    //TODO change to &AgentStates
-    public fun to_prompt(agent_states: AgentStates): String {
+    public fun to_prompt(agent_states: &AgentStates): String {
         let prompt = string::utf8(b"Your current states:\n");
        
         vector::for_each(agent_states.states, |state| {
