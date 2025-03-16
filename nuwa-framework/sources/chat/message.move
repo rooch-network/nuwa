@@ -4,7 +4,7 @@ module nuwa_framework::message {
     use moveos_std::timestamp;
     use moveos_std::object::{Self, ObjectID};
 
-    use nuwa_framework::agent_input_v2::{Self, AgentInput};
+    use nuwa_framework::agent_input::{Self, AgentInput};
     use nuwa_framework::string_utils::{channel_id_to_string};
 
     friend nuwa_framework::channel;
@@ -125,7 +125,7 @@ module nuwa_framework::message {
         string::append(&mut description, channel_id_to_string(channel_id));
         string::append(&mut description, string::utf8(b")\n"));
         string::append(&mut description, string::utf8(MESSAGE_INPUT_DESCRIPTION));
-        agent_input_v2::new_agent_input(
+        agent_input::new_agent_input(
             current.sender,
             channel_id,
             description,

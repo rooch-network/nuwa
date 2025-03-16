@@ -12,7 +12,7 @@ module nuwa_framework::agent_runner {
     use rooch_framework::account_coin_store;
 
     use nuwa_framework::action::ActionGroup;
-    use nuwa_framework::agent_input_v2::{Self, AgentInput};
+    use nuwa_framework::agent_input::{Self, AgentInput};
     use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
     use nuwa_framework::ai_request;
     use nuwa_framework::ai_service;
@@ -77,7 +77,7 @@ module nuwa_framework::agent_runner {
             decimal_value::new(amount_except_base_fee, decimals),
         );
 
-        let input_info = agent_input_v2::into_agent_input_info(input, coin_input_info);
+        let input_info = agent_input::into_agent_input_info(input, coin_input_info);
         // Generate system prompt with context
         let system_prompt = generate_system_prompt(
             agent_obj,

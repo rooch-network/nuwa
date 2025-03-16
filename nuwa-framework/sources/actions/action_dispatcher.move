@@ -268,7 +268,7 @@ module nuwa_framework::action_dispatcher {
         use nuwa_framework::response_action;
         use nuwa_framework::channel;
         use nuwa_framework::message;
-        use nuwa_framework::agent_input_v2;
+        use nuwa_framework::agent_input;
         use rooch_framework::gas_coin::RGas;
 
         // Initialize
@@ -319,7 +319,7 @@ module nuwa_framework::action_dispatcher {
         );
         let coin_input_info = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000000000000u256);
         let agent_input = message::new_agent_input_v4(vector[message]);
-        let agent_input_info = agent_input_v2::into_agent_input_info(agent_input, coin_input_info);
+        let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input_info);
 
         // Execute actions
         dispatch_actions_internal(agent, agent_input_info, test_response);

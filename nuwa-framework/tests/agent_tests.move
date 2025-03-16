@@ -9,7 +9,7 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::action_dispatcher;
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
-    use nuwa_framework::agent_input_v2;
+    use nuwa_framework::agent_input;
     use nuwa_framework::channel;
     use nuwa_framework::message;
     use nuwa_framework::agent_input_info;
@@ -65,7 +65,7 @@ module nuwa_framework::agent_tests {
         let agent_input = message::new_agent_input_v4(vector[test_message]);
         std::debug::print(&agent_input);
         
-        let agent_input_info = agent_input_v2::into_agent_input_info(agent_input, coin_input);
+        let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input);
         
         let app_task_specs = task_spec::empty_task_specifications();
         // Get first prompt
