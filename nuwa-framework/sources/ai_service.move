@@ -4,7 +4,6 @@ module nuwa_framework::ai_service {
     use std::signer;
     use std::u256;
     use moveos_std::object::{Self, ObjectID, Object};
-    use moveos_std::account;
     use moveos_std::result::{ok, err_str, Result};
     use verity::oracles;
     use verity::registry;
@@ -155,6 +154,7 @@ module nuwa_framework::ai_service {
 
     #[test]
     fun test_oracle_fee_operations() {
+        use moveos_std::account;
         oracles::init_for_test();
 
         // Initialize test accounts
