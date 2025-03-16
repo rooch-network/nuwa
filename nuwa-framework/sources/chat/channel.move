@@ -180,7 +180,6 @@ module nuwa_framework::channel {
         //Only AI_HOME channel can create topic channel
         assert!(parent_channel.channel_type == CHANNEL_TYPE_AI_HOME, ErrorInvalidChannelType);
         let now = timestamp::now_milliseconds();
-        //TODO maybe we need to add parent_channel_id to topic channel
         let channel = Channel {
             parent_channel: option::some(parent_channel_id),
             title: topic,

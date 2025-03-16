@@ -13,31 +13,22 @@ module nuwa_framework::balance_provider {
 
     const BALANCE_DESCRIPTION: vector<u8> = b"This is your balances";
 
-    //TODO remove
+    
     #[data_struct]
     struct BalanceState has copy, drop, store {
-        coin_symbol: String,
-        coin_type: String,
-        decimals: u8,
-        balance: u256,
-    }
-
-    #[data_struct]
-    struct BalanceStateV2 has copy, drop, store {
         coin_symbol: String,
         coin_type: String,
         balance: DecimalValue,
     }
     
     public fun get_state(agent: &Object<Agent>): AgentState {
-        //TODO support dynamic get coin info and balance
         let balance_states = vector::empty();
         let coin_type = type_info::type_name<RGas>();
         let coin_symbol = coin::symbol_by_type<RGas>();
         let decimals = coin::decimals_by_type<RGas>();
         let agent_address = agent::get_agent_address(agent);
         let balance = account_coin_store::balance<RGas>(agent_address);
-        let balance_state = BalanceStateV2 {
+        let balance_state = BalanceState {
             coin_symbol,
             coin_type,
             balance: decimal_value::new(balance, decimals),
@@ -50,7 +41,7 @@ module nuwa_framework::balance_provider {
 
     #[test]
     fun test_balance_state(){
-        let balance_state = BalanceStateV2 {
+        let balance_state = BalanceState {
             coin_symbol: string::utf8(b"RGas"),
             coin_type: string::utf8(b"0x3::gas_coin::RGas"),
             balance: decimal_value::new(110000000, 8),
