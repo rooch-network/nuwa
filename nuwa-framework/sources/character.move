@@ -1,7 +1,6 @@
 module nuwa_framework::character {
 
     use std::string::String;
-    use std::vector;
 
     use moveos_std::object::{Self, Object};
     use moveos_std::json;
@@ -12,13 +11,18 @@ module nuwa_framework::character {
     const ErrorUsernameAlreadyRegistered: u64 = 1;
 
 
-    /// Character represents an AI agent's personality and knowledge
+    /// Character represents an AI agent's personality
     struct Character has key,store {
+        /// The name of the character
         name: String,
+        /// The unique identifier for the character
         username: String,
-        description: String,      // The character's system prompt
-        bio: vector<String>,      // Character's background stories and personalities
-        knowledge: vector<String>,// Character's domain knowledge and capabilities
+        /// The avatar of the character
+        avatar: String,
+        /// One-line description of the character
+        description: String,
+        /// Instructions for the character when the agent is running
+        instructions: String,
     }
 
     #[data_struct]
@@ -26,24 +30,24 @@ module nuwa_framework::character {
     struct CharacterData has copy, drop, store {
         name: String,
         username: String,
+        avatar: String,
         description: String,
-        bio: vector<String>,
-        knowledge: vector<String>,
+        instructions: String,
     }
 
     public fun new_character_data(
         name: String,
         username: String,
+        avatar: String,
         description: String,
-        bio: vector<String>,
-        knowledge: vector<String>,
+        instructions: String,
     ) : CharacterData {
         CharacterData {
             name,
             username,
+            avatar,
             description,
-            bio,
-            knowledge,
+            instructions,
         }
     }
 
@@ -52,9 +56,9 @@ module nuwa_framework::character {
         let character = Character {
             name: data.name,
             username: data.username,
+            avatar: data.avatar,
             description: data.description,
-            bio: data.bio,
-            knowledge: data.knowledge,
+            instructions: data.instructions,
         };
         // Every account only has one character
         let obj = object::new(character);
@@ -67,9 +71,9 @@ module nuwa_framework::character {
         let Character {
             name: _,
             username,
+            avatar: _,
             description: _,
-            bio: _,
-            knowledge: _,
+            instructions: _,
         } = c;
         character_registry::unregister_username(username);
     }
@@ -85,26 +89,10 @@ module nuwa_framework::character {
         object::transfer(co, signer::address_of(caller));
     }
 
-    public entry fun create_character_entry(caller: &signer, name: String, username: String, description: String){
-        let data = new_character_data(name, username, description, vector::empty(), vector::empty());
+    public entry fun create_character_entry(caller: &signer, name: String, username: String, avatar: String, description: String, instructions: String){
+        let data = new_character_data(name, username, avatar, description, instructions);
         let co = create_character(data);
         object::transfer(co, signer::address_of(caller));
-    }
-
-    public entry fun add_bio(co: &mut Object<Character>, bio: String) {
-        let c = object::borrow_mut(co);
-        if(vector::contains(&c.bio, &bio)){
-            return
-        };
-        vector::push_back(&mut c.bio, bio);
-    }
-
-    public entry fun add_knowledge(co: &mut Object<Character>, knowledge: String) {
-        let c = object::borrow_mut(co);
-        if(vector::contains(&c.knowledge, &knowledge)){
-            return
-        };
-        vector::push_back(&mut c.knowledge, knowledge);
     }
 
     public entry fun destroy_character(co: Object<Character>){
@@ -124,23 +112,33 @@ module nuwa_framework::character {
         &character.description
     }
 
-    public fun get_bio(character: &Character): &vector<String> {
-        &character.bio
+    public fun get_instructions(character: &Character): &String {
+        &character.instructions
     }
 
-    public fun get_knowledge(character: &Character): &vector<String> {
-        &character.knowledge
+    public fun get_avatar(character: &Character): &String {
+        &character.avatar
     }
 
     // Add these functions to allow updating character properties
-    public fun update_name(character: &mut Object<Character>, new_name: String) {
+    public entry fun update_name(character: &mut Object<Character>, new_name: String) {
         let c = object::borrow_mut(character);
         c.name = new_name;
     }
 
-    public fun update_description(character: &mut Object<Character>, new_description: String) {
+    public entry fun update_description(character: &mut Object<Character>, new_description: String) {
         let c = object::borrow_mut(character);
         c.description = new_description;
+    }
+
+    public entry fun update_instructions(character: &mut Object<Character>, new_instructions: String) {
+        let c = object::borrow_mut(character);
+        c.instructions = new_instructions;
+    }
+
+    public entry fun update_avatar(character: &mut Object<Character>, new_avatar: String) {
+        let c = object::borrow_mut(character);
+        c.avatar = new_avatar;
     }
 
     #[test(caller = @0x42)]
@@ -151,9 +149,9 @@ module nuwa_framework::character {
         let data = new_character_data(
             string::utf8(b"Dobby"),
             string::utf8(b"dobby"),
-            string::utf8(b"You are Dobby, a helpful and loyal assistant."),
-            vector[string::utf8(b"Dobby is a free assistant who helps because of his enormous heart.")],
-            vector[string::utf8(b"Creative problem-solving")]
+            string::utf8(b""),
+            string::utf8(b"Dobby is a free assistant who helps because of his enormous heart."),
+            string::utf8(b"Creative problem-solving"),
         );
         
         let character_obj = create_character(data);
@@ -161,19 +159,19 @@ module nuwa_framework::character {
         
         // Verify character fields
         assert!(*get_name(character) == string::utf8(b"Dobby"), 1);
-        assert!(*get_description(character) == string::utf8(b"You are Dobby, a helpful and loyal assistant."), 2);
-        assert!(vector::length(get_bio(character)) == 1, 3);
-        assert!(vector::length(get_knowledge(character)) == 1, 4);
+        assert!(*get_description(character) == string::utf8(b"Dobby is a free assistant who helps because of his enormous heart."), 2);
+        assert!(*get_instructions(character) == string::utf8(b"Creative problem-solving"), 3);
+        assert!(*get_avatar(character) == string::utf8(b""), 4);
        
-        // Test add_bio
-        add_bio(&mut character_obj, string::utf8(b"Dobby excels at programming and system design"));
+        // Test update_description
+        update_description(&mut character_obj, string::utf8(b"Dobby is a free assistant who helps because of his enormous heart."));
         let character = object::borrow(&character_obj);
-        assert!(vector::length(get_bio(character)) == 2, 6);
+        assert!(*get_description(character) == string::utf8(b"Dobby is a free assistant who helps because of his enormous heart."), 6);
 
-        // Test add_knowledge
-        add_knowledge(&mut character_obj, string::utf8(b"System architecture"));
+        // Test update_instructions
+        update_instructions(&mut character_obj, string::utf8(b"System architecture"));
         let character = object::borrow(&character_obj);
-        assert!(vector::length(get_knowledge(character)) == 2, 7);
+        assert!(*get_instructions(character) == string::utf8(b"System architecture"), 7);
 
         // Clean up
         destroy_character(character_obj);

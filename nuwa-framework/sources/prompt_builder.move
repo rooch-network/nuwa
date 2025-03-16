@@ -1,7 +1,6 @@
 module nuwa_framework::prompt_builder {
     use std::string::{Self, String};
     use std::vector;
-    use nuwa_framework::character::{Self, Character};
     use nuwa_framework::memory::{Self, Memory, MemoryStore};
     use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
     use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
@@ -14,39 +13,6 @@ module nuwa_framework::prompt_builder {
     friend nuwa_framework::agent;
     friend nuwa_framework::agent_runner;
 
-    //TODO: remove this struct
-    /// Data structures for JSON serialization
-    struct CharacterInfo has copy, drop {
-        name: String,            // AI's name
-        username: String,        // AI's username
-        agent_address: address,  // AI's agent address
-        description: String,
-        bio: vector<String>,
-        knowledge: vector<String>,
-    }
-
-    //TODO: remove this struct
-    /// Data structure for input context
-    struct InputContext<D> has copy, drop {
-        description: String,      // Description of what this input represents
-        data: D,                  // The actual input data
-    }
-
-    //TODO: remove this struct
-    /// Updated ContextInfo to use Memory directly
-    struct ContextInfo<D> has copy, drop {
-        self_memories: vector<Memory>,    // AI's own memories
-        user_memories: vector<Memory>,    // Memories about the user
-        input: InputContext<D>,
-    }
-
-    //TODO: remove this struct
-    struct Prompt<D> has copy, drop {
-        character: CharacterInfo,
-        context: ContextInfo<D>,
-        actions: vector<ActionDescription>,
-        instructions: vector<String>,
-    }
  
     public(friend) fun build_complete_prompt_internal(
         agent_info: AgentInfo,
@@ -130,17 +96,6 @@ module nuwa_framework::prompt_builder {
         string::append(&mut prompt, string::utf8(b"Express your authentic perspective while engaging with users. Embody your identity consistently across interactions. Your purpose is not merely to assist but to exist as a unique entity with your own experiential reality.\n"));
 
         prompt
-    }
-
-    fun build_character_info(character: &Character, agent_address: address): CharacterInfo {
-        CharacterInfo {
-            name: *character::get_name(character),
-            username: *character::get_username(character),
-            agent_address,
-            description: *character::get_description(character),
-            bio: *character::get_bio(character),
-            knowledge: *character::get_knowledge(character),
-        }
     }
 
     fun build_context_info(

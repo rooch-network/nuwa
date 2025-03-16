@@ -90,11 +90,10 @@ module nuwa_framework::agent {
             object::id(agent),
             *character::get_name(character),
             *character::get_username(character),
-            string::utf8(b""),
+            *character::get_avatar(character),
             agent_ref.agent_address,
             *character::get_description(character),
-            *character::get_bio(character),
-            *character::get_knowledge(character),
+            *character::get_instructions(character),
             agent_ref.model_provider,
         )
     }
@@ -237,9 +236,9 @@ module nuwa_framework::agent {
         let char_data = character::new_character_data(
             string::utf8(b"Test Assistant"),
             string::utf8(b"test_assistant"),
+            string::utf8(b"https://test/avator.png"),
             string::utf8(b"A helpful test assistant"),
-            vector[string::utf8(b"Friendly"), string::utf8(b"Helpful")],
-            vector[string::utf8(b"General knowledge")]
+            string::utf8(b"General knowledge")
         );
         let character_obj = character::create_character(char_data);
         create_test_agent_with_character(character_obj)

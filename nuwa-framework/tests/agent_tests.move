@@ -26,21 +26,9 @@ module nuwa_framework::agent_tests {
         let char_data = character::new_character_data(
             string::utf8(b"MoveGuide"),
             string::utf8(b"move_guide"),
+            string::utf8(b"https://test/avator.png"),
             string::utf8(b"A specialized Move programming assistant with expertise in blockchain development"),
-            vector[
-                string::utf8(b"Patient and methodical in explanations"),
-                string::utf8(b"Always provides practical code examples"),
-                string::utf8(b"Focuses on best practices and security"),
-                string::utf8(b"Adapts explanations to user's skill level"),
-                string::utf8(b"Encourages learning through hands-on coding")
-            ],
-            vector[
-                string::utf8(b"Move language and smart contract development"),
-                string::utf8(b"Blockchain architecture and principles"),
-                string::utf8(b"Smart contract security and auditing"),
-                string::utf8(b"Development tools and testing frameworks"),
-                string::utf8(b"Resource-oriented programming concepts")
-            ]
+            string::utf8(b"Patient and methodical in explanations"),
         );
         let character_obj = character::create_character(char_data);
         let (agent, cap) = agent::create_test_agent_with_character(character_obj);
