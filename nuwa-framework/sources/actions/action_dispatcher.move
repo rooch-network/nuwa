@@ -302,8 +302,7 @@ module nuwa_framework::action_dispatcher {
             true,
         );
         
-        let response_args = response_action::create_channel_message_args_v2(
-            channel_id,
+        let response_args = response_action::create_say_args(
             string::utf8(b"I understand you prefer detailed explanations.")
         );
 
@@ -313,7 +312,7 @@ module nuwa_framework::action_dispatcher {
         );
         
         let response_action = create_action_call_with_object(
-            response_action::action_name_channel_message(), 
+            response_action::action_name_say(), 
             response_args
         );
 
