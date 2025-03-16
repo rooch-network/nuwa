@@ -81,10 +81,12 @@ module nuwa_framework::channel_tests {
         
         // Verify message
         let channel = object::borrow_object(channel_id);
-        let messages = channel::get_messages(channel);
-        assert!(vector::length(&messages) == 1, 0);
+        let message_ids = channel::get_messages(channel);
+        assert!(vector::length(&message_ids) == 1, 0);
         
-        let msg = vector::borrow(&messages, 0);
+        let msg_id = vector::borrow(&message_ids, 0);
+        let msg_obj = object::borrow_object<message::Message>(*msg_id);
+        let msg = object::borrow(msg_obj);
         assert!(message::get_content(msg) == msg_content, 1);
         assert!(message::get_sender(msg) == signer::address_of(&user), 2);
         assert!(message::get_type(msg) == message::type_normal(), 3);

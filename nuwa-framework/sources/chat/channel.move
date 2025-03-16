@@ -9,7 +9,7 @@ module nuwa_framework::channel {
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::timestamp;
     use moveos_std::signer;
-    use nuwa_framework::message::{Self, Message};
+    use nuwa_framework::message;
     use nuwa_framework::agent::{Self, Agent};
 
     friend nuwa_framework::response_action;
@@ -28,7 +28,7 @@ module nuwa_framework::channel {
     const ErrorDeprecatedFunction: u64 = 9;
     const ErrorMentionedUserNotMember: u64 = 10;
     const ErrorInvalidReplyTo: u64 = 11;
-    
+
     /// Channel status constants
     const CHANNEL_STATUS_ACTIVE: u8 = 0;
     const CHANNEL_STATUS_CLOSED: u8 = 1;
@@ -57,15 +57,22 @@ module nuwa_framework::channel {
     /// - is_public: true  => Anyone can join the channel automatically when sending their first message
     /// - is_public: false => Only admins can add members, and only members can send messages
     struct Channel has key {
+        /// Parent channel id, for topic channel
+        parent_channel: Option<ObjectID>,
         title: String,
-        creator: address,        // For AI_HOME: AI agent address, For AI_PEER: user address
-        members: Table<address, Member>,  // Changed from vector to Table
-        messages: Table<u64, ObjectID>,  // Changed from Table<u64, Message> to Table<u64, ObjectID>
+        creator: address, 
+        members: Table<address, Member>,  
+        messages: Table<u64, ObjectID>,
+        topics: Table<String, ObjectID>,
         message_counter: u64,
-        created_at: u64,    // Now in milliseconds
-        last_active: u64,   // Now in milliseconds
+        /// Channel creation time in milliseconds
+        created_at: u64,    
+        /// Last message time in milliseconds
+        last_active: u64,   
+        /// Channel status
         status: u8,
-        channel_type: u8,  // AI_HOME or AI_PEER
+        /// Channel type
+        channel_type: u8, 
     }
 
     /// Initialize a new AI home channel
@@ -83,10 +90,12 @@ module nuwa_framework::channel {
         let now = timestamp::now_milliseconds();
         
         let channel = Channel {
+            parent_channel: option::none(),
             title,
-            creator,  // AI agent's address
+            creator,  
             members: table::new(),
             messages: table::new(),
+            topics: table::new(),
             message_counter: 0,
             created_at: now,
             last_active: now,
@@ -116,10 +125,12 @@ module nuwa_framework::channel {
         let now = timestamp::now_milliseconds();
         
         let channel = Channel {
+            parent_channel: option::none(), 
             title,
-            creator,  // User's address
+            creator,  
             members: table::new(),
             messages: table::new(),
+            topics: table::new(),
             message_counter: 0,
             created_at: now,
             last_active: now,
@@ -164,26 +175,31 @@ module nuwa_framework::channel {
         let user_address = signer::address_of(user_account);
         //Only parent channel members can create topic channel
         assert!(is_channel_member(parent_channel_obj, user_address), ErrorNotMember);
+        let parent_channel_id = object::id(parent_channel_obj);
         let parent_channel = object::borrow_mut(parent_channel_obj);
         //Only AI_HOME channel can create topic channel
         assert!(parent_channel.channel_type == CHANNEL_TYPE_AI_HOME, ErrorInvalidChannelType);
         let now = timestamp::now_milliseconds();
         //TODO maybe we need to add parent_channel_id to topic channel
         let channel = Channel {
+            parent_channel: option::some(parent_channel_id),
             title: topic,
             creator: agent_address,
             members: table::new(),
             messages: table::new(),
+            topics: table::new(),
             message_counter: 0,
             created_at: now,
             last_active: now,
             status: CHANNEL_STATUS_ACTIVE,
             channel_type: CHANNEL_TYPE_TOPIC,
         };
+        
         add_member_internal(&mut channel, user_address, now);
         add_member_internal(&mut channel, agent_address, now);
         let channel_obj = object::new(channel);
         let channel_id = object::id(&channel_obj);
+        table::add(&mut parent_channel.topics, topic, channel_id);
         object::to_shared(channel_obj);
         channel_id
     }
@@ -200,12 +216,6 @@ module nuwa_framework::channel {
 
     fun generate_ai_peer_channel_id(agent: &Object<Agent>, user_address: address): ObjectID {
         let id = generate_peer_channel_id(agent::get_agent_address(agent), user_address);
-        object::custom_object_id<address, Channel>(id)
-    }
-
-    //TODO remove this function
-    public fun get_peer_channel_id(agent_address: address, user_address: address): ObjectID {
-        let id = generate_peer_channel_id(agent_address, user_address);
         object::custom_object_id<address, Channel>(id)
     }
 
@@ -284,28 +294,27 @@ module nuwa_framework::channel {
         add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty(), 0);
     }
 
-    /// Get all messages in the channel
-    public fun get_messages(channel: &Object<Channel>): vector<Message> {
+    /// Get all message ids in the channel
+    public fun get_messages(channel: &Object<Channel>): vector<ObjectID> {
         let channel_ref = object::borrow(channel);
-        let messages = vector::empty<Message>();
+        let messages = vector::empty<ObjectID>();
         let i = 0;
         while (i < channel_ref.message_counter) {
             let msg_id = table::borrow(&channel_ref.messages, i);
-            let msg_obj = object::borrow_object<Message>(*msg_id);
-            vector::push_back(&mut messages, *object::borrow(msg_obj));
+            vector::push_back(&mut messages, *msg_id);
             i = i + 1;
         };
         messages
     }
 
-    /// Get messages with pagination
+    /// Get message ids with pagination
     public fun get_messages_paginated(
         channel: &Object<Channel>, 
         start_index: u64,
         limit: u64
-    ): vector<Message> {
+    ): vector<ObjectID> {
         let channel_ref = object::borrow(channel);
-        let messages = vector::empty<Message>();
+        let messages = vector::empty<ObjectID>();
         
         // Check if start_index is valid
         if (start_index >= channel_ref.message_counter) {
@@ -322,8 +331,7 @@ module nuwa_framework::channel {
         let i = start_index;
         while (i < end_index) {
             let msg_id = table::borrow(&channel_ref.messages, i);
-            let msg_obj = object::borrow_object<Message>(*msg_id);
-            vector::push_back(&mut messages, *object::borrow(msg_obj));
+            vector::push_back(&mut messages, *msg_id);
             i = i + 1;
         };
         messages
@@ -336,7 +344,7 @@ module nuwa_framework::channel {
     }
 
     /// Get last N messages from the channel
-    public fun get_last_messages(channel_obj: &Object<Channel>, limit: u64): vector<Message> {
+    public fun get_last_messages(channel_obj: &Object<Channel>, limit: u64): vector<ObjectID> {
         let channel = object::borrow(channel_obj);
         let messages = vector::empty();
         let start = if (channel.message_counter > limit) {
@@ -348,8 +356,7 @@ module nuwa_framework::channel {
         let i = start;
         while (i < channel.message_counter) {
             let msg_id = table::borrow(&channel.messages, i);
-            let msg_obj = object::borrow_object<Message>(*msg_id);
-            vector::push_back(&mut messages, *object::borrow(msg_obj));
+            vector::push_back(&mut messages, *msg_id);
             i = i + 1;
         };
         messages
@@ -402,7 +409,7 @@ module nuwa_framework::channel {
         let channel = object::borrow_mut(channel_obj);
         
         // Only AI_HOME channels can be joined directly
-        assert!(channel.channel_type == CHANNEL_TYPE_AI_HOME, ErrorNotAuthorized);
+        assert!(channel.channel_type != CHANNEL_TYPE_AI_PEER, ErrorNotAuthorized);
         
         let now = timestamp::now_milliseconds();
         add_member_internal(channel, sender, now);
@@ -418,32 +425,32 @@ module nuwa_framework::channel {
 
     // ==================== Getters ====================
 
-    public fun get_channel_title(channel: &Object<Channel>): &String {
+    public fun get_title(channel: &Object<Channel>): &String {
         let channel_ref = object::borrow(channel);
         &channel_ref.title
     }
 
-    public fun get_channel_creator(channel: &Object<Channel>): address {
+    public fun get_creator(channel: &Object<Channel>): address {
         let channel_ref = object::borrow(channel);
         channel_ref.creator
     }
 
-    public fun get_channel_created_at(channel: &Object<Channel>): u64 {
+    public fun get_created_at(channel: &Object<Channel>): u64 {
         let channel_ref = object::borrow(channel);
         channel_ref.created_at
     }
 
-    public fun get_channel_last_active(channel: &Object<Channel>): u64 {
+    public fun get_last_active(channel: &Object<Channel>): u64 {
         let channel_ref = object::borrow(channel);
         channel_ref.last_active
     }
 
-    public fun get_channel_status(channel: &Object<Channel>): u8 {
+    public fun get_status(channel: &Object<Channel>): u8 {
         let channel_ref = object::borrow(channel);
         channel_ref.status
     }
 
-    public fun get_channel_type(channel: &Object<Channel>): u8 {
+    public fun get_type(channel: &Object<Channel>): u8 {
         let channel_ref = object::borrow(channel);
         channel_ref.channel_type
     }
@@ -453,16 +460,23 @@ module nuwa_framework::channel {
         table::contains(&channel_ref.members, addr)
     }
 
+    public fun get_parent_channel(channel: &Object<Channel>): Option<ObjectID> {
+        let channel_ref = object::borrow(channel);
+        channel_ref.parent_channel
+    }
+
     // =================== Test helpers ===================
 
     #[test_only]
     /// Test helper function to delete a channel, only available in test mode
     fun force_delete_channel(channel: Object<Channel>) {
-        let Channel { 
+        let Channel {
+            parent_channel: _,
             title: _,
             creator: _,
             members,
             messages,
+            topics,
             message_counter: _,
             created_at: _,
             last_active: _,
@@ -472,6 +486,7 @@ module nuwa_framework::channel {
         
         table::drop(members);
         table::drop(messages);
+        table::drop(topics);
     }
 
     #[test_only]

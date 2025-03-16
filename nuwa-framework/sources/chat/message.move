@@ -1,4 +1,5 @@
 module nuwa_framework::message {
+    use std::vector;
     use std::string::{String};
     use moveos_std::timestamp;
     use moveos_std::object::{Self, ObjectID};
@@ -106,6 +107,18 @@ module nuwa_framework::message {
 
     public fun get_message_type(message: &Message): u8 {
         message.message_type
+    }
+
+    public fun get_messages_by_ids(message_ids: &vector<ObjectID>): vector<Message> {
+        let messages = vector::empty<Message>();
+        let i = 0;
+        while (i < vector::length(message_ids)) {
+            let message_id = vector::borrow(message_ids, i);
+            let message_obj = object::borrow_object<Message>(*message_id);
+            vector::push_back(&mut messages, *object::borrow(message_obj));
+            i = i + 1;
+        };
+        messages
     }
 
     // =============== Tests helper functions ===============

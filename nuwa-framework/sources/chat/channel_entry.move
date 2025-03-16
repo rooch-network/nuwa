@@ -12,7 +12,8 @@ module nuwa_framework::channel_entry {
     use nuwa_framework::task_spec;
     use nuwa_framework::config;
     use nuwa_framework::message_for_agent;
-
+    use nuwa_framework::message;
+    
     const ErrorInvalidCoinType: u64 = 1;
     const ErrorInvalidToAddress: u64 = 2;
 
@@ -64,7 +65,8 @@ module nuwa_framework::channel_entry {
         let fee = account_coin_store::withdraw<RGas>(caller, amount_fee);
 
         let message_limit: u64 = config::get_history_message_size() + 1;
-        let messages = channel::get_last_messages(channel_obj, message_limit);
+        let message_ids = channel::get_last_messages(channel_obj, message_limit);
+        let messages = message::get_messages_by_ids(&message_ids);
         
         let message_input = message_for_agent::new_agent_input(messages);
         let agent = agent::borrow_mut_agent_by_address(ai_addr);
