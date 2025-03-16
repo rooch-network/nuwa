@@ -65,7 +65,7 @@ module nuwa_framework::agent {
         let agent_signer = account::create_signer_with_account(&mut agent_account);
         //TODO provide a function to get address from account
         let agent_address = signer::address_of(&agent_signer);
-        name_registry::register_username(username, agent_address);
+        name_registry::register_username_internal(agent_address, username);
         let agent = Agent {
             agent_address,
             name,

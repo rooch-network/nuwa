@@ -3,6 +3,13 @@ module nuwa_framework::name_registry {
     use std::string::{Self, String};
     use moveos_std::object::{Self, Object};
     use moveos_std::event;
+    use moveos_std::signer;
+
+    use rooch_framework::coin_store::{Self, CoinStore};
+    use rooch_framework::account_coin_store;
+    use rooch_framework::gas_coin::RGas;
+
+    use nuwa_framework::config;
 
     friend nuwa_framework::agent;
     friend nuwa_framework::genesis;
@@ -34,12 +41,15 @@ module nuwa_framework::name_registry {
 
     /// Empty struct for the registry object
     struct NameRegistry has key {
-        // The fields will be dynamically added/removed as username registrations
+        fee: Object<CoinStore<RGas>>,
     }
     
     /// Initialize the registry
     public(friend) fun genesis_init() {
-        let registry = NameRegistry {};
+        let coin_store = coin_store::create_coin_store<RGas>();
+        let registry = NameRegistry {
+            fee: coin_store
+        };
         let registry_obj = object::new_named_object(registry);
         object::to_shared(registry_obj);
     }
@@ -113,7 +123,7 @@ module nuwa_framework::name_registry {
     }
 
     /// Register a username for an object
-    public(friend) fun register_username(username: String, addr: address) {
+    public(friend) fun register_username_internal(addr: address, username: String) {
         // Validate the username
         validate_username(&username);
         
@@ -130,7 +140,16 @@ module nuwa_framework::name_registry {
         // Emit event
         event::emit(UsernameRegistered { username, addr });
     }
-    
+
+    /// Register a username, the caller must have enough RGas to pay for the registration fee
+    public entry fun register_username(caller: &signer, username: String) {
+        let fee_amount = config::get_username_registration_fee();
+        let fee = account_coin_store::withdraw<RGas>(caller, fee_amount);
+        let registry_obj = borrow_mut_registry_object();
+        coin_store::deposit(&mut object::borrow_mut(registry_obj).fee, fee);
+        register_username_internal(signer::address_of(caller), username);
+    }
+
     /// Unregister a username
     public(friend) fun unregister_username(username: String) {
         let registry_mut = borrow_mut_registry_object();
@@ -219,7 +238,8 @@ module nuwa_framework::name_registry {
     fun test_registry() {
         use std::string;
         use moveos_std::tx_context;
-        // Initialize registry
+       
+        rooch_framework::genesis::init_for_test();
         genesis_init();
         
         let addr = tx_context::fresh_address();
@@ -228,7 +248,7 @@ module nuwa_framework::name_registry {
         let username = string::utf8(b"testuser");
         assert!(is_username_available(&username), 0);
         
-        register_username(username, addr);
+        register_username_internal(addr, username);
         assert!(!is_username_available(&username), 1);
         
         let stored_addr = get_address_by_username(&username);

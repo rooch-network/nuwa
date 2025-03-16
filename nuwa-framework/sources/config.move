@@ -17,4 +17,9 @@ module nuwa_framework::config {
     public fun get_ai_agent_initial_fee(): u256 {
         AI_AGENT_INITIAL_FEE
     }
+
+    const USERNAME_REGISTRATION_FEE: u256 = 10_0000_0000;
+    public fun get_username_registration_fee(): u256 {
+        USERNAME_REGISTRATION_FEE
+    }
 }
