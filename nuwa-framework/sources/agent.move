@@ -25,6 +25,10 @@ module nuwa_framework::agent {
     const ErrorDeprecatedFunction: u64 = 1;
     const ErrorInvalidInitialFee: u64 = 2;
 
+    const AGENT_STATUS_DRAFT: u8 = 0;
+    const AGENT_STATUS_ACTIVE: u8 = 1;
+    const AGENT_STATUS_INACTIVE: u8 = 2;
+
     /// Agent represents a running instance of a Character
     struct Agent has key {
         agent_address: address,
@@ -34,6 +38,7 @@ module nuwa_framework::agent {
         last_active_timestamp: u64,
         memory_store: MemoryStore,
         model_provider: String,
+        status: u8,
     }
 
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
@@ -52,6 +57,7 @@ module nuwa_framework::agent {
             last_active_timestamp: timestamp::now_milliseconds(),
             memory_store: memory::new_memory_store(),
             model_provider: string::utf8(AI_GPT4O_MODEL),
+            status: AGENT_STATUS_DRAFT,
         };
         account_coin_store::deposit<RGas>(agent_address, initial_fee);
         // Every account only has one agent
@@ -95,6 +101,7 @@ module nuwa_framework::agent {
             *character::get_description(character),
             *character::get_instructions(character),
             agent_ref.model_provider,
+            agent_ref.status,
         )
     }
 
@@ -152,7 +159,7 @@ module nuwa_framework::agent {
         memory::get_all_memories(memory_store, user_address, true)
     }
 
-    // ============== Mutating functions ==============
+    // ============== Internal functions ==============
 
     public(friend) fun create_agent_signer(agent: &mut Object<Agent>): signer {
         let agent_ref = object::borrow_mut(agent);
@@ -164,12 +171,13 @@ module nuwa_framework::agent {
         agent_ref.last_active_timestamp = timestamp::now_milliseconds();
     }
 
+    //================= Public agent update functions ==============
+
     /// Update agent's character name and description
     /// Only allowed for users who possess the AgentCap for this agent
-    public fun update_agent_character(
+    public entry fun update_agent_character_name(
         cap: &mut Object<AgentCap>,
         new_name: String,
-        new_description: String,
     ) {
         let agent_obj_id = agent_cap::get_agent_obj_id(cap);
         let agent_obj = borrow_mut_agent(agent_obj_id);
@@ -177,17 +185,43 @@ module nuwa_framework::agent {
         
         // Update character properties
         character::update_name(&mut agent.character, new_name);
+    }
+
+    public entry fun update_agent_character_description(
+        cap: &mut Object<AgentCap>,
+        new_description: String,
+    ) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(cap);
+        let agent_obj = borrow_mut_agent(agent_obj_id);
+        let agent = object::borrow_mut(agent_obj);
         character::update_description(&mut agent.character, new_description);
     }
 
-    /// Entry function for updating agent character properties
-    public entry fun update_agent_character_entry(
+    public entry fun update_agent_character_instructions(
         cap: &mut Object<AgentCap>,
-        new_name: String,
-        new_description: String,
+        new_instructions: String,
     ) {
-        update_agent_character(cap, new_name, new_description);
+        let agent_obj_id = agent_cap::get_agent_obj_id(cap);
+        let agent_obj = borrow_mut_agent(agent_obj_id);
+        let agent = object::borrow_mut(agent_obj);
+        character::update_instructions(&mut agent.character, new_instructions);
     }
+
+    public entry fun activate_agent(cap: &mut Object<AgentCap>) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(cap);
+        let agent_obj = borrow_mut_agent(agent_obj_id);
+        let agent = object::borrow_mut(agent_obj);
+        agent.status = AGENT_STATUS_ACTIVE;
+    }
+
+    public entry fun deactivate_agent(cap: &mut Object<AgentCap>) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(cap);
+        let agent_obj = borrow_mut_agent(agent_obj_id);
+        let agent = object::borrow_mut(agent_obj);
+        agent.status = AGENT_STATUS_INACTIVE;
+    }
+
+    //================= Task specs ==============
 
     public fun get_agent_task_specs_json(agent_obj: &Object<Agent>): String {
         let task_specs = get_agent_task_specs(agent_obj);

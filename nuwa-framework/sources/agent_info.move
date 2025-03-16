@@ -14,6 +14,7 @@ module nuwa_framework::agent_info {
         description: String,
         instructions: String,
         model_provider: String,
+        status: u8,
     }
 
     public fun new_agent_info(
@@ -25,6 +26,7 @@ module nuwa_framework::agent_info {
         description: String,
         instructions: String,
         model_provider: String,
+        status: u8,
     ): AgentInfo {
         AgentInfo {
             id,
@@ -35,6 +37,7 @@ module nuwa_framework::agent_info {
             description,
             instructions,
             model_provider,
+            status,
         }
     }
 
@@ -69,6 +72,10 @@ module nuwa_framework::agent_info {
 
     public fun get_model_provider(agent_info: &AgentInfo): &String {
         &agent_info.model_provider
+    }
+
+    public fun get_status(agent_info: &AgentInfo): u8 {
+        agent_info.status
     }
 
     /// The PromptAgentInfo struct is used to display agent information in a prompt
