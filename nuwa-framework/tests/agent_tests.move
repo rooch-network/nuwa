@@ -14,7 +14,7 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::message;
     use nuwa_framework::agent_input_info;
     use nuwa_framework::task_spec;
-    
+    use nuwa_framework::message_for_agent;
     #[test]
     fun test_prompt_builder() {
         rooch_framework::genesis::init_for_test();
@@ -45,12 +45,13 @@ module nuwa_framework::agent_tests {
             test_user,
             string::utf8(b"Hi, I'm Alex. I prefer learning with real code examples and practical projects. I'm very interested in Move smart contracts and blockchain development. Could you help me learn?"),
             message::type_normal(),
-            vector::empty()
+            vector::empty(),
+            0
         );
         
         let coin_input = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000u256);
 
-        let agent_input = message::new_agent_input_v4(vector[test_message]);
+        let agent_input = message_for_agent::new_agent_input(vector[test_message]);
         std::debug::print(&agent_input);
         
         let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input);

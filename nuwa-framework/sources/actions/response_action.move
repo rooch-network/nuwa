@@ -10,7 +10,8 @@ module nuwa_framework::response_action {
     use nuwa_framework::channel;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
     use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
-
+    use nuwa_framework::message_for_agent;
+    
     friend nuwa_framework::action_dispatcher;
     friend nuwa_framework::task_action;
 
@@ -92,7 +93,11 @@ module nuwa_framework::response_action {
         let channel_id = agent_input_info::get_response_channel_id(agent_input);
         let channel = object::borrow_mut_object_shared<channel::Channel>(channel_id);
         let agent_addr = agent::get_agent_address(agent);
-        channel::add_ai_response(channel, content, agent_addr);
+        let input_data_json = agent_input_info::get_input_data_json(agent_input);
+        let input_data = message_for_agent::decode_agent_input(*input_data_json);
+        let current_message = message_for_agent::get_current(&input_data);
+        let reply_to = message_for_agent::get_index(current_message);
+        channel::add_ai_response(channel, content, agent_addr, reply_to);
     }
 
     public(friend) fun send_event_to_channel(agent: &mut Object<Agent>, channel_id: ObjectID, event: String) {

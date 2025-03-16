@@ -27,7 +27,8 @@ module nuwa_framework::channel {
     const ErrorNotMember: u64 = 8;
     const ErrorDeprecatedFunction: u64 = 9;
     const ErrorMentionedUserNotMember: u64 = 10;
-
+    const ErrorInvalidReplyTo: u64 = 11;
+    
     /// Channel status constants
     const CHANNEL_STATUS_ACTIVE: u8 = 0;
     const CHANNEL_STATUS_CLOSED: u8 = 1;
@@ -217,34 +218,41 @@ module nuwa_framework::channel {
     }
 
     /// Add message to channel - use message_counter as id
-    fun add_message(channel_obj: &mut Object<Channel>, sender: address, content: String, message_type: u8, mentions: vector<address>) {
+    fun add_message(channel_obj: &mut Object<Channel>, sender: address, content: String, message_type: u8, mentions: vector<address>, reply_to: u64):(ObjectID, u64) {
         let channel_id = object::id(channel_obj);
         let channel = object::borrow_mut(channel_obj);
+        let index = channel.message_counter;
         let msg_id = message::new_message_object(
-            channel.message_counter,
+            index,
             channel_id,
             sender,
             content,
             message_type,
-            mentions
+            mentions,
+            reply_to
         );
-        table::add(&mut channel.messages, channel.message_counter, msg_id);
+        table::add(&mut channel.messages, index, msg_id);
         channel.message_counter = channel.message_counter + 1;
+        (msg_id, index)
     }
 
-    /// Send a message and trigger AI response if needed
     public fun send_message(
         account: &signer,
         channel_obj: &mut Object<Channel>,
         content: String,
-        mentions: vector<address>
-    ) {
+        mentions: vector<address>,
+        reply_to: u64
+    ):(ObjectID, u64) {
         vector::for_each(mentions, |addr| {
             assert!(is_channel_member(channel_obj, addr), ErrorMentionedUserNotMember);
         });
         let sender = signer::address_of(account);
         let now = timestamp::now_milliseconds();
         let channel = object::borrow_mut(channel_obj);
+
+        if(reply_to > 0) {
+            assert!(table::contains(&channel.messages, reply_to), ErrorInvalidReplyTo);
+        };
 
         // Check if sender is a member
         assert!(table::contains(&channel.members, sender), ErrorNotMember);
@@ -255,16 +263,17 @@ module nuwa_framework::channel {
         member.last_active = now;
         channel.last_active = now;
 
-        add_message(channel_obj, sender, content, message::type_normal(), mentions);
+        add_message(channel_obj, sender, content, message::type_normal(), mentions, reply_to)
     }
 
     /// Add AI response to the channel
     public(friend) fun add_ai_response(
         channel_obj: &mut Object<Channel>, 
         response_message: String, 
-        ai_agent_address: address
-    ){
-        add_message(channel_obj, ai_agent_address, response_message, message::type_normal(), vector::empty());
+        ai_agent_address: address,
+        reply_to: u64
+    ):(ObjectID, u64) {
+        add_message(channel_obj, ai_agent_address, response_message, message::type_normal(), vector::empty(), reply_to)
     }
 
     public(friend) fun add_ai_event(
@@ -272,21 +281,7 @@ module nuwa_framework::channel {
         event: String, 
         ai_agent_address: address
     ){
-        add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty());
-    }
-
-    public(friend) fun send_ai_direct_message(
-        agent: &mut Object<Agent>,
-        user_address: address,
-        content: String,
-    ) : ObjectID {
-        let channel_id = generate_ai_peer_channel_id(agent, user_address);
-        if (!object::exists_object(channel_id)) {
-            create_ai_peer_channel_internal(user_address, agent);            
-        };
-        let channel_obj = object::borrow_mut_object_shared<Channel>(channel_id);
-        add_message(channel_obj, agent::get_agent_address(agent), content, message::type_normal(), vector::empty());
-        channel_id
+        add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty(), 0);
     }
 
     /// Get all messages in the channel
@@ -375,18 +370,7 @@ module nuwa_framework::channel {
             member.joined_at,
             member.last_active
         )
-    }
-
-    //TODO remove this function
-    /// Send a message and trigger AI response if needed
-    public entry fun send_message_entry(
-        _caller: &signer,
-        _channel_obj: &mut Object<Channel>,
-        _content: String,
-        _mentions: vector<address>
-    ) {
-        abort ErrorDeprecatedFunction
-    }
+    } 
 
     /// Update channel title
     public(friend) fun update_channel_title(channel_obj: &mut Channel, new_title: String) {

@@ -269,6 +269,7 @@ module nuwa_framework::action_dispatcher {
         use nuwa_framework::channel;
         use nuwa_framework::message;
         use nuwa_framework::agent_input;
+        use nuwa_framework::message_for_agent;
         use rooch_framework::gas_coin::RGas;
 
         // Initialize
@@ -315,10 +316,11 @@ module nuwa_framework::action_dispatcher {
             test_addr,
             string::utf8(b"Hi, I'm Alex. I prefer learning with real code examples and practical projects. I'm very interested in Move smart contracts and blockchain development. Could you help me learn?"),
             message::type_normal(),
-            vector::empty()
+            vector::empty(),
+            0
         );
         let coin_input_info = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000000000000u256);
-        let agent_input = message::new_agent_input_v4(vector[message]);
+        let agent_input = message_for_agent::new_agent_input(vector[message]);
         let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input_info);
 
         // Execute actions

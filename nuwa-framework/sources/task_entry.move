@@ -12,7 +12,7 @@ module nuwa_framework::task_entry {
         let agent_address = object::owner(task);
         let channel_id = task::get_response_channel_id(task);
         let channel_obj = object::borrow_mut_object_shared<Channel>(channel_id);
-        channel::add_ai_response(channel_obj, message, agent_address);
+        channel::add_ai_response(channel_obj, message, agent_address, 0);
     }
 
     public entry fun resolve_task(resolver: &signer, task_id: ObjectID, result: String) {
@@ -22,7 +22,7 @@ module nuwa_framework::task_entry {
         let agent_address = object::owner(task);
         let channel_id = task::get_response_channel_id(task);
         let channel_obj = object::borrow_mut_object_shared<Channel>(channel_id);
-        channel::add_ai_response(channel_obj, result, agent_address);
+        channel::add_ai_response(channel_obj, result, agent_address, 0);
     }
 
     public entry fun fail_task(resolver: &signer, task_id: ObjectID, message: String) {
@@ -32,6 +32,6 @@ module nuwa_framework::task_entry {
         let agent_address = object::owner(task);
         let channel_id = task::get_response_channel_id(task);
         let channel_obj = object::borrow_mut_object_shared<Channel>(channel_id);
-        channel::add_ai_response(channel_obj, message, agent_address);
+        channel::add_ai_response(channel_obj, message, agent_address, 0);
     }
 }
