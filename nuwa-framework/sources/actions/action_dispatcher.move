@@ -262,7 +262,6 @@ module nuwa_framework::action_dispatcher {
     #[test]
     fun test_dispatch_actions() {
         use nuwa_framework::agent;
-        use nuwa_framework::action;
         use nuwa_framework::memory;
         use nuwa_framework::memory_action;
         use nuwa_framework::response_action;
@@ -273,11 +272,9 @@ module nuwa_framework::action_dispatcher {
         use rooch_framework::gas_coin::RGas;
 
         // Initialize
-        rooch_framework::genesis::init_for_test();
-        nuwa_framework::character_registry::init_for_test();
-        action::init_for_test();
+        nuwa_framework::genesis::init_for_test();
 
-        let (agent, cap) = agent::create_test_agent();
+        let (agent, cap) = agent::create_default_test_agent();
         let test_addr = @0x42;
        
 

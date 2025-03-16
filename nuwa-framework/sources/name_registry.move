@@ -1,10 +1,11 @@
-module nuwa_framework::character_registry {
+module nuwa_framework::name_registry {
     use std::vector;
     use std::string::{Self, String};
-    use moveos_std::object::{Self, Object, ObjectID};
+    use moveos_std::object::{Self, Object};
     use moveos_std::event;
 
-    friend nuwa_framework::character;
+    friend nuwa_framework::agent;
+    friend nuwa_framework::genesis;
 
     /// Error codes
     const ErrorUsernameAlreadyRegistered: u64 = 1;
@@ -15,7 +16,7 @@ module nuwa_framework::character_registry {
     const ErrorUsernameInvalidChar: u64 = 6;
     const ErrorUsernameEmpty: u64 = 7;
     const ErrorUsernameOnlyNumbers: u64 = 8;
-
+    const ErrorAddressAlreadyRegistered: u64 = 9;
     // Username constraints
     const MIN_USERNAME_LENGTH: u64 = 4;
     const MAX_USERNAME_LENGTH: u64 = 16;
@@ -23,36 +24,36 @@ module nuwa_framework::character_registry {
     /// Events
     struct UsernameRegistered has drop, copy, store {
         username: String,
-        character_id: ObjectID,
+        addr: address,
     }
 
     struct UsernameUnregistered has drop, copy, store {
         username: String,
-        character_id: ObjectID,
+        addr: address,
     }
 
     /// Empty struct for the registry object
-    struct CharacterRegistry has key {
+    struct NameRegistry has key {
         // The fields will be dynamically added/removed as username registrations
     }
     
     /// Initialize the registry
-    fun init() {
-        let registry = CharacterRegistry {};
+    public(friend) fun genesis_init() {
+        let registry = NameRegistry {};
         let registry_obj = object::new_named_object(registry);
         object::to_shared(registry_obj);
     }
 
     /// Get the registry object
-    fun borrow_registry_object(): &Object<CharacterRegistry> {
-        let registry_obj_id = object::named_object_id<CharacterRegistry>();
-        object::borrow_object<CharacterRegistry>(registry_obj_id)
+    fun borrow_registry_object(): &Object<NameRegistry> {
+        let registry_obj_id = object::named_object_id<NameRegistry>();
+        object::borrow_object<NameRegistry>(registry_obj_id)
     }
 
     /// Get mutable reference to registry object
-    fun borrow_mut_registry_object(): &mut Object<CharacterRegistry> {
-        let registry_obj_id = object::named_object_id<CharacterRegistry>();
-        object::borrow_mut_object_shared<CharacterRegistry>(registry_obj_id)
+    fun borrow_mut_registry_object(): &mut Object<NameRegistry> {
+        let registry_obj_id = object::named_object_id<NameRegistry>();
+        object::borrow_mut_object_shared<NameRegistry>(registry_obj_id)
     }
 
     /// Internal function to check if a username meets all requirements
@@ -112,7 +113,7 @@ module nuwa_framework::character_registry {
     }
 
     /// Register a username for an object
-    public(friend) fun register_username(username: String, character_id: ObjectID) {
+    public(friend) fun register_username(username: String, addr: address) {
         // Validate the username
         validate_username(&username);
         
@@ -120,12 +121,14 @@ module nuwa_framework::character_registry {
         
         // Check if username is already registered
         assert!(!object::contains_field(registry_mut, username), ErrorUsernameAlreadyRegistered);
+        assert!(!object::contains_field(registry_mut, addr), ErrorAddressAlreadyRegistered);
         
         // Register the username by adding a field to the registry object
-        object::add_field(registry_mut, username, character_id);
+        object::add_field(registry_mut, username, addr);
+        object::add_field(registry_mut, addr, username);
         
         // Emit event
-        event::emit(UsernameRegistered { username, character_id });
+        event::emit(UsernameRegistered { username, addr });
     }
     
     /// Unregister a username
@@ -138,10 +141,10 @@ module nuwa_framework::character_registry {
         };
         
         // Remove the username
-        let character_id = object::remove_field(registry_mut, username);
-        
+        let addr = object::remove_field(registry_mut, username);
+        let _name: String = object::remove_field(registry_mut, addr);
         // Emit event
-        event::emit(UsernameUnregistered { username, character_id });
+        event::emit(UsernameUnregistered { username, addr });
     }
     
     /// Check if a username is available
@@ -150,11 +153,60 @@ module nuwa_framework::character_registry {
         !object::contains_field(registry, *username)
     }
     
-    /// Get object ID by username
-    public fun get_character_id_by_username(username: &String): ObjectID {
+    /// Get object ID by username, return 0x0 if not registered
+    public fun get_address_by_username(username: &String): address {
         let registry = borrow_registry_object();
-        assert!(object::contains_field(registry, *username), ErrorUsernameNotRegistered);
-        *object::borrow_field(registry, *username)
+        if(!object::contains_field(registry, *username)){
+            @0x0
+        }else{
+            *object::borrow_field(registry, *username)
+        }
+    }
+
+    /// Get username by address, return the address to string if not registered
+    public fun get_username_by_address(addr: address): String {
+        let registry = borrow_registry_object();
+        if(!object::contains_field(registry, addr)){
+            string::utf8(b"")
+        }else{
+            *object::borrow_field(registry, addr)
+        }
+    }
+
+    public fun get_username_by_addreses(addresses: vector<address>): vector<String> {
+        let registry = borrow_registry_object();
+        let usernames = vector[];
+        let i = 0;
+        let length = vector::length(&addresses);
+        while (i < length) {
+            let addr = *vector::borrow(&addresses, i);
+            let username = if(object::contains_field(registry, addr)){
+                *object::borrow_field(registry, addr)
+            }else{
+                string::utf8(b"")
+            };
+            vector::push_back(&mut usernames, username);
+            i = i + 1;
+        };
+        usernames
+    }
+
+    public fun get_address_by_usernames(usernames: vector<String>): vector<address> {
+        let registry = borrow_registry_object();
+        let addresses = vector[];
+        let i = 0;
+        let length = vector::length(&usernames);
+        while (i < length) {
+            let username = *vector::borrow(&usernames, i);
+            let address = if(object::contains_field(registry, username)){
+                *object::borrow_field(registry, username)
+            }else{
+                @0x0
+            };
+            vector::push_back(&mut addresses, address);
+            i = i + 1;
+        };
+        addresses
     }
     
     /// Check if a username is valid (without checking availability)
@@ -163,30 +215,24 @@ module nuwa_framework::character_registry {
         is_valid && has_non_number
     }
 
-    #[test_only]
-    public fun init_for_test() {
-        init();
-    }
-
     #[test]
     fun test_registry() {
         use std::string;
-        
+        use moveos_std::tx_context;
         // Initialize registry
-        init_for_test();
+        genesis_init();
         
-        // Create test object ID (using a dummy value for testing)
-        let dummy_object_id = object::named_object_id<CharacterRegistry>(); // Just using an existing ID for test
-        
+        let addr = tx_context::fresh_address();
+
         // Test username registration
         let username = string::utf8(b"testuser");
         assert!(is_username_available(&username), 0);
         
-        register_username(username, dummy_object_id);
+        register_username(username, addr);
         assert!(!is_username_available(&username), 1);
         
-        let stored_id = get_character_id_by_username(&username);
-        assert!(stored_id == dummy_object_id, 2);
+        let stored_addr = get_address_by_username(&username);
+        assert!(stored_addr == addr, 2);
         
         // Test unregistering
         unregister_username(username);

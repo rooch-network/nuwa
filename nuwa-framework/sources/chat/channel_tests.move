@@ -19,7 +19,7 @@ module nuwa_framework::channel_tests {
     #[test]
     fun test_create_ai_home_channel() {
         nuwa_framework::genesis::init_for_test();
-        let (agent, cap) = agent::create_test_agent();
+        let (agent, cap) = agent::create_default_test_agent();
         let ai_account = agent::get_agent_address(agent);
         timestamp::update_global_time_for_test(1000);
 
@@ -46,7 +46,7 @@ module nuwa_framework::channel_tests {
     fun test_create_ai_peer_channel() {
         nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_test_agent();
+        let (agent, cap) = agent::create_default_test_agent();
         let ai_address = agent::get_agent_address(agent);
         timestamp::update_global_time_for_test(1000);
 
@@ -65,7 +65,7 @@ module nuwa_framework::channel_tests {
     fun test_message_sending() {
         nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_test_agent();
+        let (agent, cap) = agent::create_default_test_agent();
          
         // Create peer channel
         let channel_id = channel::create_ai_peer_channel(
@@ -101,7 +101,7 @@ module nuwa_framework::channel_tests {
         nuwa_framework::genesis::init_for_test();
         let user1 = create_account_with_address(@0x42);
         let user2 = create_account_with_address(@0x44);
-        let (agent, cap) = agent::create_test_agent();
+        let (agent, cap) = agent::create_default_test_agent();
         
         let channel_id = channel::create_ai_peer_channel(
             &user1,
@@ -122,7 +122,7 @@ module nuwa_framework::channel_tests {
     fun test_message_pagination() {
         nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_test_agent();
+        let (agent, cap) = agent::create_default_test_agent();
          
         let channel_id = channel::create_ai_peer_channel(
             &user,
@@ -155,7 +155,7 @@ module nuwa_framework::channel_tests {
     fun test_member_info() {
         nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_test_agent();
+        let (agent, cap) = agent::create_default_test_agent();
         timestamp::update_global_time_for_test(1000);
         
         let channel_id = channel::create_ai_peer_channel(

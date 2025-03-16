@@ -5,16 +5,18 @@ module nuwa_framework::agent {
     use moveos_std::account::{Self, Account};
     use moveos_std::signer;
     use moveos_std::timestamp;
-    use nuwa_framework::character::{Self, Character};
+
+    use rooch_framework::coin::{Self, Coin};
+    use rooch_framework::account_coin_store;
+    use rooch_framework::gas_coin::RGas;
+
     use nuwa_framework::agent_cap::{Self, AgentCap};
     use nuwa_framework::memory::{Self, MemoryStore};
     use nuwa_framework::agent_info;
     use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
-    use rooch_framework::coin::{Self, Coin};
-    use rooch_framework::account_coin_store;
     use nuwa_framework::config;
-    use rooch_framework::gas_coin::RGas;
-
+    use nuwa_framework::name_registry;
+    
     friend nuwa_framework::memory_action;
     friend nuwa_framework::transfer_action;
     friend nuwa_framework::action_dispatcher;
@@ -24,16 +26,28 @@ module nuwa_framework::agent {
 
     const ErrorDeprecatedFunction: u64 = 1;
     const ErrorInvalidInitialFee: u64 = 2;
+    const ErrorUsernameAlreadyRegistered: u64 = 3;
 
     const AGENT_STATUS_DRAFT: u8 = 0;
     const AGENT_STATUS_ACTIVE: u8 = 1;
     const AGENT_STATUS_INACTIVE: u8 = 2;
 
-    /// Agent represents a running instance of a Character
+    /// OnChain AI Agent
     struct Agent has key {
+        /// The address of the agent
         agent_address: address,
-        character: Object<Character>,
+        /// The name of the agent
+        name: String,
+        /// The unique identifier for the agent
+        username: String,
+        /// The avatar of the agent
+        avatar: String,
+        /// One-line description of the agent
+        description: String,
+        /// Instructions for the agent when the agent is running
+        instructions: String,
         // The Agent account, every agent has its own account
+        //TODO design a AccountCap to manage the agent account
         account: Object<Account>,
         last_active_timestamp: u64,
         memory_store: MemoryStore,
@@ -43,16 +57,22 @@ module nuwa_framework::agent {
 
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
 
-    public fun create_agent_with_initial_fee(character: Object<Character>, initial_fee: Coin<RGas>) : Object<AgentCap> {
+    public fun create_agent_with_initial_fee(name: String, username: String, avatar: String, description: String, instructions: String, initial_fee: Coin<RGas>) : Object<AgentCap> {
+        assert!(name_registry::is_username_available(&username), ErrorUsernameAlreadyRegistered);
         let initial_fee_amount = coin::value(&initial_fee);
         assert!(initial_fee_amount >= config::get_ai_agent_initial_fee(), ErrorInvalidInitialFee);
         let agent_account = account::create_account();
         let agent_signer = account::create_signer_with_account(&mut agent_account);
         //TODO provide a function to get address from account
         let agent_address = signer::address_of(&agent_signer);
+        name_registry::register_username(username, agent_address);
         let agent = Agent {
             agent_address,
-            character,
+            name,
+            username,
+            avatar,
+            description,
+            instructions,
             account: agent_account,
             last_active_timestamp: timestamp::now_milliseconds(),
             memory_store: memory::new_memory_store(),
@@ -91,15 +111,14 @@ module nuwa_framework::agent {
 
     public fun get_agent_info(agent: &Object<Agent>): agent_info::AgentInfo {
         let agent_ref = object::borrow(agent);
-        let character = object::borrow(&agent_ref.character);
         agent_info::new_agent_info(
             object::id(agent),
-            *character::get_name(character),
-            *character::get_username(character),
-            *character::get_avatar(character),
             agent_ref.agent_address,
-            *character::get_description(character),
-            *character::get_instructions(character),
+            agent_ref.name,
+            agent_ref.username,
+            agent_ref.avatar,
+            agent_ref.description,
+            agent_ref.instructions,
             agent_ref.model_provider,
             agent_ref.status,
         )
@@ -119,8 +138,7 @@ module nuwa_framework::agent {
 
     public fun get_agent_username(agent: &Object<Agent>): &String {
         let agent_ref = object::borrow(agent);
-        let character = object::borrow(&agent_ref.character);
-        character::get_username(character)
+        &agent_ref.username
     }
 
     public fun get_agent_model_provider(agent: &Object<Agent>): &String {
@@ -173,38 +191,40 @@ module nuwa_framework::agent {
 
     //================= Public agent update functions ==============
 
-    /// Update agent's character name and description
+    /// Update agent's name
     /// Only allowed for users who possess the AgentCap for this agent
-    public entry fun update_agent_character_name(
+    public entry fun update_agent_name(
         cap: &mut Object<AgentCap>,
         new_name: String,
     ) {
         let agent_obj_id = agent_cap::get_agent_obj_id(cap);
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
-        
-        // Update character properties
-        character::update_name(&mut agent.character, new_name);
+        agent.name = new_name;
     }
 
-    public entry fun update_agent_character_description(
+    /// Update agent's description
+    /// Only allowed for users who possess the AgentCap for this agent
+    public entry fun update_agent_description(
         cap: &mut Object<AgentCap>,
         new_description: String,
     ) {
         let agent_obj_id = agent_cap::get_agent_obj_id(cap);
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
-        character::update_description(&mut agent.character, new_description);
+        agent.description = new_description;
     }
 
-    public entry fun update_agent_character_instructions(
+    /// Update agent's instructions
+    /// Only allowed for users who possess the AgentCap for this agent
+    public entry fun update_agent_instructions(
         cap: &mut Object<AgentCap>,
         new_instructions: String,
     ) {
         let agent_obj_id = agent_cap::get_agent_obj_id(cap);
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
-        character::update_instructions(&mut agent.character, new_instructions);
+        agent.instructions = new_instructions;
     }
 
     public entry fun activate_agent(cap: &mut Object<AgentCap>) {
@@ -263,28 +283,25 @@ module nuwa_framework::agent {
 
     #[test_only]
     /// Create a test agent for unit testing
-    public fun create_test_agent(): (&mut Object<Agent>, Object<AgentCap>) {
+    public fun create_default_test_agent(): (&mut Object<Agent>, Object<AgentCap>) {
         use std::string;
-        use nuwa_framework::character; 
-       
-        let char_data = character::new_character_data(
+
+        create_test_agent(
             string::utf8(b"Test Assistant"),
             string::utf8(b"test_assistant"),
             string::utf8(b"https://test/avator.png"),
             string::utf8(b"A helpful test assistant"),
             string::utf8(b"General knowledge")
-        );
-        let character_obj = character::create_character(char_data);
-        create_test_agent_with_character(character_obj)
+        )
     }
 
     #[test_only]
-    public fun create_test_agent_with_character(character: Object<Character>): (&mut Object<Agent>, Object<AgentCap>) {
+    public fun create_test_agent(name: String, username: String, avatar: String, description: String, instructions: String): (&mut Object<Agent>, Object<AgentCap>) {
         use moveos_std::object;
         use rooch_framework::gas_coin;
         
         let initial_fee = gas_coin::mint_for_test(config::get_ai_agent_initial_fee());
-        let agent_cap = create_agent_with_initial_fee(character, initial_fee);
+        let agent_cap = create_agent_with_initial_fee(name, username, avatar, description, instructions, initial_fee);
         
         let agent_obj_id = agent_cap::get_agent_obj_id(&agent_cap);
         let agent_obj = object::borrow_mut_object_shared<Agent>(agent_obj_id);
@@ -292,9 +309,9 @@ module nuwa_framework::agent {
     }
 
     #[test]
-    fun test_create_test_agent() {
+    fun test_create_default_test_agent() {
         nuwa_framework::genesis::init_for_test();
-        let (agent, agent_cap) = create_test_agent();
+        let (agent, agent_cap) = create_default_test_agent();
         assert!(object::is_shared(agent), 1);
         agent_cap::destroy_agent_cap(agent_cap);
     }

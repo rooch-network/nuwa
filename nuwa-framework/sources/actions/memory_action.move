@@ -246,11 +246,9 @@ module nuwa_framework::memory_action {
         use nuwa_framework::memory;
         use moveos_std::object;
 
-        rooch_framework::genesis::init_for_test();
-        nuwa_framework::character_registry::init_for_test();
-        action::init_for_test();
+        nuwa_framework::genesis::init_for_test();
         
-        let (agent_obj, cap) = agent::create_test_agent();
+        let (agent_obj, cap) = agent::create_default_test_agent();
         let agent_address = agent::get_agent_address(agent_obj);
         let test_addr = @0x42;
 

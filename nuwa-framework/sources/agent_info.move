@@ -7,10 +7,10 @@ module nuwa_framework::agent_info {
     #[data_struct]
     struct AgentInfo has copy, drop, store {
         id: ObjectID,
+        agent_address: address,
         name: String,            
         username: String,
         avatar: String,        
-        agent_address: address,  // AI's agent address
         description: String,
         instructions: String,
         model_provider: String,
@@ -19,10 +19,10 @@ module nuwa_framework::agent_info {
 
     public fun new_agent_info(
         id: ObjectID,
+        agent_address: address,
         name: String,
         username: String,
         avatar: String,
-        agent_address: address,
         description: String,
         instructions: String,
         model_provider: String,
@@ -30,10 +30,10 @@ module nuwa_framework::agent_info {
     ): AgentInfo {
         AgentInfo {
             id,
+            agent_address,
             name,
             username,
             avatar,
-            agent_address,
             description,
             instructions,
             model_provider,

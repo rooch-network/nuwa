@@ -4,9 +4,6 @@ module nuwa_framework::agent_tests {
     use std::string;
     use std::vector;
     use rooch_framework::gas_coin::RGas;
-    use nuwa_framework::character;
-    use nuwa_framework::action;
-    use nuwa_framework::action_dispatcher;
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
     use nuwa_framework::agent_input;
@@ -17,21 +14,15 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::message_for_agent;
     #[test]
     fun test_prompt_builder() {
-        rooch_framework::genesis::init_for_test();
-        // Initialize actions
-        action::init_for_test();
-        action_dispatcher::init_for_test();
-        nuwa_framework::character_registry::init_for_test();
-        // Create test character with more detailed personality
-        let char_data = character::new_character_data(
+        nuwa_framework::genesis::init_for_test();
+
+        let (agent, cap) = agent::create_test_agent(
             string::utf8(b"MoveGuide"),
             string::utf8(b"move_guide"),
             string::utf8(b"https://test/avator.png"),
             string::utf8(b"A specialized Move programming assistant with expertise in blockchain development"),
             string::utf8(b"Patient and methodical in explanations"),
         );
-        let character_obj = character::create_character(char_data);
-        let (agent, cap) = agent::create_test_agent_with_character(character_obj);
         
         // Create AI home channel
         let channel_id = channel::create_ai_home_channel(agent);
