@@ -15,11 +15,6 @@ module nuwa_framework::action_dispatcher {
 
     friend nuwa_framework::ai_callback;
     
-    /// Error codes
-    const ERROR_INVALID_RESPONSE: u64 = 1;
-    const ERROR_MISSING_ACTION_NAME: u64 = 2;
-    const ERROR_MISSING_ARGS: u64 = 3;
-
     #[data_struct]
     struct ActionCall has copy, drop {
         action: String,

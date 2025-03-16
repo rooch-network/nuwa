@@ -7,14 +7,14 @@ module nuwa_framework::character_registry {
     friend nuwa_framework::character;
 
     /// Error codes
-    const ERR_USERNAME_ALREADY_REGISTERED: u64 = 1;
-    const ERR_USERNAME_NOT_REGISTERED: u64 = 2;
-    const ERR_NOT_OWNER: u64 = 3;
-    const ERR_USERNAME_TOO_SHORT: u64 = 4;
-    const ERR_USERNAME_TOO_LONG: u64 = 5;
-    const ERR_USERNAME_INVALID_CHAR: u64 = 6;
-    const ERR_USERNAME_EMPTY: u64 = 7;
-    const ERR_USERNAME_ONLY_NUMBERS: u64 = 8;
+    const ErrorUsernameAlreadyRegistered: u64 = 1;
+    const ErrorUsernameNotRegistered: u64 = 2;
+    const ErrorNotOwner: u64 = 3;
+    const ErrorUsernameTooShort: u64 = 4;
+    const ErrorUsernameTooLong: u64 = 5;
+    const ErrorUsernameInvalidChar: u64 = 6;
+    const ErrorUsernameEmpty: u64 = 7;
+    const ErrorUsernameOnlyNumbers: u64 = 8;
 
     // Username constraints
     const MIN_USERNAME_LENGTH: u64 = 4;
@@ -96,19 +96,19 @@ module nuwa_framework::character_registry {
         let length = vector::length(bytes);
         
         // Check if username is empty
-        assert!(length > 0, ERR_USERNAME_EMPTY);
+        assert!(length > 0, ErrorUsernameEmpty);
         
         // Check length constraints
-        assert!(length >= MIN_USERNAME_LENGTH, ERR_USERNAME_TOO_SHORT);
-        assert!(length <= MAX_USERNAME_LENGTH, ERR_USERNAME_TOO_LONG);
+        assert!(length >= MIN_USERNAME_LENGTH, ErrorUsernameTooShort);
+        assert!(length <= MAX_USERNAME_LENGTH, ErrorUsernameTooLong);
         
         let (is_valid, has_non_number) = check_username_requirements(username);
         
         // Check if all characters are valid
-        assert!(is_valid, ERR_USERNAME_INVALID_CHAR);
+        assert!(is_valid, ErrorUsernameInvalidChar);
         
         // Username can't be all numbers
-        assert!(has_non_number, ERR_USERNAME_ONLY_NUMBERS);
+        assert!(has_non_number, ErrorUsernameOnlyNumbers);
     }
 
     /// Register a username for an object
@@ -119,7 +119,7 @@ module nuwa_framework::character_registry {
         let registry_mut = borrow_mut_registry_object();
         
         // Check if username is already registered
-        assert!(!object::contains_field(registry_mut, username), ERR_USERNAME_ALREADY_REGISTERED);
+        assert!(!object::contains_field(registry_mut, username), ErrorUsernameAlreadyRegistered);
         
         // Register the username by adding a field to the registry object
         object::add_field(registry_mut, username, character_id);
@@ -153,7 +153,7 @@ module nuwa_framework::character_registry {
     /// Get object ID by username
     public fun get_character_id_by_username(username: &String): ObjectID {
         let registry = borrow_registry_object();
-        assert!(object::contains_field(registry, *username), ERR_USERNAME_NOT_REGISTERED);
+        assert!(object::contains_field(registry, *username), ErrorUsernameNotRegistered);
         *object::borrow_field(registry, *username)
     }
     
