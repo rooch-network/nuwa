@@ -11,17 +11,7 @@ export default defineConfig({
   },
   define: {
     'process.env.PACKAGE_ID': `"${process.env.VITE_PACKAGE_ID}"`,
-  },
-  resolve: {
-    alias: {
-      'zwitch': path.resolve(__dirname, 'node_modules/zwitch/index.js'),
-      'mdast-util-to-markdown': path.resolve(__dirname, 'node_modules/mdast-util-to-markdown/index.js'),
-      'unist-util-stringify-position': path.resolve(__dirname, 'node_modules/unist-util-stringify-position/index.js'),
-      'unist-util-visit': path.resolve(__dirname, 'node_modules/unist-util-visit/index.js'),
-      'unist-util-visit-parents': path.resolve(__dirname, 'node_modules/unist-util-visit-parents/index.js'),
-      'unist-util-is': path.resolve(__dirname, 'node_modules/unist-util-is/index.js')
-    }
-  },
+  }, 
   optimizeDeps: {
     include: [
       'react-markdown',
