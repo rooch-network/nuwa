@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm install --force && npm run build",
   "devCommand": "npm run dev",
   "framework": "vite",
-  "installCommand": "npm install",
+  "installCommand": "npm install --force",
   "outputDirectory": "dist",
   "headers": [
     {
