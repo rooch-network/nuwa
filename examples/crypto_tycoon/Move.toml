@@ -1,0 +1,16 @@
+[package]
+name = "crypto_tycoon"
+version = "0.0.1"
+
+[dependencies]
+MoveStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/move-stdlib", rev = "c8a69360e786579d9c5bfcca273419d88b30e14e" }
+MoveosStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/moveos-stdlib", rev = "c8a69360e786579d9c5bfcca273419d88b30e14e" }
+RoochFramework = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/rooch-framework", rev = "c8a69360e786579d9c5bfcca273419d88b30e14e" }
+BitcoinMove = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/bitcoin-move", rev = "c8a69360e786579d9c5bfcca273419d88b30e14e" }
+NuwaFramework = { local = "../../nuwa-framework" }
+
+[addresses]
+crypto_tycoon = "_"
+std = "0x1"
+moveos_std = "0x2"
+rooch_framework = "0x3"
