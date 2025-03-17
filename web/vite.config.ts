@@ -24,12 +24,31 @@ export default defineConfig({
       'unist-util-visit',
       'unist-util-visit-parents',
       'unist-util-is'
-    ]
+    ],
+    esbuildOptions: {
+      target: 'esnext'
+    }
   },
   build: {
     commonjsOptions: {
       include: [/node_modules/],
-      transformMixedEsModules: true
+      transformMixedEsModules: true,
+      // Ensure these packages are processed
+      requireReturnsDefault: 'preferred'
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'markdown-vendor': ['react-markdown', 'remark-gfm', 'zwitch', 'mdast-util-to-markdown']
+        }
+      }
+    },
+    target: 'esnext',
+    sourcemap: true,
+    // Force Vite to bundle these dependencies
+    modulePreload: {
+      polyfill: true
     }
   }
 })
