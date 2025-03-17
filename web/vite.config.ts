@@ -16,14 +16,29 @@ export default defineConfig({
       'react-markdown',
       'remark-gfm',
       'react-syntax-highlighter',
-      'react-syntax-highlighter/dist/esm/styles/prism'
-    ],
-    exclude: ['@roochnetwork/rooch-sdk']
+      'react-syntax-highlighter/dist/esm/styles/prism',
+      'zwitch',
+      'mdast-util-to-markdown',
+      'unist-util-stringify-position',
+      'unist-util-visit',
+      'unist-util-visit-parents',
+      'unist-util-is'
+    ]
   },
   build: {
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true
+    },
+    rollupOptions: {
+      external: [
+        'zwitch',
+        'mdast-util-to-markdown',
+        'unist-util-stringify-position',
+        'unist-util-visit',
+        'unist-util-visit-parents',
+        'unist-util-is'
+      ]
     }
   }
 })
