@@ -11,4 +11,19 @@ export default defineConfig({
   define: {
     'process.env.PACKAGE_ID': `"${process.env.VITE_PACKAGE_ID}"`,
   },
+  optimizeDeps: {
+    include: [
+      'react-markdown',
+      'remark-gfm',
+      'react-syntax-highlighter',
+      'react-syntax-highlighter/dist/esm/styles/prism'
+    ],
+    exclude: ['@roochnetwork/rooch-sdk']
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true
+    }
+  }
 })
