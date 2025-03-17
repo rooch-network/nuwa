@@ -29,16 +29,6 @@ export default defineConfig({
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true
-    },
-    rollupOptions: {
-      external: [
-        'zwitch',
-        'mdast-util-to-markdown',
-        'unist-util-stringify-position',
-        'unist-util-visit',
-        'unist-util-visit-parents',
-        'unist-util-is'
-      ]
     }
   }
 })
