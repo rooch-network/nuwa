@@ -38,6 +38,10 @@ module nuwa_framework::action_dispatcher {
         error: String,
     }
 
+    //TODO remove this
+    entry fun register_actions() {
+    }
+
     public fun get_action_groups(): vector<ActionGroup> {
         let groups = vector::empty();
         let memory_group = memory_action::get_action_group();
