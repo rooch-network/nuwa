@@ -4,12 +4,14 @@ module nuwa_framework::agent_input{
     use moveos_std::type_info;
     use moveos_std::object::{ObjectID};
     use nuwa_framework::agent_input_info::{Self, AgentInputInfo, CoinInputInfo};
-    
+    use nuwa_framework::task_spec::{TaskSpecifications};
+
     struct AgentInput<I> has copy, drop, store {
         sender: address,
         response_channel_id: ObjectID,
         input_description: String,
         input_data: I,
+        app_task_specs: TaskSpecifications,
     } 
 
     public fun new_agent_input<I>(
@@ -17,12 +19,14 @@ module nuwa_framework::agent_input{
         response_channel_id: ObjectID,
         input_description: String,
         input_data: I,
+        app_task_specs: TaskSpecifications,
     ): AgentInput<I> {
         AgentInput {
             sender,
             response_channel_id,
             input_description,
             input_data,
+            app_task_specs,
         }
     } 
 
@@ -42,9 +46,13 @@ module nuwa_framework::agent_input{
         &input.input_data
     }
 
-    public fun unpack<I>(input: AgentInput<I>) : (address, ObjectID, String, I) {
-        let AgentInput { sender, response_channel_id, input_description, input_data } = input;
-        (sender, response_channel_id, input_description, input_data)
+    public fun get_app_task_specs<I>(input: &AgentInput<I>): &TaskSpecifications {
+        &input.app_task_specs
+    }
+
+    public fun unpack<I>(input: AgentInput<I>) : (address, ObjectID, String, I, TaskSpecifications) {
+        let AgentInput { sender, response_channel_id, input_description, input_data, app_task_specs } = input;
+        (sender, response_channel_id, input_description, input_data, app_task_specs)
     }
 
     public fun into_agent_input_info<I: drop>(input: AgentInput<I>, coin_input_info: CoinInputInfo) : AgentInputInfo {
@@ -55,6 +63,7 @@ module nuwa_framework::agent_input{
             input.input_description,
             type_info::type_name<I>(),
             string::utf8(json::to_json(&input.input_data)),
+            input.app_task_specs,
         )
     }
 }

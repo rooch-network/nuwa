@@ -15,7 +15,8 @@ module nuwa_framework::channel {
     friend nuwa_framework::response_action;
     friend nuwa_framework::task_entry;
     friend nuwa_framework::channel_entry;
-
+    friend nuwa_framework::agent_runner;
+    
     // Error codes
     const ErrorChannelNotFound: u64 = 1;
     const ErrorChannelAlreadyExists: u64 = 2;

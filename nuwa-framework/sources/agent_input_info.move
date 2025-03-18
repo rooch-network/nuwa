@@ -5,6 +5,7 @@ module nuwa_framework::agent_input_info{
     use moveos_std::type_info;
     use rooch_framework::coin;
     use nuwa_framework::string_utils::{build_json_section};
+    use nuwa_framework::task_spec::{TaskSpecifications};
 
     struct CoinInputInfo has copy, drop, store {
         coin_symbol: String,
@@ -19,9 +20,10 @@ module nuwa_framework::agent_input_info{
         input_description: String,
         input_data_type: String,
         input_data_json: String,
+        app_task_specs: TaskSpecifications,
     }
 
-    public fun new(sender: address, response_channel_id: ObjectID, coin_input_info: CoinInputInfo, input_description: String, input_data_type: String, input_data_json: String) : AgentInputInfo {
+    public fun new(sender: address, response_channel_id: ObjectID, coin_input_info: CoinInputInfo, input_description: String, input_data_type: String, input_data_json: String, app_task_specs: TaskSpecifications) : AgentInputInfo {
         AgentInputInfo {
             sender,
             response_channel_id,
@@ -29,6 +31,7 @@ module nuwa_framework::agent_input_info{
             input_description,
             input_data_type,
             input_data_json,
+            app_task_specs,
         }
     }
 
@@ -69,6 +72,10 @@ module nuwa_framework::agent_input_info{
 
     public fun get_input_data_json(info: &AgentInputInfo): &String {
         &info.input_data_json
+    }
+
+    public fun get_app_task_specs(info: &AgentInputInfo): &TaskSpecifications {
+        &info.app_task_specs
     }
 
     public fun to_prompt(info: &AgentInputInfo): String {

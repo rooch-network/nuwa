@@ -1,15 +1,13 @@
 module nuwa_framework::channel_entry {
     use std::vector;
-    use std::string::{Self, String};
+    use std::string::{String};
     use moveos_std::object::Object;
     use moveos_std::type_info;
-    use moveos_std::result::{Self, is_err};
     use rooch_framework::gas_coin::RGas;
     use rooch_framework::account_coin_store;
     use nuwa_framework::channel::{Self, Channel};
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
-    use nuwa_framework::task_spec;
     use nuwa_framework::config;
     use nuwa_framework::message_for_agent;
     use nuwa_framework::message;
@@ -60,7 +58,7 @@ module nuwa_framework::channel_entry {
         call_agent(caller, channel_obj, index, to, amount);     
     }
 
-    fun call_agent(caller: &signer, channel_obj: &mut Object<Channel>, user_msg_index: u64, ai_addr: address, extra_fee: u256) {
+    fun call_agent(caller: &signer, channel_obj: &mut Object<Channel>, _user_msg_index: u64, ai_addr: address, extra_fee: u256) {
         let amount_fee = config::get_ai_agent_base_fee() + extra_fee;
         let fee = account_coin_store::withdraw<RGas>(caller, amount_fee);
 
@@ -70,13 +68,6 @@ module nuwa_framework::channel_entry {
         
         let message_input = message_for_agent::new_agent_input(messages);
         let agent = agent::borrow_mut_agent_by_address(ai_addr);
-        let app_task_specs = task_spec::empty_task_specifications();
-        let result = agent_runner::process_input_internal(agent, message_input, fee, app_task_specs);
-        if (is_err(&result)) {
-            let err = result::unwrap_err(result);
-            let response = string::utf8(b"Call AI agent failed:");
-            string::append(&mut response, err);
-            channel::add_ai_response(channel_obj, response, ai_addr, user_msg_index);
-        }
+        agent_runner::submit_input_internal(agent, message_input, fee);
     }
 }

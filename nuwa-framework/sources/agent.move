@@ -1,6 +1,7 @@
 module nuwa_framework::agent {
     use std::string::{Self, String};
-    use std::option::{Option};
+    use std::option::{Self, Option};
+    use std::vector;
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::account::{Self, Account};
     use moveos_std::signer;
@@ -13,6 +14,7 @@ module nuwa_framework::agent {
     use nuwa_framework::agent_cap::{Self, AgentCap};
     use nuwa_framework::memory::{Self, MemoryStore};
     use nuwa_framework::agent_info;
+    use nuwa_framework::agent_input_info::{AgentInputInfo};
     use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
     use nuwa_framework::config;
     use nuwa_framework::name_registry;
@@ -53,6 +55,20 @@ module nuwa_framework::agent {
         memory_store: MemoryStore,
         model_provider: String,
         status: u8,
+    }
+
+    const AGENT_INPUT_QUEUE_PROPERTY_NAME: vector<u8> = b"input_queue";
+
+    /// The input queue of the agent
+    struct AgentInputQueue has key, store {
+        queue: vector<AgentInputInfo>,
+    }
+
+    const AGENT_PROCESSING_REQUEST_PROPERTY_NAME: vector<u8> = b"processing_request";
+
+    /// The processing request of the agent
+    struct AgentProcessingRequest has key, store {
+        requests: vector<ObjectID>,
     }
 
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
@@ -187,6 +203,67 @@ module nuwa_framework::agent {
     public(friend) fun update_last_active_timestamp(agent: &mut Object<Agent>) {
         let agent_ref = object::borrow_mut(agent);
         agent_ref.last_active_timestamp = timestamp::now_milliseconds();
+    }
+
+    fun borrow_mut_input_queue(agent: &mut Object<Agent>): &mut AgentInputQueue {
+        if (!object::contains_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME)) {
+            object::add_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME, AgentInputQueue {
+                queue: vector[]
+            });
+        };
+        object::borrow_mut_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME)
+    }
+
+    public(friend) fun append_input(agent: &mut Object<Agent>, input: AgentInputInfo) {
+        let input_queue = borrow_mut_input_queue(agent);
+        vector::push_back(&mut input_queue.queue, input);
+    }
+
+    public fun has_pending_input(agent: &Object<Agent>): bool {
+        if (!object::contains_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME)) {
+            false
+        } else {
+            let input_queue : &AgentInputQueue = object::borrow_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME);
+            vector::length(&input_queue.queue) > 0
+        }
+    }
+
+    public(friend) fun dequeue_input(agent: &mut Object<Agent>): Option<AgentInputInfo> {
+        let input_queue = borrow_mut_input_queue(agent);
+        if (vector::length(&input_queue.queue) == 0) {
+            option::none()
+        } else {
+            let input = vector::remove(&mut input_queue.queue, 0);
+            option::some(input)
+        }
+    }
+
+    fun borrow_mut_processing_request(agent: &mut Object<Agent>): &mut AgentProcessingRequest {
+        if (!object::contains_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME)) {
+            object::add_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME, AgentProcessingRequest {
+                requests: vector[]
+            });
+        };
+        object::borrow_mut_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME)
+    }
+
+    public(friend) fun add_processing_request(agent: &mut Object<Agent>, request_id: ObjectID) {
+        let processing_request = borrow_mut_processing_request(agent);
+        vector::push_back(&mut processing_request.requests, request_id);
+    }
+
+    public(friend) fun finish_request(agent: &mut Object<Agent>, request_id: ObjectID) {
+        let processing_request = borrow_mut_processing_request(agent);
+        vector::remove_value(&mut processing_request.requests, &request_id);
+    }
+
+    public fun is_processing_request(agent: &Object<Agent>): bool {
+        if (!object::contains_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME)) {
+            false
+        } else {
+            let processing_request : &AgentProcessingRequest = object::borrow_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME);
+            vector::length(&processing_request.requests) > 0
+        }
     }
 
     //================= Public agent update functions ==============
