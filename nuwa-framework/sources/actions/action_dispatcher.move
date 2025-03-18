@@ -38,12 +38,6 @@ module nuwa_framework::action_dispatcher {
         error: String,
     }
 
-    fun init() {
-    }
-
-    entry fun register_actions() {
-    }
-
     public fun get_action_groups(): vector<ActionGroup> {
         let groups = vector::empty();
         let memory_group = memory_action::get_action_group();
@@ -73,13 +67,17 @@ module nuwa_framework::action_dispatcher {
         descriptions
     }
  
-    //TODO return result
     public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
         let action_response = parse_line_based_response(&response);
         let actions = action_response.actions;
         let i = 0;
         let len = vector::length(&actions);
         let default_channel_id = agent_input_info::get_response_channel_id(&agent_input);
+        if (len == 0) {
+            //If the AI response format is not correct, reply to the current message
+            response_action::reply_to_current_message(agent, &agent_input, response);
+            return
+        };
         while (i < len) {
             let action_call = vector::borrow(&actions, i);
             execute_action(agent, &agent_input, default_channel_id, action_call);

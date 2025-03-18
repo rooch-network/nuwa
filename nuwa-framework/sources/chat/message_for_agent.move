@@ -1,6 +1,7 @@
 module nuwa_framework::message_for_agent {
     use std::string::{Self, String};
     use std::vector;
+    use std::option::{Option};
     use moveos_std::object;
     use moveos_std::json;
     use nuwa_framework::message::{Self, Message};
@@ -57,6 +58,10 @@ module nuwa_framework::message_for_agent {
 
     public fun decode_agent_input(input_data_json: String) : MessageInput {
         json::from_json<MessageInput>(string::into_bytes(input_data_json))
+    }
+
+    public fun decode_agent_input_option(input_data_json: String) : Option<MessageInput> {
+        json::from_json_option<MessageInput>(string::into_bytes(input_data_json))
     }
 
     public fun get_history(input: &MessageInput) : &vector<MessageForAgent> {
