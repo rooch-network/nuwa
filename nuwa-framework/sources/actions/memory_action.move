@@ -10,8 +10,8 @@ module nuwa_framework::memory_action {
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::memory;
     use nuwa_framework::action::{Self, ActionGroup};
-    use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
-
+    use nuwa_framework::agent_input_info;
+    use nuwa_framework::prompt_input::{Self, PromptInput};
     friend nuwa_framework::action_dispatcher;
 
     /// Memory action names using more intuitive namespacing
@@ -24,13 +24,10 @@ module nuwa_framework::memory_action {
     const ACTION_NAME_NONE: vector<u8> = b"memory::none";
     public fun action_name_none(): String { string::utf8(ACTION_NAME_NONE) }
 
-    /// Special content to mark "deleted" memories
-    const MEMORY_DELETED_MARK: vector<u8> = b"[deleted]";
-
 
     #[data_struct]
     /// Arguments for adding a memory about oneself
-    struct RememberSelfArgs has copy, drop {
+    struct RememberSelfArgs has copy, drop, store {
         content: String,     // Memory content
     }
 
@@ -44,7 +41,7 @@ module nuwa_framework::memory_action {
 
     #[data_struct]
     /// Arguments for adding a memory about a user
-    struct RememberUserArgs has copy, drop {
+    struct RememberUserArgs has copy, drop, store {
         content: String,     // Memory content
     }
 
@@ -66,7 +63,7 @@ module nuwa_framework::memory_action {
 
     #[data_struct]
     /// Arguments for the memory::none action
-    struct NoneArgs has copy, drop {
+    struct NoneArgs has copy, drop, store {
         reason: Option<String>,     // Optional reason for not creating memory
     }
 
@@ -78,15 +75,15 @@ module nuwa_framework::memory_action {
         }
     }
 
-    public fun get_action_group(): ActionGroup {
+    public(friend) fun get_action_group(): ActionGroup {
         action::new_action_group(
             string::utf8(b"memory"),
-            string::utf8(b"Memory actions for storing and updating personal and user memories. You MUST use at least one memory action (or memory::none) in EVERY interaction."),
+            string::utf8(b"Memory actions for storing and updating personal and user memories. You MUST use at least one memory action in EVERY interaction, use memory::none if there's nothing to remember."),
             get_action_descriptions()
         )   
     }
 
-    public fun get_action_descriptions(): vector<action::ActionDescription> {
+    public(friend) fun get_action_descriptions(): vector<action::ActionDescription> {
         let descriptions = vector::empty();
         
         // First add the memory::none action with clear instruction about memory actions requirement
@@ -94,7 +91,7 @@ module nuwa_framework::memory_action {
             action::new_action_argument(
                 string::utf8(b"reason"),
                 string::utf8(b"string"),
-                string::utf8(b"Optional reason why no memory should be created"),
+                string::utf8(b"Optional reason why no memory should be created, can be null"),
                 false,
             ),
         ];
@@ -104,8 +101,6 @@ module nuwa_framework::memory_action {
             string::utf8(b"Explicitly indicate that nothing should be remembered from this interaction"),
             none_args,
             string::utf8(NONE_EXAMPLE),
-            string::utf8(b"You MUST use at least one memory action in each interaction - use this action if there's nothing to remember"),
-            string::utf8(b"Using this action acknowledges that you've considered memory but determined there's nothing important to record"),
         ));
 
         // Register remember_self action (AI's memories about itself)
@@ -120,11 +115,9 @@ module nuwa_framework::memory_action {
 
         vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_REMEMBER_SELF),
-            string::utf8(b"Remember something about yourself"),
+            string::utf8(b"Remember something about yourself, Use this to record your own thoughts, feelings, goals, or personal development"),
             remember_self_args,
             string::utf8(REMEMBER_SELF_EXAMPLE),
-            string::utf8(b"Use this to record your own thoughts, feelings, goals, or personal development"),
-            string::utf8(b"Self-memories help you maintain continuity of identity"),
         ));
 
         // Register remember_user action (AI's memories about the user)
@@ -139,17 +132,15 @@ module nuwa_framework::memory_action {
 
         vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_REMEMBER_USER),
-            string::utf8(b"Remember something about the current user"),
+            string::utf8(b"Remember something about the current user, Use this to record important information about the user you're speaking with"),
             remember_user_args,
             string::utf8(REMEMBER_USER_EXAMPLE),
-            string::utf8(b"Use this to record important information about the user you're speaking with"),
-            string::utf8(b"User memories help you personalize future interactions"),
         ));
         descriptions
     }
 
     /// Execute memory actions
-    public(friend) fun execute_internal(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_name: String, args_json: String) :Result<bool, String> {
+    public(friend) fun execute_internal(agent: &mut Object<Agent>, prompt: &PromptInput, action_name: String, args_json: String) :Result<bool, String> {
         let agent_address = agent::get_agent_address(agent);
         let store = agent::borrow_mut_memory_store(agent);
         
@@ -160,7 +151,7 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for remember_self action")
             };
             let args = option::destroy_some(args_opt);
-            memory::add_memory(store, agent_address, args.content, false);
+            memory::add_memory(store, agent_address, args.content);
             ok(true)
         } 
         else if (action_name == string::utf8(ACTION_NAME_REMEMBER_USER)) {
@@ -170,30 +161,19 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for remember_user action")
             };
             let args = option::destroy_some(args_opt);
+            let agent_input = prompt_input::get_input_info(prompt);
             let current_user = agent_input_info::get_sender(agent_input);
-            memory::add_memory(store, current_user, args.content, false);
+            memory::add_memory(store, current_user, args.content);
             ok(true)
         }
         else if (action_name == string::utf8(ACTION_NAME_NONE)) {
-            // This action is just a marker - no actual operation is needed
-            let none_args = json::from_json_option<NoneArgs>(string::into_bytes(args_json));
-            
-            if (!option::is_some(&none_args)) {
-                return err_str(b"Invalid arguments for none action")
-            };
-
-            // We don't need to do anything with the args, just validate them
-            let none_args = option::destroy_some(none_args);
-            if (option::is_some(&none_args.reason)) {
-                let _reason = option::destroy_some(none_args.reason);
-                //std::debug::print(_reason);
-            };
             ok(false)
         }
         else {
             err_str(b"Unsupported action")
         }
     }
+    
 
     #[test_only]
     struct TestInput has copy, drop, store{
@@ -207,7 +187,8 @@ module nuwa_framework::memory_action {
         use nuwa_framework::agent_input_info;
         use nuwa_framework::memory;
         use moveos_std::object;
-
+        use moveos_std::result;
+        
         nuwa_framework::genesis::init_for_test();
         
         let (agent_obj, cap) = agent::create_default_test_agent();
@@ -223,14 +204,19 @@ module nuwa_framework::memory_action {
             TestInput{},
             1000000000000000000u256
         );
-        
+
+        let agent_info = agent::get_agent_info(agent_obj);
+        let prompt_input = prompt_input::new_prompt_input_for_test(agent_info, agent_input_info);
+
         // Test remember_self action
         let remember_self_json = string::utf8(b"{\"content\":\"I enjoy helping with technical explanations\"}");
-        execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
+        let result = execute_internal(agent_obj, &prompt_input, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
+        assert!(result::is_ok(&result), 1);
 
         // Test remember_user action
         let remember_user_json = string::utf8(b"{\"content\":\"User likes detailed explanations\"}");
-        execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
+        let result = execute_internal(agent_obj, &prompt_input, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
+        assert!(result::is_ok(&result), 2);
         
         let store = agent::borrow_memory_store(agent_obj);
        

@@ -4,6 +4,8 @@ module nuwa_framework::agent_info {
     use moveos_std::json;
     use moveos_std::object::{ObjectID};
 
+    friend nuwa_framework::prompt_input;
+
     #[data_struct]
     struct AgentInfo has copy, drop, store {
         id: ObjectID,
@@ -87,7 +89,7 @@ module nuwa_framework::agent_info {
         instructions: String,
     }
 
-    public fun to_prompt(agent_info: &AgentInfo): String {
+    public(friend) fun format_prompt(agent_info: &AgentInfo): String {
         let prompt_agent_info = PromptAgentInfo {
             name: agent_info.name,
             username: agent_info.username,
@@ -99,5 +101,25 @@ module nuwa_framework::agent_info {
         vector::append(&mut prompt, json::to_json(&prompt_agent_info));
         vector::append(&mut prompt, b"\n```");
         string::utf8(prompt)
+    }
+
+    #[test_only]
+    public fun mock_agent_info(): AgentInfo {
+        use moveos_std::tx_context;
+        use moveos_std::object;
+        
+        let obj_id = object::derive_object_id_for_test();
+        let agent_address = tx_context::fresh_address();
+        new_agent_info(
+            obj_id,
+            agent_address,
+            string::utf8(b"Test Agent"),
+            string::utf8(b"test_agent"),
+            string::utf8(b"https://example.com/avatar.png"),
+            string::utf8(b"Test Agent Description"),
+            string::utf8(b"Test Agent Instructions"),
+            string::utf8(b"gpt-4o"),
+            0,
+        )
     }
 }

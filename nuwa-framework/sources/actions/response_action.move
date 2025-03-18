@@ -11,6 +11,7 @@ module nuwa_framework::response_action {
     use nuwa_framework::action::{ActionDescription, ActionGroup};
     use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
     use nuwa_framework::message_for_agent;
+    use nuwa_framework::prompt_input::{Self, PromptInput};
     
     friend nuwa_framework::action_dispatcher;
     friend nuwa_framework::task_action;
@@ -19,6 +20,8 @@ module nuwa_framework::response_action {
     public fun action_name_say(): String {
         string::utf8(ACTION_NAME_SAY)
     }
+
+    const SAY_EXAMPLE: vector<u8> = b"{\"content\":\"Hello\"}";
 
     #[data_struct]
     /// Arguments for the say action, respond to the current message
@@ -35,7 +38,7 @@ module nuwa_framework::response_action {
     }
 
 
-    public fun get_action_group(): ActionGroup {
+    public(friend) fun get_action_group(): ActionGroup {
         let description = string::utf8(b"Actions related to responding to user.\n\n");
 
         action::new_action_group(
@@ -46,7 +49,7 @@ module nuwa_framework::response_action {
     }
 
     /// Get descriptions for all response actions
-    public fun get_action_descriptions() : vector<ActionDescription> {
+    public(friend) fun get_action_descriptions() : vector<ActionDescription> {
         let descriptions = vector::empty();
 
         // Register channel message action
@@ -62,19 +65,16 @@ module nuwa_framework::response_action {
         vector::push_back(&mut descriptions,
             action::new_action_description(
                 string::utf8(ACTION_NAME_SAY),
-                string::utf8(b"Reply to the current message"),
+                string::utf8(b"Use this action to reply to the current message, this message will be visible to everyone in the channel"),
                 channel_args,
-                string::utf8(b"{\"content\":\"Hello\"}"),
-                string::utf8(b"Use this action to reply to the current message"),
-                string::utf8(b"This message will be visible to everyone in the channel"),
-            )
-        );
+                string::utf8(SAY_EXAMPLE),
+        ));
  
         descriptions
     }
 
     /// Execute a response action
-    public(friend) fun execute_internal(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, action_name: String, args_json: String) : Result<bool, String> {
+    public(friend) fun execute_internal(agent: &mut Object<Agent>, prompt: &PromptInput, action_name: String, args_json: String) : Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_SAY)) {
             // Handle channel message action
             let args_opt = json::from_json_option<SayActionArgs>(string::into_bytes(args_json));
@@ -82,6 +82,7 @@ module nuwa_framework::response_action {
                 return err_str(b"Invalid arguments for channel message action")
             };
             let args = option::destroy_some(args_opt);
+            let agent_input = prompt_input::get_input_info(prompt);
             reply_to_current_message(agent, agent_input, args.content);
             ok(true)
         } else {
@@ -114,7 +115,7 @@ module nuwa_framework::response_action {
     #[test]
     fun test_response_action_examples() {
         // Test channel message example
-        let channel_args = json::from_json<SayActionArgs>(b"{\"content\":\"Hello\"}");
+        let channel_args = json::from_json<SayActionArgs>(SAY_EXAMPLE);
         assert!(channel_args.content == string::utf8(b"Hello"), 1);
     }
 

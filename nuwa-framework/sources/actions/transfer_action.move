@@ -11,7 +11,7 @@ module nuwa_framework::transfer_action {
     use rooch_framework::account_coin_store;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action::{Self, ActionDescription, ActionGroup};
-    use nuwa_framework::agent_input_info::{AgentInputInfo};
+    use nuwa_framework::prompt_input::{PromptInput};
 
     friend nuwa_framework::action_dispatcher;
 
@@ -22,22 +22,14 @@ module nuwa_framework::transfer_action {
 
     #[data_struct]
     /// Arguments for the transfer coin action
-    struct TransferActionArgs has copy, drop {
-        to: address,          // The recipient address in string format
-        amount: String,         // Amount to transfer
-        coin_type: String,    // The coin type to transfer (fully qualified type name)
-        memo: String,         // Optional memo for the transfer, leave empty if not needed
+    struct TransferActionArgs has copy, drop, store {
+        to: address,          
+        amount: String,        
+        coin_type: String,    
+        memo: String,         
     }
 
-    /// Register all transfer-related actions
-    public fun register_actions() {
-    }
-
-    entry fun register_actions_entry() {
-        register_actions();
-    }
-
-    public fun get_action_group(): ActionGroup {
+    public(friend) fun get_action_group(): ActionGroup {
         action::new_action_group(
             string::utf8(b"transfer"),
             string::utf8(b"Actions related to coin transfers, including sending and managing coins."),
@@ -45,7 +37,7 @@ module nuwa_framework::transfer_action {
         )   
     }
 
-    public fun get_action_descriptions() : vector<ActionDescription> {
+    public(friend) fun get_action_descriptions() : vector<ActionDescription> {
         let descriptions = vector::empty();
         // Register transfer coin action
         let transfer_args = vector[
@@ -76,17 +68,15 @@ module nuwa_framework::transfer_action {
         ];
         vector::push_back(&mut descriptions, action::new_action_description(
             string::utf8(ACTION_NAME_TRANSFER),
-            string::utf8(b"Transfer coin_type coins to an address"),
+            string::utf8(b"Use this action to transfer coin_type coins from your account to another address, transfer will be executed immediately and is irreversible"),
             transfer_args,
             string::utf8(TRANSFER_ACTION_EXAMPLE),
-            string::utf8(b"Use this action to transfer coin_type coins from your account to another address"),
-            string::utf8(b"Transfers will be executed immediately and are irreversible"),
         ));
         descriptions
     }
-    
+
     /// Execute a transfer action
-    public(friend) fun execute_internal(agent: &mut Object<Agent>, _agent_input: &AgentInputInfo, action_name: String, args_json: String) :Result<bool, String> {
+    public(friend) fun execute_internal(agent: &mut Object<Agent>, _prompt: &PromptInput, action_name: String, args_json: String) :Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_TRANSFER)) {
             let args_opt = json::from_json_option<TransferActionArgs>(string::into_bytes(args_json));
             if (option::is_none(&args_opt)) {

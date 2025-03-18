@@ -1,8 +1,10 @@
 module nuwa_framework::genesis {
     use nuwa_framework::name_registry;
+    use nuwa_framework::ai_service;
 
     fun init(){
         name_registry::genesis_init();
+        ai_service::genesis_init();
     }
     
 

@@ -180,7 +180,7 @@ module nuwa_framework::agent {
         let agent_address = agent_ref.agent_address;
         
         // Get the agent's own memories (self-reflections, personal thoughts)
-        memory::get_all_memories(memory_store, agent_address, true)
+        memory::get_all_memories(memory_store, agent_address)
     }
 
     /// Get memories that an agent has about a specific user
@@ -190,7 +190,7 @@ module nuwa_framework::agent {
         let memory_store = &agent_ref.memory_store;
         
         // Get all memories about this specific user
-        memory::get_all_memories(memory_store, user_address, true)
+        memory::get_all_memories(memory_store, user_address)
     }
 
     // ============== Internal functions ==============

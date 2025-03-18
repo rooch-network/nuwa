@@ -14,7 +14,7 @@ module nuwa_framework::ai_callback {
     use nuwa_framework::ai_response;
     use nuwa_framework::action_dispatcher;
     use nuwa_framework::agent_runner;
-
+    
     struct PendingRequestNotFoundEvent has copy, drop, store {
         request_id: ObjectID,
     }
@@ -28,7 +28,7 @@ module nuwa_framework::ai_callback {
         let pending_request = ai_service::take_pending_request(request_id);
         if(option::is_some(&pending_request)){
             let pending_request = option::destroy_some(pending_request);
-            let (request_id, agent_id, agent_input_info) = ai_service::unpack_pending_request(pending_request);
+            let (request_id, agent_id, prompt) = ai_service::unpack_pending_request(pending_request);
             let response_status = oracles::get_response_status(&request_id);
             if (response_status != 0) {
                 let response = oracles::get_response(&request_id);
@@ -47,7 +47,7 @@ module nuwa_framework::ai_callback {
                         let message_content = ai_response::get_message_content(&chat_completion);
 
                         let agent = object::borrow_mut_object_shared<Agent>(agent_id);
-                        action_dispatcher::dispatch_actions_internal(agent, agent_input_info, message_content);
+                        action_dispatcher::dispatch_actions_internal(agent, prompt, message_content);
                         agent_runner::finish_request(agent, request_id);
                         let refusal = ai_response::get_refusal(&chat_completion);
                         if(option::is_some(&refusal)){

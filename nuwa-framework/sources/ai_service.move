@@ -11,11 +11,12 @@ module nuwa_framework::ai_service {
     use rooch_framework::gas_coin::RGas;
 
     use nuwa_framework::ai_request::{Self, ChatRequest};
-    use nuwa_framework::agent_input_info::{AgentInputInfo};
-
+    use nuwa_framework::prompt_input::{PromptInput};
+    
     friend nuwa_framework::ai_callback;
     friend nuwa_framework::agent;
     friend nuwa_framework::agent_runner;
+    friend nuwa_framework::genesis;
 
     const ORACLE_ADDRESS: address = @0x694cbe655b126e9e6a997e86aaab39e538abf30a8c78669ce23a98740b47b65d;
     const NOTIFY_CALLBACK: vector<u8> = b"ai_callback::process_response";
@@ -39,13 +40,13 @@ module nuwa_framework::ai_service {
     struct PendingRequest has copy, drop, store {
         request_id: ObjectID,
         agent_obj_id: ObjectID,
-        agent_input_info: AgentInputInfo,
+        prompt: PromptInput,
     }
 
     struct Requests has key {
     }
 
-    fun init() {
+    public(friend) fun genesis_init() {
         let requests_obj = object::new_named_object(Requests {
         });
         object::transfer_extend(requests_obj, @nuwa_framework);
@@ -59,7 +60,7 @@ module nuwa_framework::ai_service {
     public(friend) fun request_ai(
         from: &signer,
         agent_obj_id: ObjectID,
-        agent_input_info: AgentInputInfo,
+        prompt: PromptInput,
         request: ChatRequest,
     ) : Result<ObjectID, String> {
         let url = string::utf8(AI_ORACLE_URL);
@@ -108,7 +109,7 @@ module nuwa_framework::ai_service {
         let pending_request = PendingRequest { 
             request_id,
             agent_obj_id,
-            agent_input_info,
+            prompt,
         };
         object::add_field(requests_obj, request_id, pending_request);
     
@@ -116,8 +117,8 @@ module nuwa_framework::ai_service {
     }
 
 
-    public(friend) fun unpack_pending_request(request: PendingRequest): (ObjectID, ObjectID, AgentInputInfo) {
-        (request.request_id, request.agent_obj_id, request.agent_input_info)
+    public(friend) fun unpack_pending_request(request: PendingRequest): (ObjectID, ObjectID, PromptInput) {
+        (request.request_id, request.agent_obj_id, request.prompt)
     }
 
     public(friend) fun take_pending_request(request_id: ObjectID): Option<PendingRequest> {

@@ -4,7 +4,7 @@ module nuwa_framework::agent_state{
 
     friend nuwa_framework::state_providers;
     friend nuwa_framework::agent;
-    friend nuwa_framework::prompt_builder;
+    friend nuwa_framework::prompt_input;
 
     #[data_struct]
     struct AgentState has copy, drop, store {
@@ -17,7 +17,7 @@ module nuwa_framework::agent_state{
         states: vector<AgentState>,
     }
 
-    public(friend) fun new_agent_states() : AgentStates {
+    public fun new_agent_states() : AgentStates {
         AgentStates {
             states: vector::empty(),
         }
@@ -34,7 +34,7 @@ module nuwa_framework::agent_state{
         vector::push_back(&mut agent_states.states, agent_state);
     }
 
-    public fun to_prompt(agent_states: &AgentStates): String {
+    public(friend) fun format_prompt(agent_states: &AgentStates): String {
         let prompt = string::utf8(b"Your current states:\n");
        
         vector::for_each(agent_states.states, |state| {

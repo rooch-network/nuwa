@@ -14,9 +14,7 @@ module nuwa_framework::action {
         name: String,
         description: String,
         args: vector<ActionArgument>,
-        args_example: String,  // Changed from 'example' to 'args_example'
-        usage_hint: String,       // When and how to use this action
-        constraints: String,      // Requirements and limitations
+        args_example: String,
     }
 
     #[data_struct]
@@ -47,16 +45,12 @@ module nuwa_framework::action {
         description: String,
         args: vector<ActionArgument>,
         args_example: String,
-        usage_hint: String,
-        constraints: String,
     ): ActionDescription {
         ActionDescription {
             name,
             description,
             args,
             args_example,
-            usage_hint,
-            constraints,
         }
     }
 
@@ -88,9 +82,6 @@ module nuwa_framework::action {
     public fun get_args_example(action: &ActionDescription): &String {
         &action.args_example
     }
-
-    public fun get_usage_hint(action: &ActionDescription): &String { &action.usage_hint }
-    public fun get_constraints(action: &ActionDescription): &String { &action.constraints }
 
     // Add getters for ActionArgument
     public fun get_arg_name(arg: &ActionArgument): &String { &arg.name }

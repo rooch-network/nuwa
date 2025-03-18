@@ -7,6 +7,8 @@ module nuwa_framework::agent_input_info{
     use nuwa_framework::string_utils::{build_json_section};
     use nuwa_framework::task_spec::{TaskSpecifications};
 
+    friend nuwa_framework::prompt_input;
+
     struct CoinInputInfo has copy, drop, store {
         coin_symbol: String,
         coin_type: String,
@@ -78,7 +80,7 @@ module nuwa_framework::agent_input_info{
         &info.app_task_specs
     }
 
-    public fun to_prompt(info: &AgentInputInfo): String {
+    public fun format_prompt(info: &AgentInputInfo): String {
         let result = string::utf8(b"\nInput Context:\n ");
         string::append(&mut result, info.input_description);
         string::append(&mut result, string::utf8(b"\n"));

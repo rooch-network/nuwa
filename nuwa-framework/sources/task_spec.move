@@ -6,6 +6,8 @@ module nuwa_framework::task_spec{
     use moveos_std::decimal_value::{Self, DecimalValue};
     use nuwa_framework::string_utils::{Self, build_json_section};
 
+    friend nuwa_framework::prompt_input;
+
     const MAX_TASK_SPECIFICATIONS: u64 = 5;
     const TASK_NAME_PREFIX: vector<u8> = b"task::";
 
@@ -236,18 +238,18 @@ module nuwa_framework::task_spec{
         task_spec.price
     }
 
-    public fun to_prompt(task_specs: &TaskSpecifications): String {
+    public(friend) fun format_prompt(task_specs: &TaskSpecifications): String {
         if (vector::length(&task_specs.task_specs) == 0) {
             return string::utf8(b"")
         };
         let prompt = string::utf8(b"You can perform the following tasks, the task is a specific type of action, it will be executed async:\n");
         string::append(&mut prompt, string::utf8(b"You can call the task same as the action.\n"));
-        string::append(&mut prompt, string::utf8(b"The task price is the price of the task, in the unit of RGas.\n"));
+        string::append(&mut prompt, string::utf8(b"The task price is in the unit of RGas, the user needs to pay for the task.\n"));
         let task_spec_json = build_json_section(task_specs);
         string::append(&mut prompt, task_spec_json);
         prompt
     }
-
+ 
     public fun example_task_specs(resolver: address): TaskSpecifications {
         let task_spec = new_task_spec(
             string::utf8(b"task::hello"),

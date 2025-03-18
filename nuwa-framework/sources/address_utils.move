@@ -3,7 +3,7 @@ module nuwa_framework::address_utils{
     use moveos_std::address;
 
     friend nuwa_framework::memory_action;
-    friend nuwa_framework::prompt_builder;
+    friend nuwa_framework::prompt_input;
     friend nuwa_framework::message;
 
 

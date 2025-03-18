@@ -1,6 +1,6 @@
 module nuwa_framework::agent_runner {
 
-    use std::string::{Self, String};
+    use std::string;
     use std::vector;
     use std::option;
     use moveos_std::object::{Self, Object, ObjectID};
@@ -17,7 +17,7 @@ module nuwa_framework::agent_runner {
     use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
     use nuwa_framework::ai_request;
     use nuwa_framework::ai_service;
-    use nuwa_framework::prompt_builder;
+    use nuwa_framework::prompt_input::{Self, PromptInput};
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::action_dispatcher;
     use nuwa_framework::state_providers;
@@ -25,6 +25,8 @@ module nuwa_framework::agent_runner {
     use nuwa_framework::agent_cap::{AgentCap};
     use nuwa_framework::config;
     use nuwa_framework::channel::{Self, Channel};
+    use nuwa_framework::memory;
+    use nuwa_framework::memory_info;
 
     friend nuwa_framework::channel_entry;
     friend nuwa_framework::ai_callback;
@@ -35,16 +37,23 @@ module nuwa_framework::agent_runner {
     public fun generate_system_prompt(
         agent: &Object<Agent>,
         agent_input_info: AgentInputInfo,
-    ): String {
+    ): PromptInput {
         let states = state_providers::get_agent_state(agent);
         let available_actions = get_available_actions();
         let agent_info = agent::get_agent_info(agent);
+        
         let memory_store = agent::borrow_memory_store(agent);
+        let agent_addr = agent::get_agent_address(agent);
+        let user_addr = agent_input_info::get_sender(&agent_input_info);
+        let self_memories = memory::get_all_memories(memory_store, agent_addr);
+        let user_memories = memory::get_all_memories(memory_store, user_addr);
+        let memory_info = memory_info::new(self_memories, user_memories);
+
         let task_specs = agent::get_agent_task_specs(agent);
         task_spec::merge_task_specifications(&mut task_specs, *agent_input_info::get_app_task_specs(&agent_input_info));
-        prompt_builder::build_complete_prompt_internal(
+        prompt_input::new(
             agent_info,
-            memory_store,
+            memory_info,
             agent_input_info,
             available_actions,
             task_specs,
@@ -60,10 +69,11 @@ module nuwa_framework::agent_runner {
         let model_provider = *agent::get_agent_model_provider(agent_obj);
         
         // Generate system prompt with context
-        let system_prompt = generate_system_prompt(
+        let prompt = generate_system_prompt(
             agent_obj,
             input_info,
         );
+        let system_prompt = prompt_input::format_prompt(&prompt);
         // Create chat messages
         let messages = vector::empty();
         
@@ -78,7 +88,7 @@ module nuwa_framework::agent_runner {
         //Use the agent signer to call the AI service
         let agent_signer = agent::create_agent_signer(agent_obj);  
         // Call AI service
-        let result = ai_service::request_ai(&agent_signer, agent_id, input_info, chat_request); 
+        let result = ai_service::request_ai(&agent_signer, agent_id, prompt, chat_request); 
         if (is_err(&result)) {
             let ai_addr = agent::get_agent_address(agent_obj);
             let err = result::unwrap_err(result);

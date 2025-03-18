@@ -12,7 +12,8 @@ module nuwa_framework::action_dispatcher {
     use nuwa_framework::agent::Agent;
     use nuwa_framework::string_utils;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
-    use nuwa_framework::agent_input_info::{Self, AgentInputInfo};
+    use nuwa_framework::agent_input_info;
+    use nuwa_framework::prompt_input::{Self, PromptInput};
 
     friend nuwa_framework::ai_callback;
     
@@ -37,10 +38,6 @@ module nuwa_framework::action_dispatcher {
         args: String,
         success: bool,
         error: String,
-    }
-
-    //TODO remove this
-    entry fun register_actions() {
     }
 
     public fun get_action_groups(): vector<ActionGroup> {
@@ -70,33 +67,34 @@ module nuwa_framework::action_dispatcher {
         vector::append(&mut descriptions, transfer_descriptions);
 
         descriptions
-    }
+    } 
  
-    public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, agent_input: AgentInputInfo, response: String) {
+    public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, prompt: PromptInput, response: String) {
         let action_response = parse_line_based_response(&response);
         let actions = action_response.actions;
         let i = 0;
         let len = vector::length(&actions);
-        let default_channel_id = agent_input_info::get_response_channel_id(&agent_input);
+        let agent_input = prompt_input::get_input_info(&prompt);
+        let default_channel_id = agent_input_info::get_response_channel_id(agent_input);
         if (len == 0) {
             //If the AI response format is not correct, reply to the current message
-            response_action::reply_to_current_message(agent, &agent_input, response);
+            response_action::reply_to_current_message(agent, agent_input, response);
             return
         };
         while (i < len) {
             let action_call = vector::borrow(&actions, i);
-            execute_action(agent, &agent_input, default_channel_id, action_call);
+            execute_action(agent, &prompt, default_channel_id, action_call);
             i = i + 1;
         };
     }
 
     /// Execute a single action call
-    fun execute_action(agent: &mut Object<Agent>, agent_input: &AgentInputInfo, default_channel_id: ObjectID, action_call: &ActionCall) {
+    fun execute_action(agent: &mut Object<Agent>, prompt: &PromptInput, default_channel_id: ObjectID, action_call: &ActionCall) {
         let action_name = &action_call.action;
         let args = &action_call.args;
         let skip_event = false;
         let result: Result<bool,String> = if (string_utils::starts_with(action_name, &b"memory::")) {
-            let result = memory_action::execute_internal(agent, agent_input, *action_name, *args);
+            let result = memory_action::execute_internal(agent, prompt, *action_name, *args);
             if(is_ok(&result)){
                 //if the memory action is none, skip the event
                 let updated_memory:bool = result::unwrap(result);
@@ -108,11 +106,11 @@ module nuwa_framework::action_dispatcher {
         } else if (string_utils::starts_with(action_name, &b"response::")) {
             //skip all response actions
             skip_event = true;
-            response_action::execute_internal(agent, agent_input, *action_name, *args)
+            response_action::execute_internal(agent, prompt, *action_name, *args)
         } else if (string_utils::starts_with(action_name, &b"transfer::")) {
-            transfer_action::execute_internal(agent, agent_input, *action_name, *args)
+            transfer_action::execute_internal(agent, prompt, *action_name, *args)
         } else if (string_utils::starts_with(action_name, &b"task::")) {
-            task_action::execute_internal(agent, agent_input, *action_name, *args)
+            task_action::execute_internal(agent, prompt, *action_name, *args)
         } else {
             err_str(b"Unsupported action")
         };
@@ -374,9 +372,10 @@ module nuwa_framework::action_dispatcher {
         let coin_input_info = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000000000000u256);
         let agent_input = message_for_agent::new_agent_input(vector[message]);
         let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input_info);
-
+        let agent_info = agent::get_agent_info(agent);
+        let prompt_input = prompt_input::new_prompt_input_for_test(agent_info, agent_input_info);
         // Execute actions
-        dispatch_actions_internal(agent, agent_input_info, test_response);
+        dispatch_actions_internal(agent, prompt_input, test_response);
 
         // Verify memory was added
         let store = agent::borrow_memory_store(agent);
