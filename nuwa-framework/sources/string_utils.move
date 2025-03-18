@@ -35,6 +35,23 @@ module nuwa_framework::string_utils {
         true
     }
 
+    public(friend) fun contains(s: &String, sub: &vector<u8>): bool {
+        let bytes = string::bytes(s);
+        let sub_len = vector::length(sub);
+        let len = vector::length(bytes);
+        let i = 0;
+        if (sub_len > len) {
+            return false
+        };
+        while (i <= len - sub_len) {
+            if (is_substr_at(bytes, sub, i)) {
+                return true
+            };
+            i = i + 1;
+        };
+        false
+    }
+
     //TODO migrate to std::string or moveos_std::string_utils
     /// Split string by delimiter
     public(friend) fun split(s: &String, delimiter: &String): vector<String> {
@@ -60,7 +77,7 @@ module nuwa_framework::string_utils {
             };
         };
         result
-    }
+    } 
 
     /// Check if the substring appears at position i in bytes
     fun is_substr_at(bytes: &vector<u8>, sub: &vector<u8>, i: u64): bool {

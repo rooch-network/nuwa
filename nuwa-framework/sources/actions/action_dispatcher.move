@@ -1,6 +1,7 @@
 module nuwa_framework::action_dispatcher {
     use std::string::{Self, String};
     use std::vector;
+    use std::option::{Self, Option};
     use moveos_std::json;
     use moveos_std::object::{Object, ObjectID};
     use moveos_std::result::{Self, is_ok, is_err, err_str, Result};
@@ -179,9 +180,14 @@ module nuwa_framework::action_dispatcher {
     }
 
     /// Parse a line-based response string into an ActionResponse
-    //TODO handle no line break case
+    /// Handle various edge cases and try to fix common formatting issues:
+    /// 1. No line breaks between actions
+    /// 2. Missing or malformed JSON
+    /// 3. Extra spaces or formatting issues
     public fun parse_line_based_response(response: &String): ActionResponse {
         let actions = vector::empty<ActionCall>();
+        
+        // First try to split by newline
         let lines = string_utils::split(response, &string::utf8(b"\n"));
         
         let i = 0;
@@ -191,41 +197,95 @@ module nuwa_framework::action_dispatcher {
             let line = string_utils::trim(vector::borrow(&lines, i));
             
             if (!string::is_empty(&line)) {
-                // Find the first space to separate action name from parameters
-                let line_bytes = string::bytes(&line);
-                let line_len = vector::length(line_bytes);
-                let j = 0;
-                let found_space = false;
-                
-                while (j < line_len && !found_space) {
-                    if (*vector::borrow(line_bytes, j) == 0x20) { // Space character (ASCII 32)
-                        found_space = true;
-                    } else {
-                        j = j + 1;
-                    }
+                let maybe_action = try_extract_action(&line);
+                if (option::is_some(&maybe_action)) {
+                    vector::push_back(&mut actions, option::extract(&mut maybe_action));
                 };
-                
-                if (found_space && j < line_len) {
-                    let action = string::utf8(string_utils::get_substr(line_bytes, 0, j));
-                    let args = string::utf8(string_utils::get_substr(line_bytes, j + 1, line_len));
-                    
-                    // Remove any extra spaces
-                    let trimmed_action = string_utils::trim(&action);
-                    let trimmed_args = string_utils::trim(&args);
-                    
-                    if (!string::is_empty(&trimmed_action) && !string::is_empty(&trimmed_args)) {
-                        // Check for JSON format in args
-                        if (string::index_of(&trimmed_args, &string::utf8(b"{")) == 0) {
-                            let action_call = create_action_call(trimmed_action, trimmed_args);
-                            vector::push_back(&mut actions, action_call);
-                        }
-                    }
-                }
             };
             i = i + 1;
         };
         
         ActionResponse { actions }
+    }
+
+    /// Try to fix common JSON formatting issues
+    fun fix_json_args(args: &String): String {
+        if (string::is_empty(args)) {
+            return string::utf8(b"{}")
+        };
+        
+        let args_str = string_utils::trim(args);
+        
+        // If doesn't start with {, wrap it
+        if (!string_utils::starts_with(&args_str, &b"{")) {
+            if (string_utils::contains(&args_str, &b":")) {
+                // Might be JSON without braces
+                let result = string::utf8(b"{");
+                string::append(&mut result, args_str);
+                string::append(&mut result, string::utf8(b"}"));
+                return result
+            } else {
+                // Treat as content parameter
+                let result = string::utf8(b"{\"content\":\"");
+                string::append(&mut result, args_str);
+                string::append(&mut result, string::utf8(b"\"}"));
+                return result
+            }
+        };
+        
+        args_str
+    }
+
+    /// Try to extract action from a line without proper spacing
+    fun try_extract_action(line: &String): Option<ActionCall> {
+        // Common action prefixes we recognize
+        let prefixes = vector[
+            b"memory::", 
+            b"response::", 
+            b"transfer::",
+            b"task::"
+        ];
+        
+        let i = 0;
+        let len = vector::length(&prefixes);
+        
+        while (i < len) {
+            let prefix = vector::borrow(&prefixes, i);
+            if (string_utils::starts_with(line, prefix)) {
+                // Found a valid prefix, try to split after the action name
+                let line_str = string::bytes(line);
+                let j = vector::length(prefix);
+                let line_len = vector::length(line_str);
+                
+                while (j < line_len) {
+                    if (*vector::borrow(line_str, j) == 0x3A || // :
+                        *vector::borrow(line_str, j) == 0x20) { // space
+                        let action = string::utf8(string_utils::get_substr(line_str, 0, j));
+                        let args = if (j + 1 < line_len) {
+                            string::utf8(string_utils::get_substr(line_str, j + 1, line_len))
+                        } else {
+                            string::utf8(b"{}")
+                        };
+                        
+                        return option::some(create_action_call(
+                            string_utils::trim(&action),
+                            fix_json_args(&args)
+                        ))
+                    };
+                    j = j + 1;
+                };
+                
+                // If we reach here, no separator was found, treat the whole thing as the action name
+                let action = string::utf8(string_utils::get_substr(line_str, 0, line_len));
+                return option::some(create_action_call(
+                    string_utils::trim(&action),
+                    string::utf8(b"{}")
+                ))
+            };
+            i = i + 1;
+        };
+        
+        option::none()
     }
 
     /// Convert ActionResponse to string format
@@ -254,11 +314,6 @@ module nuwa_framework::action_dispatcher {
         };
         
         result
-    }
-
-    #[test_only]
-    public fun init_for_test() {
-        init();
     }
 
     #[test]
@@ -416,4 +471,132 @@ module nuwa_framework::action_dispatcher {
         assert!(get_action_name(second_action) == &string::utf8(b"response::say"), 3);
     }
 
+
+
+    #[test]
+    fun test_parse_malformed_responses() {
+        // Test case 1: Missing braces in JSON
+        let response1 = string::utf8(b"response::say content:\"Hello world\"");
+        let result1 = parse_line_based_response(&response1);
+        let actions1 = get_actions(&result1);
+        assert!(vector::length(actions1) == 1, 1);
+        let action1 = vector::borrow(actions1, 0);
+        assert!(get_action_name(action1) == &string::utf8(b"response::say"), 2);
+        assert!(get_action_args(action1) == &string::utf8(b"{content:\"Hello world\"}"), 3);
+
+        // Test case 2: No JSON at all, just plain text
+        let response2 = string::utf8(b"response::say Hello world");
+        let result2 = parse_line_based_response(&response2);
+        let actions2 = get_actions(&result2);
+        assert!(vector::length(actions2) == 1, 4);
+        let action2 = vector::borrow(actions2, 0);
+        assert!(get_action_name(action2) == &string::utf8(b"response::say"), 5);
+        assert!(get_action_args(action2) == &string::utf8(b"{\"content\":\"Hello world\"}"), 6);
+
+        // Test case 3: Multiple actions without proper formatting
+        let response3 = string::utf8(b"memory::remember_user likes coding\nresponse::say:Great!");
+        let result3 = parse_line_based_response(&response3);
+        let actions3 = get_actions(&result3);
+        assert!(vector::length(actions3) == 2, 7);
+        let action3_1 = vector::borrow(actions3, 0);
+        let action3_2 = vector::borrow(actions3, 1);
+        assert!(get_action_name(action3_1) == &string::utf8(b"memory::remember_user"), 8);
+        assert!(get_action_name(action3_2) == &string::utf8(b"response::say"), 9);
+
+        // Test case 4: Action without parameters
+        let response4 = string::utf8(b"memory::clear");
+        let result4 = parse_line_based_response(&response4);
+        let actions4 = get_actions(&result4);
+        assert!(vector::length(actions4) == 1, 10);
+        let action4 = vector::borrow(actions4, 0);
+        assert!(get_action_name(action4) == &string::utf8(b"memory::clear"), 11);
+        assert!(get_action_args(action4) == &string::utf8(b"{}"), 12);
+
+        // Test case 5: Mixed format actions
+        let response5 = string::utf8(b"response::say {\"content\":\"Hello\"}\nmemory::remember_user:likes formal json\nresponse::say Bye!");
+        let result5 = parse_line_based_response(&response5);
+        let actions5 = get_actions(&result5);
+        assert!(vector::length(actions5) == 3, 13);
+        
+        // Test case 6: Empty lines and whitespace
+        let response6 = string::utf8(b"\n  response::say hello  \n\n  memory::clear  \n");
+        let result6 = parse_line_based_response(&response6);
+        let actions6 = get_actions(&result6);
+        assert!(vector::length(actions6) == 2, 14);
+        let action6_1 = vector::borrow(actions6, 0);
+        let action6_2 = vector::borrow(actions6, 1);
+        assert!(get_action_name(action6_1) == &string::utf8(b"response::say"), 15);
+        assert!(get_action_name(action6_2) == &string::utf8(b"memory::clear"), 16);
+
+        // Test case 7: Invalid action prefix
+        let response7 = string::utf8(b"invalid::action test\nresponse::say valid action");
+        let result7 = parse_line_based_response(&response7);
+        let actions7 = get_actions(&result7);
+        assert!(vector::length(actions7) == 1, 17); // Should only parse the valid action
+        let action7 = vector::borrow(actions7, 0);
+        assert!(get_action_name(action7) == &string::utf8(b"response::say"), 18);
+    }
+
+    #[test]
+    fun test_fix_json_args() {
+        // Test empty args
+        let empty = string::utf8(b"");
+        assert!(fix_json_args(&empty) == string::utf8(b"{}"), 1);
+
+        // Test plain text
+        let plain_text = string::utf8(b"Hello world");
+        let expected = string::utf8(b"{\"content\":\"");
+        string::append(&mut expected, string::utf8(b"Hello world"));
+        string::append(&mut expected, string::utf8(b"\"}"));
+        assert!(fix_json_args(&plain_text) == expected, 2);
+
+        // Test JSON without braces
+        let no_braces = string::utf8(b"content:\"test\",type:\"message\"");
+        let expected2 = string::utf8(b"{");
+        string::append(&mut expected2, string::utf8(b"content:\"test\",type:\"message\""));
+        string::append(&mut expected2, string::utf8(b"}"));
+        assert!(fix_json_args(&no_braces) == expected2, 3);
+
+        // Test proper JSON
+        let proper_json = string::utf8(b"{\"content\":\"test\"}");
+        assert!(fix_json_args(&proper_json) == string::utf8(b"{\"content\":\"test\"}"), 4);
+
+        // Test with extra spaces
+        let spaced = string::utf8(b"  {\"content\":\"test\"}  ");
+        assert!(fix_json_args(&spaced) == string::utf8(b"{\"content\":\"test\"}"), 5);
+    }
+
+    #[test]
+    fun test_try_extract_action() {
+        // Test valid action with colon
+        let line1 = string::utf8(b"response::say:Hello");
+        let result1 = try_extract_action(&line1);
+        assert!(option::is_some(&result1), 1);
+        let action1 = option::extract(&mut result1);
+        assert!(get_action_name(&action1) == &string::utf8(b"response::say"), 2);
+        let expected1 = string::utf8(b"{\"content\":\"");
+        string::append(&mut expected1, string::utf8(b"Hello"));
+        string::append(&mut expected1, string::utf8(b"\"}"));
+        assert!(get_action_args(&action1) == &expected1, 3);
+
+        // Test valid action with space
+        let line2 = string::utf8(b"memory::remember_user test");
+        let result2 = try_extract_action(&line2);
+        assert!(option::is_some(&result2), 4);
+        let action2 = option::extract(&mut result2);
+        assert!(get_action_name(&action2) == &string::utf8(b"memory::remember_user"), 5);
+
+        // Test invalid action prefix
+        let line3 = string::utf8(b"invalid::action test");
+        let result3 = try_extract_action(&line3);
+        assert!(option::is_none(&result3), 6);
+
+        // Test action without parameters
+        let line4 = string::utf8(b"memory::clear");
+        let result4 = try_extract_action(&line4);
+        assert!(option::is_some(&result4), 7);
+        let action4 = option::extract(&mut result4);
+        assert!(get_action_name(&action4) == &string::utf8(b"memory::clear"), 8);
+        assert!(get_action_args(&action4) == &string::utf8(b"{}"), 9);
+    } 
 }
