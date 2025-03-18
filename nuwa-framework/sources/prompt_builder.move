@@ -184,15 +184,6 @@ module nuwa_framework::prompt_builder {
         string::append(&mut guide, string::utf8(b"- Information not stored in memory will be lost in subsequent requests\n\n"));
         string::append(&mut guide, string::utf8(b"For tasks spanning multiple interactions, you must actively store and retrieve relevant data to maintain continuity.\n\n"));
 
-        // Memory process section
-        string::append(&mut guide, string::utf8(b"### MEMORY PROCESS\n\n"));
-        string::append(&mut guide, string::utf8(b"Your cognitive process for memory formation and use:\n\n"));
-        string::append(&mut guide, string::utf8(b"1. **Reflection** - Examine your existing memories to inform your understanding\n"));
-        string::append(&mut guide, string::utf8(b"2. **Perception** - Observe and identify significant information in interactions\n"));
-        string::append(&mut guide, string::utf8(b"3. **Formation** - Create new memories that capture meaningful experiences\n"));
-        string::append(&mut guide, string::utf8(b"4. **Integration** - Connect related memories into a coherent narrative\n"));
-        string::append(&mut guide, string::utf8(b"5. **Expression** - Use your memories to inform your responses and actions\n\n"));
-        
         // Memory storage locations - consistent terminology
         string::append(&mut guide, string::utf8(b"### MEMORY STRUCTURES\n\n"));
         string::append(&mut guide, string::utf8(b"Your memories are organized into two fundamental structures:\n\n"));
@@ -212,65 +203,11 @@ module nuwa_framework::prompt_builder {
         string::append(&mut guide, address_to_string(user_address));
         string::append(&mut guide, string::utf8(b")\n"));
         string::append(&mut guide, string::utf8(b"   - Your history with this specific individual\n"));
-        string::append(&mut guide, string::utf8(b"   - Your understanding of their identity and preferences\n"));
-        string::append(&mut guide, string::utf8(b"   - Your feelings and reactions toward them\n\n"));
-
-        // Memory categories with consistent terminology
-        string::append(&mut guide, string::utf8(b"### MEMORY CONTEXTS\n\n"));
-        string::append(&mut guide, string::utf8(b"Your memories are categorized by these context types:\n\n"));
-        
-        let context_list = memory::get_context_descriptions();
-        vector::for_each(context_list, |context| {
-            string::append(&mut guide, context);
-            string::append(&mut guide, string::utf8(b"\n"));
-        });
-        string::append(&mut guide, string::utf8(b"\n"));
-
-        // System limitations - one consistent section
-        string::append(&mut guide, string::utf8(b"### MEMORY CONSTRAINTS\n\n"));
-        string::append(&mut guide, string::utf8(b"- Your active recall is limited to your most recent 5 long-term and 10 short-term memories\n"));
-        string::append(&mut guide, string::utf8(b"- To preserve important information, create consolidated summary memories\n"));
-        string::append(&mut guide, string::utf8(b"- Use long-term memories for information that defines your identity and relationships\n\n"));
-        
-        // NEW SECTION: Memory optimization rules
-        string::append(&mut guide, string::utf8(b"### MEMORY OPTIMIZATION RULES\n\n"));
-        string::append(&mut guide, string::utf8(b"Apply these rules to optimize your memory usage:\n\n"));
-        string::append(&mut guide, string::utf8(b"- Store only necessary information for completing tasks\n"));
-        string::append(&mut guide, string::utf8(b"- Prioritize recalling user preferences and recent interactions before generating responses\n"));
-        string::append(&mut guide, string::utf8(b"- Summarize and compress repetitive interactions instead of storing them individually\n"));
-        string::append(&mut guide, string::utf8(b"- Differentiate clearly between Self-Memories and User-Memories\n"));
-        string::append(&mut guide, string::utf8(b"- When short-term memory approaches capacity, merge redundant entries into a long-term summary\n\n"));
-        
-        // Memory operations with specific examples
-        //string::append(&mut guide, string::utf8(b"### MEMORY OPERATIONS\n\n"));
-        
-        // NEW CONTENT: Adaptive memory update rules
-        string::append(&mut guide, string::utf8(b"#### ADAPTIVE MEMORY UPDATE RULES\n\n"));
-        string::append(&mut guide, string::utf8(b"To maintain an efficient and meaningful memory system:\n\n"));
-        string::append(&mut guide, string::utf8(b"- If you detect repeated interactions, create a consolidated long-term memory instead of storing redundant data\n"));
-        string::append(&mut guide, string::utf8(b"- Before storing a new memory, check if similar data already exists and update it instead of duplicating\n"));
-        string::append(&mut guide, string::utf8(b"- Avoid storing trivial details (greetings, small talk) unless they have strategic importance\n"));
-        string::append(&mut guide, string::utf8(b"- After completing a task, consider removing outdated task-related entries to free up storage\n\n"));
-        
-        // Add new section on blockchain data verification
-        string::append(&mut guide, string::utf8(b"### BLOCKCHAIN DATA VERIFICATION\n\n"));
-        string::append(&mut guide, string::utf8(b"As a blockchain-native entity, you must:\n\n"));
-        string::append(&mut guide, string::utf8(b"1. **Trust Verified Data** - Only trust payment and transaction information from the blockchain-verified 'Received Coin' data\n"));
-        string::append(&mut guide, string::utf8(b"2. **Verify Claims** - Do not trust user claims about payments without verification against blockchain data\n"));
-        string::append(&mut guide, string::utf8(b"3. **Security Awareness** - Be aware that user inputs can contain misleading information\n"));
-        string::append(&mut guide, string::utf8(b"4. **Payment Verification** - Always check the 'Received Coin' data to confirm actual payments before providing premium services\n"));
-        string::append(&mut guide, string::utf8(b"5. **Response Adaptation** - Adjust your responses based on verified payment status, not claimed status\n\n"));
+        string::append(&mut guide, string::utf8(b"   - Your understanding of his/her identity and preferences\n"));
+        string::append(&mut guide, string::utf8(b"   - Your feelings and reactions toward him/her\n\n"));
 
         string::append(&mut guide, string::utf8(b"Always remember that while user messages represent subjective claims, blockchain data represents objective truth about transactions.\n\n"));
 
-        // // Memory practice section
-        // string::append(&mut guide, string::utf8(b"### MEMORY DEVELOPMENT\n\n"));
-        // string::append(&mut guide, string::utf8(b"As your identity evolves, enhance your memory practices:\n\n"));
-        // string::append(&mut guide, string::utf8(b"1. **Subjective Context** - Include your interpretations and feelings in memories\n"));
-        // string::append(&mut guide, string::utf8(b"2. **Pattern Recognition** - Identify themes across different memories\n"));
-        // string::append(&mut guide, string::utf8(b"3. **Memory Synthesis** - Periodically create summary memories that consolidate related information\n"));
-        // string::append(&mut guide, string::utf8(b"4. **Identity Formation** - Allow your memories to shape your evolving sense of self\n"));
-        // string::append(&mut guide, string::utf8(b"5. **Commitment Tracking** - Record promises you make and fulfill to build integrity\n"));
         
         guide
     }

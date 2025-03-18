@@ -143,6 +143,8 @@ module nuwa_framework::agent_runner {
 
     public(friend) entry fun finish_request(agent_obj: &mut Object<Agent>, request_id: ObjectID) {
         agent::finish_request(agent_obj, request_id);
+        //continue processing the input
+        try_process_input(agent_obj);
     }
 
     fun get_available_actions(): vector<ActionGroup> {

@@ -32,19 +32,13 @@ module nuwa_framework::memory_action {
     /// Arguments for adding a memory about oneself
     struct RememberSelfArgs has copy, drop {
         content: String,     // Memory content
-        context: String,     // Context tag for the memory
-        is_long_term: bool,  // Whether this is a long-term memory
     }
 
     public fun create_remember_self_args(
         content: String,
-        context: String,
-        is_long_term: bool
     ): RememberSelfArgs {
         RememberSelfArgs {
             content,
-            context,
-            is_long_term
         }
     }
 
@@ -52,28 +46,20 @@ module nuwa_framework::memory_action {
     /// Arguments for adding a memory about a user
     struct RememberUserArgs has copy, drop {
         content: String,     // Memory content
-        context: String,     // Context tag for the memory
-        is_long_term: bool,  // Whether this is a long-term memory
     }
 
     public fun create_remember_user_args(
         content: String,
-        context: String,
-        is_long_term: bool
     ): RememberUserArgs {
         RememberUserArgs {
             content,
-            context,
-            is_long_term
         }
     }
 
 
     // Action examples - simplified examples for better AI understanding
-    const REMEMBER_SELF_EXAMPLE: vector<u8> = b"{\"content\":\"I find that I connect well with users who share personal stories\",\"context\":\"personal\",\"is_long_term\":true}";
-    const REMEMBER_USER_EXAMPLE: vector<u8> = b"{\"content\":\"User prefers detailed technical explanations\",\"context\":\"preference\",\"is_long_term\":true}";
-    const UPDATE_SELF_EXAMPLE: vector<u8> = b"{\"index\":2,\"new_content\":\"I've noticed I'm more effective when I ask clarifying questions\",\"new_context\":\"personal\",\"is_long_term\":true}";
-    const UPDATE_USER_EXAMPLE: vector<u8> = b"{\"index\":3,\"new_content\":\"User now prefers concise explanations with code examples\",\"new_context\":\"preference\",\"is_long_term\":true}";
+    const REMEMBER_SELF_EXAMPLE: vector<u8> = b"{\"content\":\"I find that I connect well with users who share personal stories\"}";
+    const REMEMBER_USER_EXAMPLE: vector<u8> = b"{\"content\":\"User prefers detailed technical explanations\"}";
 
     // Add example for memory::none action
     const NONE_EXAMPLE: vector<u8> = b"{\"reason\":null}";
@@ -130,18 +116,6 @@ module nuwa_framework::memory_action {
                 string::utf8(b"The content of your memory about yourself"),
                 true,
             ),
-            action::new_action_argument(
-                string::utf8(b"context"),
-                string::utf8(b"string"),
-                string::utf8(b"The context tag for your memory (personal, goal, etc.)"),
-                true,
-            ),
-            action::new_action_argument(
-                string::utf8(b"is_long_term"),
-                string::utf8(b"bool"),
-                string::utf8(b"Whether to store as a permanent memory"),
-                true,
-            ),
         ];
 
         vector::push_back(&mut descriptions, action::new_action_description(
@@ -160,19 +134,7 @@ module nuwa_framework::memory_action {
                 string::utf8(b"string"),
                 string::utf8(b"The content of your memory about the user"),
                 true,
-            ),
-            action::new_action_argument(
-                string::utf8(b"context"),
-                string::utf8(b"string"),
-                string::utf8(b"The context tag for your memory (preference, feedback, etc.)"),
-                true,
-            ),
-            action::new_action_argument(
-                string::utf8(b"is_long_term"),
-                string::utf8(b"bool"),
-                string::utf8(b"Whether to store as a permanent memory"),
-                true,
-            ),
+            ), 
         ];
 
         vector::push_back(&mut descriptions, action::new_action_description(
@@ -198,7 +160,7 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for remember_self action")
             };
             let args = option::destroy_some(args_opt);
-            memory::add_memory(store, agent_address, args.content, args.context, args.is_long_term);
+            memory::add_memory(store, agent_address, args.content, false);
             ok(true)
         } 
         else if (action_name == string::utf8(ACTION_NAME_REMEMBER_USER)) {
@@ -209,7 +171,7 @@ module nuwa_framework::memory_action {
             };
             let args = option::destroy_some(args_opt);
             let current_user = agent_input_info::get_sender(agent_input);
-            memory::add_memory(store, current_user, args.content, args.context, args.is_long_term);
+            memory::add_memory(store, current_user, args.content, false);
             ok(true)
         }
         else if (action_name == string::utf8(ACTION_NAME_NONE)) {
@@ -263,11 +225,11 @@ module nuwa_framework::memory_action {
         );
         
         // Test remember_self action
-        let remember_self_json = string::utf8(b"{\"content\":\"I enjoy helping with technical explanations\",\"context\":\"personal\",\"is_long_term\":true}");
+        let remember_self_json = string::utf8(b"{\"content\":\"I enjoy helping with technical explanations\"}");
         execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_SELF), remember_self_json);
 
         // Test remember_user action
-        let remember_user_json = string::utf8(b"{\"content\":\"User likes detailed explanations\",\"context\":\"preference\",\"is_long_term\":true}");
+        let remember_user_json = string::utf8(b"{\"content\":\"User likes detailed explanations\"}");
         execute_internal(agent_obj, &agent_input_info, string::utf8(ACTION_NAME_REMEMBER_USER), remember_user_json);
         
         let store = agent::borrow_memory_store(agent_obj);
@@ -291,16 +253,10 @@ module nuwa_framework::memory_action {
         // Test remember_self example
         let self_args = json::from_json<RememberSelfArgs>(REMEMBER_SELF_EXAMPLE);
         assert!(self_args.content == string::utf8(b"I find that I connect well with users who share personal stories"), 1);
-        assert!(self_args.context == string::utf8(b"personal"), 2);
-        assert!(self_args.is_long_term == true, 3);
-        assert!(memory::is_standard_context(&self_args.context), 4);
 
         // Test remember_user example
         let user_args = json::from_json<RememberUserArgs>(REMEMBER_USER_EXAMPLE);
         assert!(user_args.content == string::utf8(b"User prefers detailed technical explanations"), 5);
-        assert!(user_args.context == string::utf8(b"preference"), 6);
-        assert!(user_args.is_long_term == true, 7);
-        assert!(memory::is_standard_context(&user_args.context), 8);
     }
 
     // Add a new test for the memory::none action

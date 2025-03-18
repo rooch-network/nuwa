@@ -340,8 +340,6 @@ module nuwa_framework::action_dispatcher {
         // Using type-specific constructors with serialization
         let memory_args = memory_action::create_remember_user_args(
             string::utf8(b"User prefers detailed explanations"), 
-            string::utf8(b"preference"),
-            true,
         );
         
         let response_args = response_action::create_say_args(
@@ -386,7 +384,6 @@ module nuwa_framework::action_dispatcher {
         assert!(vector::length(&memories) == 1, 1);
         let memory = vector::borrow(&memories, 0);
         assert!(memory::get_content(memory) == string::utf8(b"User prefers detailed explanations"), 2);
-        assert!(memory::get_context(memory) == string::utf8(b"preference"), 3);
 
         agent::destroy_agent_cap(cap);
     }

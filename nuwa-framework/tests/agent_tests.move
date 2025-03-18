@@ -10,7 +10,6 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::channel;
     use nuwa_framework::message;
     use nuwa_framework::agent_input_info;
-    use nuwa_framework::task_spec;
     use nuwa_framework::message_for_agent;
     #[test]
     fun test_prompt_builder() {
@@ -47,9 +46,8 @@ module nuwa_framework::agent_tests {
         
         let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input);
         
-        let app_task_specs = task_spec::empty_task_specifications();
         // Get first prompt
-        let prompt = agent_runner::generate_system_prompt(agent, agent_input_info, app_task_specs);
+        let prompt = agent_runner::generate_system_prompt(agent, agent_input_info);
 
         // Print first prompt for debugging
         debug::print(&string::utf8(b"First Prompt:"));
