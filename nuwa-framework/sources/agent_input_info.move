@@ -3,10 +3,12 @@ module nuwa_framework::agent_input_info{
     use moveos_std::object::{ObjectID};
     use moveos_std::decimal_value::{Self, DecimalValue};
     use moveos_std::type_info;
+    use moveos_std::address;
     use rooch_framework::coin;
     use nuwa_framework::string_utils::{build_json_section};
     use nuwa_framework::task_spec::{TaskSpecifications};
-
+    use nuwa_framework::user_profile_for_agent;
+    
     friend nuwa_framework::prompt_input;
 
     struct CoinInputInfo has copy, drop, store {
@@ -82,8 +84,14 @@ module nuwa_framework::agent_input_info{
 
     public fun format_prompt(info: &AgentInputInfo): String {
         let result = string::utf8(b"\nInput Context:\n ");
-        string::append(&mut result, info.input_description);
+        string::append(&mut result, string::utf8(b"\nSender: "));
+        string::append(&mut result, address::to_bech32_string(info.sender));
+        //TODO put the profile into the PromptInput
+        let profile = user_profile_for_agent::get_user_profile(info.sender);
+        string::append(&mut result, user_profile_for_agent::to_prompt(&profile));
         string::append(&mut result, string::utf8(b"\n"));
+        string::append(&mut result, string::utf8(b"\nInput Description:\n"));
+        string::append(&mut result, info.input_description);
         string::append(&mut result, string::utf8(b"\nInput Data Type:\n"));
         string::append(&mut result, info.input_data_type);
         string::append(&mut result, string::utf8(b"\nInput Data:\n"));

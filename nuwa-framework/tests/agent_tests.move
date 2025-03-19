@@ -3,6 +3,7 @@ module nuwa_framework::agent_tests {
     use std::debug;
     use std::string;
     use std::vector;
+    use moveos_std::signer;
     use rooch_framework::gas_coin::RGas;
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
@@ -12,6 +13,8 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::agent_input_info;
     use nuwa_framework::message_for_agent;
     use nuwa_framework::prompt_input;
+    use nuwa_framework::user_profile;
+    use nuwa_framework::test_helper;
     
     #[test]
     fun test_prompt_builder() {
@@ -28,7 +31,11 @@ module nuwa_framework::agent_tests {
         // Create AI home channel
         let channel_id = channel::create_ai_home_channel(agent);
        
-        let test_user = @0x43;
+        let test_user_signer = test_helper::create_test_account();
+        let test_user = signer::address_of(&test_user_signer);
+
+        user_profile::init_profile(&test_user_signer, string::utf8(b"TestUser"), string::utf8(b"testuser"), string::utf8(b"https://test/avator.png"));
+
 
         // First interaction: User introduces themselves
         let test_message = message::new_message_for_test(

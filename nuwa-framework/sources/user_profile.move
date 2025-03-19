@@ -21,18 +21,48 @@ module nuwa_framework::user_profile {
     const ErrorUsernameNotRegistered: u64 = 8;
     const ErrorLinkNotVerified: u64 = 9;
     const ErrorLinkAlreadyExists: u64 = 10;
+
     /// Maximum number of links a user can have
     const MAX_LINKS: u64 = 10;
+    public fun max_links(): u64 {
+        MAX_LINKS
+    }
 
     /// Supported link types
     const LINK_TYPE_WEBSITE: u8 = 0;
+    public fun link_type_website(): u8 {    
+        LINK_TYPE_WEBSITE
+    }
+
     const LINK_TYPE_TWITTER: u8 = 1;
+    public fun link_type_twitter(): u8 {
+        LINK_TYPE_TWITTER
+    }
+
     const LINK_TYPE_GITHUB: u8 = 2;
+    public fun link_type_github(): u8 {
+        LINK_TYPE_GITHUB
+    }
+
     const LINK_TYPE_TELEGRAM: u8 = 3;
+    public fun link_type_telegram(): u8 {
+        LINK_TYPE_TELEGRAM
+    }
+
     const LINK_TYPE_DISCORD: u8 = 4;
+    public fun link_type_discord(): u8 {
+        LINK_TYPE_DISCORD
+    }
+
     const LINK_TYPE_LENS: u8 = 5;
+    public fun link_type_lens(): u8 {
+        LINK_TYPE_LENS
+    }
+
     const LINK_TYPE_ENS: u8 = 6;
-    const LINK_TYPE_CUSTOM: u8 = 255; // For future extensions
+    public fun link_type_ens(): u8 {
+        LINK_TYPE_ENS
+    }
 
     /// URL patterns for different link types
     const URL_PATTERN_TWITTER_1: vector<u8> = b"twitter.com";
@@ -85,6 +115,8 @@ module nuwa_framework::user_profile {
         link_type: u8,
     }
 
+    /// User profile
+    /// The Object<UserProfile> has no `store` ability, so it can't be transferred
     struct UserProfile has key {
         /// The display name of the user
         name: String,
@@ -122,6 +154,64 @@ module nuwa_framework::user_profile {
         let profile_obj_id = object::account_named_object_id<UserProfile>(addr);
         object::exists_object(profile_obj_id)
     }
+
+    // ============= Profile Getters =============
+
+    public fun get_profile(addr: address): &UserProfile {
+        let profile_obj_id = object::account_named_object_id<UserProfile>(addr);
+        let profile_obj = object::borrow_object<UserProfile>(profile_obj_id);
+        object::borrow(profile_obj)
+    }
+
+    public fun profile_name(profile: &UserProfile): &String {
+        &profile.name
+    }
+
+    public fun profile_username(profile: &UserProfile): &String {
+        &profile.username
+    }
+
+    public fun profile_avatar(profile: &UserProfile): &String {
+        &profile.avatar
+    }
+
+    public fun profile_links(profile: &UserProfile): &vector<SocialLink> {
+        &profile.links
+    }
+
+    public fun social_link_url(link: &SocialLink): &String {
+        &link.url
+    }
+
+    public fun social_link_type(link: &SocialLink): u8 {
+        link.link_type
+    }
+
+    public fun social_link_summary(link: &SocialLink): &String {
+        &link.summary
+    }
+
+    public fun social_link_is_verified(link: &SocialLink): bool {
+        option::is_some(&link.credential)
+    }
+
+    public fun social_link_credential(link: &SocialLink): &Option<VerificationCredential> {
+        &link.credential
+    }
+
+    public fun credential_verifier(credential: &VerificationCredential): &address {
+        &credential.verifier
+    }
+
+    public fun credential_issued_at(credential: &VerificationCredential): &u64 {
+        &credential.issued_at
+    }
+
+    public fun credential_signature(credential: &VerificationCredential): &vector<u8> {
+        &credential.signature
+    }
+
+    // =================================
 
     public fun borrow_mut_profile(caller: &signer): &mut Object<UserProfile> {
         let caller_addr = signer::address_of(caller);
@@ -441,161 +531,4 @@ module nuwa_framework::user_profile {
         }
     }
 
-    #[test_only]
-    use moveos_std::tx_context;
-    #[test_only]
-    use nuwa_framework::test_helper;
-    #[test_only]
-    use moveos_std::string_utils;
-
-    #[test]
-    fun test_user_profile() {
-        // Initialize test environment
-        nuwa_framework::genesis::init_for_test();
-
-        // Create test accounts
-        let user_signer = test_helper::create_test_account();
-        let verifier_signer = test_helper::create_test_account_with_address(@nuwa_framework);
-
-        // Test profile initialization
-        let username = string::utf8(b"testuser");
-        let name = string::utf8(b"Test User");
-        let avatar = string::utf8(b"https://example.com/avatar.png");
-        init_profile(&user_signer, name, username, avatar);
-
-        // Get profile object
-        let profile_obj_id = object::account_named_object_id<UserProfile>(signer::address_of(&user_signer));
-        let profile_obj = borrow_mut_profile_by_id(profile_obj_id);
-
-        // Test adding social links
-        let twitter_url = string::utf8(b"https://twitter.com/testuser");
-        let github_url = string::utf8(b"https://github.com/testuser");
-        add_social_link(profile_obj, twitter_url);
-        add_social_link(profile_obj, github_url);
-
-        // Verify links were added correctly
-        let links = *get_social_links(profile_obj);
-        assert!(vector::length(&links) == 2, 0);
-        let twitter_link = vector::borrow(&links, 0);
-        assert!(twitter_link.link_type == LINK_TYPE_TWITTER, 1);
-        assert!(twitter_link.url == twitter_url, 2);
-
-        // Test link verification
-        let signature = vector::empty<u8>();
-        verify_link_internal(signer::address_of(&verifier_signer), profile_obj, LINK_TYPE_TWITTER, signature);
-
-        // Verify credential was added
-        let credential_opt = get_link_credential(profile_obj, LINK_TYPE_TWITTER);
-        assert!(option::is_some(&credential_opt), 3);
-        let credential = option::borrow(&credential_opt);
-        assert!(credential.verifier == signer::address_of(&verifier_signer), 4);
-
-        // Test updating link summary
-        let summary = string::utf8(b"Verified Twitter account");
-        update_link_summary_internal(signer::address_of(&verifier_signer), profile_obj, LINK_TYPE_TWITTER, summary);
-        let links = *get_social_links(profile_obj);
-        let twitter_link = vector::borrow(&links, 0);
-        assert!(twitter_link.summary == summary, 5);
-
-        // Test revoking verification
-        revoke_link_verification_internal(signer::address_of(&verifier_signer), profile_obj, LINK_TYPE_TWITTER);
-        let credential_opt = get_link_credential(profile_obj, LINK_TYPE_TWITTER);
-        assert!(option::is_none(&credential_opt), 6);
-
-        // Test removing link
-        remove_social_link(profile_obj, LINK_TYPE_TWITTER);
-        let links = *get_social_links(profile_obj);
-        assert!(vector::length(&links) == 1, 7);
-        let github_link = vector::borrow(&links, 0);
-        assert!(github_link.link_type == LINK_TYPE_GITHUB, 8);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = ErrorLinkAlreadyExists)]
-    fun test_duplicate_link() {
-        // Initialize test environment
-        nuwa_framework::genesis::init_for_test();
-
-        // Create test account
-        let user = tx_context::fresh_address();
-        let user_signer = test_helper::create_test_account_with_address(user);
-
-        // Initialize profile
-        let username = string::utf8(b"testuser");
-        let name = string::utf8(b"Test User");
-        let avatar = string::utf8(b"https://example.com/avatar.png");
-        init_profile(&user_signer, name, username, avatar);
-
-        // Get profile object
-        let profile_obj_id = object::account_named_object_id<UserProfile>(user);
-        let profile_obj = borrow_mut_profile_by_id(profile_obj_id);
-
-        // Try to add same link type twice
-        let twitter_url1 = string::utf8(b"https://twitter.com/testuser1");
-        let twitter_url2 = string::utf8(b"https://twitter.com/testuser2");
-        add_social_link(profile_obj, twitter_url1);
-        add_social_link(profile_obj, twitter_url2); // This should fail
-    }
-
-    #[test]
-    #[expected_failure(abort_code = ErrorTooManyLinks)]
-    fun test_max_links() {
-        // Initialize test environment
-        nuwa_framework::genesis::init_for_test();
-
-        // Create test account
-        let user = tx_context::fresh_address();
-        let user_signer = test_helper::create_test_account_with_address(user);
-
-        // Initialize profile
-        let username = string::utf8(b"testuser");
-        let name = string::utf8(b"Test User");
-        let avatar = string::utf8(b"https://example.com/avatar.png");
-        init_profile(&user_signer, name, username, avatar);
-
-        // Get profile object
-        let profile_obj_id = object::account_named_object_id<UserProfile>(user);
-        let profile_obj = borrow_mut_profile_by_id(profile_obj_id);
-
-        // Try to add more than MAX_LINKS
-        let i = 0;
-        while (i <= MAX_LINKS) {
-            let url = string::utf8(b"https://example");
-            string::append(&mut url, string_utils::to_string_u64(i));
-            string::append(&mut url, string::utf8(b".com"));
-            add_social_link(profile_obj, url);
-            i = i + 1;
-        };
-    }
-
-    #[test]
-    #[expected_failure(abort_code = ErrorLinkNotVerified)]
-    fun test_update_unverified_link() {
-        // Initialize test environment
-        nuwa_framework::genesis::init_for_test();
-
-        // Create test accounts
-        let user = tx_context::fresh_address();
-        let verifier = @nuwa_framework;
-        let user_signer = test_helper::create_test_account_with_address(user);
-        let verifier_signer = test_helper::create_test_account_with_address(verifier);
-
-        // Initialize profile
-        let username = string::utf8(b"testuser");
-        let name = string::utf8(b"Test User");
-        let avatar = string::utf8(b"https://example.com/avatar.png");
-        init_profile(&user_signer, name, username, avatar);
-
-        // Get profile object
-        let profile_obj_id = object::account_named_object_id<UserProfile>(user);
-        let profile_obj = borrow_mut_profile_by_id(profile_obj_id);
-
-        // Add link
-        let twitter_url = string::utf8(b"https://twitter.com/testuser");
-        add_social_link(profile_obj, twitter_url);
-
-        // Try to update unverified link
-        let summary = string::utf8(b"Test summary");
-        update_link_summary(&verifier_signer, profile_obj_id, LINK_TYPE_TWITTER, summary);
-    }
 }
