@@ -18,7 +18,7 @@ module nuwa_framework::agent {
     use nuwa_framework::agent_input_info::{AgentInputInfo};
     use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
     use nuwa_framework::config;
-    use nuwa_framework::name_registry;
+    use nuwa_framework::user_profile;
     
     friend nuwa_framework::memory_action;
     friend nuwa_framework::transfer_action;
@@ -32,8 +32,7 @@ module nuwa_framework::agent {
 
     const ErrorDeprecatedFunction: u64 = 1;
     const ErrorInvalidInitialFee: u64 = 2;
-    const ErrorUsernameAlreadyRegistered: u64 = 3;
-    const ErrorInvalidAgentCap: u64 = 4;
+    const ErrorInvalidAgentCap: u64 = 3;
 
     const AGENT_STATUS_DRAFT: u8 = 0;
     const AGENT_STATUS_ACTIVE: u8 = 1;
@@ -75,13 +74,17 @@ module nuwa_framework::agent {
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
 
     public fun create_agent_with_initial_fee(name: String, username: String, avatar: String, description: String, instructions: String, initial_fee: Coin<RGas>) : Object<AgentCap> {
-        assert!(name_registry::is_username_available(&username), ErrorUsernameAlreadyRegistered);
+        
         let initial_fee_amount = coin::value(&initial_fee);
         assert!(initial_fee_amount >= config::get_ai_agent_initial_fee(), ErrorInvalidInitialFee);
         let account_cap = account::create_account_and_return_cap();
         let agent_signer = account::create_signer_with_account_cap(&mut account_cap);
         let agent_address = signer::address_of(&agent_signer);
-        name_registry::register_username_internal(agent_address, username);
+        account_coin_store::deposit<RGas>(agent_address, initial_fee);
+
+        // Create a user profile for the agent
+        user_profile::init_profile(&agent_signer, name, username, avatar);
+        
         let agent = Agent {
             agent_address,
             name,
@@ -97,7 +100,7 @@ module nuwa_framework::agent {
             temperature: decimal_value::new(7, 1),
             status: AGENT_STATUS_DRAFT,
         };
-        account_coin_store::deposit<RGas>(agent_address, initial_fee);
+        
         // Every account only has one agent
         let agent_obj = object::new_account_named_object(agent_address, agent);
         let agent_obj_id = object::id(&agent_obj);
@@ -309,6 +312,20 @@ module nuwa_framework::agent {
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
         agent.name = new_name;
+        sync_agent_profile(agent_obj);
+    }
+
+    /// Update agent's avatar
+    /// Only allowed for users who possess the AgentCap for this agent
+    public entry fun update_agent_avatar(
+        cap: &mut Object<AgentCap>,
+        new_avatar: String,
+    ) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(cap);
+        let agent_obj = borrow_mut_agent(agent_obj_id);
+        let agent = object::borrow_mut(agent_obj);
+        agent.avatar = new_avatar;
+        sync_agent_profile(agent_obj);
     }
 
     /// Update agent's description
@@ -321,6 +338,19 @@ module nuwa_framework::agent {
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
         agent.description = new_description;
+    }
+
+    fun sync_agent_profile(agent_obj: &mut Object<Agent>) {
+        let agent_signer = create_agent_signer(agent_obj);
+        let agent = object::borrow(agent_obj);
+        
+        if (!user_profile::exists_profile(agent.agent_address)) {
+            user_profile::init_profile(&agent_signer, agent.name, agent.username, agent.avatar);
+        }else{
+            let profile_obj = user_profile::borrow_mut_profile(&agent_signer);
+            user_profile::update_user_profile_name(profile_obj, agent.name);
+            user_profile::update_user_profile_avatar(profile_obj, agent.avatar);
+        }
     }
 
     /// Update agent's instructions

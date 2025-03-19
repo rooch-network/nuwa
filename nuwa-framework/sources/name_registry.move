@@ -4,6 +4,7 @@ module nuwa_framework::name_registry {
     use moveos_std::object::{Self, Object};
     use moveos_std::event;
     use moveos_std::signer;
+    use moveos_std::string_utils::{to_lower_case};
 
     use rooch_framework::coin_store::{Self, CoinStore};
     use rooch_framework::account_coin_store;
@@ -124,21 +125,24 @@ module nuwa_framework::name_registry {
 
     /// Register a username for an object
     public(friend) fun register_username_internal(addr: address, username: String) {
+        // Convert username to lowercase
+        let lowercase_username = to_lower_case(&username);
+        
         // Validate the username
-        validate_username(&username);
+        validate_username(&lowercase_username);
         
         let registry_mut = borrow_mut_registry_object();
         
-        // Check if username is already registered
-        assert!(!object::contains_field(registry_mut, username), ErrorUsernameAlreadyRegistered);
+        // Check if username is already registered (case insensitive)
+        assert!(!object::contains_field(registry_mut, lowercase_username), ErrorUsernameAlreadyRegistered);
         assert!(!object::contains_field(registry_mut, addr), ErrorAddressAlreadyRegistered);
         
         // Register the username by adding a field to the registry object
-        object::add_field(registry_mut, username, addr);
-        object::add_field(registry_mut, addr, username);
+        object::add_field(registry_mut, lowercase_username, addr);
+        object::add_field(registry_mut, addr, lowercase_username);
         
-        // Emit event
-        event::emit(UsernameRegistered { username, addr });
+        // Emit event with original username
+        event::emit(UsernameRegistered { username: lowercase_username, addr });
     }
 
     /// Register a username, the caller must have enough RGas to pay for the registration fee
@@ -166,19 +170,21 @@ module nuwa_framework::name_registry {
         event::emit(UsernameUnregistered { username, addr });
     }
     
-    /// Check if a username is available
+    /// Check if a username is available (case insensitive)
     public fun is_username_available(username: &String): bool {
         let registry = borrow_registry_object();
-        !object::contains_field(registry, *username)
+        let lowercase_username = to_lower_case(username);
+        !object::contains_field(registry, lowercase_username)
     }
     
-    /// Get object ID by username, return 0x0 if not registered
+    /// Get object ID by username (case insensitive), return 0x0 if not registered
     public fun get_address_by_username(username: &String): address {
         let registry = borrow_registry_object();
-        if(!object::contains_field(registry, *username)){
+        let lowercase_username = to_lower_case(username);
+        if(!object::contains_field(registry, lowercase_username)){
             @0x0
         }else{
-            *object::borrow_field(registry, *username)
+            *object::borrow_field(registry, lowercase_username)
         }
     }
 
@@ -210,6 +216,7 @@ module nuwa_framework::name_registry {
         usernames
     }
 
+    /// Get addresses by usernames, the caller must ensure the usernames are lowercase, because batch to lower case is expensive
     public fun get_address_by_usernames(usernames: vector<String>): vector<address> {
         let registry = borrow_registry_object();
         let addresses = vector[];
