@@ -384,7 +384,7 @@ module nuwa_framework::action_dispatcher {
         let memory = vector::borrow(&memories, 0);
         assert!(memory::get_content(memory) == string::utf8(b"User prefers detailed explanations"), 2);
 
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test_only]

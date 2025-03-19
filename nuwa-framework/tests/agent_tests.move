@@ -57,6 +57,6 @@ module nuwa_framework::agent_tests {
 
         // Clean up
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 }

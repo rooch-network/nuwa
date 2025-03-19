@@ -231,7 +231,7 @@ module nuwa_framework::memory_action {
         let user_memory = vector::borrow(&user_memories, 0);
         assert!(memory::get_content(user_memory) == string::utf8(b"User likes detailed explanations"), 4);
         
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent_obj, cap);
     }
 
     #[test]

@@ -25,10 +25,14 @@ module nuwa_framework::agent {
     friend nuwa_framework::agent_runner;
 
     const TASK_SPEC_PROPERTY_NAME: vector<u8> = b"task_specs";
+    const AGENT_CAP_PROPERTY_NAME: vector<u8> = b"agent_cap";
+    const AGENT_INPUT_QUEUE_PROPERTY_NAME: vector<u8> = b"input_queue";
+    const AGENT_PROCESSING_REQUEST_PROPERTY_NAME: vector<u8> = b"processing_request";
 
     const ErrorDeprecatedFunction: u64 = 1;
     const ErrorInvalidInitialFee: u64 = 2;
     const ErrorUsernameAlreadyRegistered: u64 = 3;
+    const ErrorInvalidAgentCap: u64 = 4;
 
     const AGENT_STATUS_DRAFT: u8 = 0;
     const AGENT_STATUS_ACTIVE: u8 = 1;
@@ -56,14 +60,10 @@ module nuwa_framework::agent {
         status: u8,
     }
 
-    const AGENT_INPUT_QUEUE_PROPERTY_NAME: vector<u8> = b"input_queue";
-
     /// The input queue of the agent
     struct AgentInputQueue has key, store {
         queue: vector<AgentInputInfo>,
     }
-
-    const AGENT_PROCESSING_REQUEST_PROPERTY_NAME: vector<u8> = b"processing_request";
 
     /// The processing request of the agent
     struct AgentProcessingRequest has key, store {
@@ -97,8 +97,9 @@ module nuwa_framework::agent {
         // Every account only has one agent
         let agent_obj = object::new_account_named_object(agent_address, agent);
         let agent_obj_id = object::id(&agent_obj);
-        object::to_shared(agent_obj);
         let agent_cap = agent_cap::new_agent_cap(agent_obj_id);
+        set_agent_cap_property(&mut agent_obj, &agent_cap);
+        object::to_shared(agent_obj);
         agent_cap
     } 
 
@@ -160,9 +161,11 @@ module nuwa_framework::agent {
         &agent_ref.model_provider
     }
 
-    public entry fun destroy_agent_cap(cap: Object<AgentCap>) {
-        //TODO record a variable to show the agent cap is destroyed
+    public entry fun destroy_agent_cap(agent_obj: &mut Object<Agent>, cap: Object<AgentCap>) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(&cap);
+        assert!(object::id(agent_obj) == agent_obj_id, ErrorInvalidAgentCap);
         agent_cap::destroy_agent_cap(cap);
+        remove_agent_cap_property(agent_obj);
     }
 
     public fun is_agent_account(addr: address): bool {
@@ -261,6 +264,25 @@ module nuwa_framework::agent {
         } else {
             let processing_request : &AgentProcessingRequest = object::borrow_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME);
             vector::length(&processing_request.requests) > 0
+        }
+    }
+
+    fun remove_agent_cap_property(agent: &mut Object<Agent>) {
+        let _cap_id: ObjectID = object::remove_field(agent, AGENT_CAP_PROPERTY_NAME);
+    }
+
+    public(friend) fun set_agent_cap_property(agent: &mut Object<Agent>, cap: &Object<AgentCap>) {
+        assert!(object::id(agent) == agent_cap::get_agent_obj_id(cap), ErrorInvalidAgentCap);
+        let agent_cap_id = object::id(cap);
+        object::upsert_field(agent, AGENT_CAP_PROPERTY_NAME, agent_cap_id);
+    }
+
+    public fun get_agent_cap_id(agent_obj: &Object<Agent>): Option<ObjectID> {
+        if (!object::contains_field(agent_obj, AGENT_CAP_PROPERTY_NAME)) { 
+            option::none()
+        } else {
+            let agent_cap_id = *object::borrow_field(agent_obj, AGENT_CAP_PROPERTY_NAME);
+            option::some(agent_cap_id)
         }
     }
 
@@ -388,7 +410,11 @@ module nuwa_framework::agent {
         nuwa_framework::genesis::init_for_test();
         let (agent, agent_cap) = create_default_test_agent();
         assert!(object::is_shared(agent), 1);
-        agent_cap::destroy_agent_cap(agent_cap);
+        assert!(get_agent_cap_id(agent) == option::some(object::id(&agent_cap)), 2);
+        destroy_agent_cap(agent, agent_cap);
+        let agent_cap_id = get_agent_cap_id(agent);
+        std::debug::print(&agent_cap_id);
+        assert!(option::is_none(&agent_cap_id), 3);
     }
 
 }
