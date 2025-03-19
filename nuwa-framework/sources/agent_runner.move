@@ -130,6 +130,7 @@ module nuwa_framework::agent_runner {
         let input_info = agent_input::into_agent_input_info(input, coin_input_info);
         agent::append_input(agent_obj, input_info);
         agent::update_last_active_timestamp(agent_obj);
+        try_process_input(agent_obj);
     }
 
     public fun submit_input_by_cap<I: copy + drop + store>(
