@@ -3,7 +3,7 @@ module nuwa_framework::agent_info {
     use std::vector;
     use moveos_std::json;
     use moveos_std::object::{ObjectID};
-
+    use moveos_std::decimal_value::{DecimalValue};
     friend nuwa_framework::prompt_input;
 
     #[data_struct]
@@ -16,6 +16,7 @@ module nuwa_framework::agent_info {
         description: String,
         instructions: String,
         model_provider: String,
+        temperature: DecimalValue,
         status: u8,
     }
 
@@ -28,6 +29,7 @@ module nuwa_framework::agent_info {
         description: String,
         instructions: String,
         model_provider: String,
+        temperature: DecimalValue,
         status: u8,
     ): AgentInfo {
         AgentInfo {
@@ -39,6 +41,7 @@ module nuwa_framework::agent_info {
             description,
             instructions,
             model_provider,
+            temperature,
             status,
         }
     }
@@ -80,6 +83,10 @@ module nuwa_framework::agent_info {
         agent_info.status
     }
 
+    public fun get_temperature(agent_info: &AgentInfo): DecimalValue {
+        agent_info.temperature
+    }
+
     /// The PromptAgentInfo struct is used to display agent information in a prompt
     struct PromptAgentInfo has copy, drop, store {
         name: String,            
@@ -107,7 +114,8 @@ module nuwa_framework::agent_info {
     public fun mock_agent_info(): AgentInfo {
         use moveos_std::tx_context;
         use moveos_std::object;
-        
+        use moveos_std::decimal_value;
+
         let obj_id = object::derive_object_id_for_test();
         let agent_address = tx_context::fresh_address();
         new_agent_info(
@@ -119,6 +127,7 @@ module nuwa_framework::agent_info {
             string::utf8(b"Test Agent Description"),
             string::utf8(b"Test Agent Instructions"),
             string::utf8(b"gpt-4o"),
+            decimal_value::new(7, 1),
             0,
         )
     }

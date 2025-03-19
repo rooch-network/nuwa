@@ -1,7 +1,8 @@
 module nuwa_framework::ai_request {
     use std::string::{Self, String};
     use moveos_std::json;
-
+    use moveos_std::decimal_value::{DecimalValue};
+    
     #[data_struct]
     struct ChatMessage has store, copy, drop {
         role: String,
@@ -12,15 +13,14 @@ module nuwa_framework::ai_request {
     struct ChatRequest has store, copy, drop {
         model: String,
         messages: vector<ChatMessage>,
-        //TODO use Decimal type
-        temperature: u64,
+        temperature: DecimalValue,
     }
 
-    public fun new_chat_request(model: String, messages: vector<ChatMessage>): ChatRequest {
+    public fun new_chat_request(model: String, messages: vector<ChatMessage>, temperature: DecimalValue): ChatRequest {
         ChatRequest {
             model,
             messages,
-            temperature: 1,
+            temperature,
         }
     }
 

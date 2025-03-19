@@ -6,6 +6,7 @@ module nuwa_framework::agent {
     use moveos_std::account::{Self, AccountCap};
     use moveos_std::signer;
     use moveos_std::timestamp;
+    use moveos_std::decimal_value::{Self, DecimalValue};
 
     use rooch_framework::coin::{Self, Coin};
     use rooch_framework::account_coin_store;
@@ -57,6 +58,7 @@ module nuwa_framework::agent {
         last_active_timestamp: u64,
         memory_store: MemoryStore,
         model_provider: String,
+        temperature: DecimalValue,
         status: u8,
     }
 
@@ -91,6 +93,8 @@ module nuwa_framework::agent {
             last_active_timestamp: timestamp::now_milliseconds(),
             memory_store: memory::new_memory_store(),
             model_provider: string::utf8(AI_GPT4O_MODEL),
+            // Default temperature is 0.7
+            temperature: decimal_value::new(7, 1),
             status: AGENT_STATUS_DRAFT,
         };
         account_coin_store::deposit<RGas>(agent_address, initial_fee);
@@ -124,18 +128,20 @@ module nuwa_framework::agent {
         &agent_ref.memory_store
     }
 
-    public fun get_agent_info(agent: &Object<Agent>): agent_info::AgentInfo {
-        let agent_ref = object::borrow(agent);
+    public fun get_agent_info(agent_obj: &Object<Agent>): agent_info::AgentInfo {
+        let id = object::id(agent_obj);
+        let agent = object::borrow(agent_obj);
         agent_info::new_agent_info(
-            object::id(agent),
-            agent_ref.agent_address,
-            agent_ref.name,
-            agent_ref.username,
-            agent_ref.avatar,
-            agent_ref.description,
-            agent_ref.instructions,
-            agent_ref.model_provider,
-            agent_ref.status,
+            id,
+            agent.agent_address,
+            agent.name,
+            agent.username,
+            agent.avatar,
+            agent.description,
+            agent.instructions,
+            agent.model_provider,
+            agent.temperature,
+            agent.status,
         )
     }
 
@@ -159,6 +165,11 @@ module nuwa_framework::agent {
     public fun get_agent_model_provider(agent: &Object<Agent>): &String {
         let agent_ref = object::borrow(agent);
         &agent_ref.model_provider
+    }
+
+    public fun get_agent_temperature(agent: &Object<Agent>): DecimalValue {
+        let agent_ref = object::borrow(agent);
+        agent_ref.temperature
     }
 
     public entry fun destroy_agent_cap(agent_obj: &mut Object<Agent>, cap: Object<AgentCap>) {

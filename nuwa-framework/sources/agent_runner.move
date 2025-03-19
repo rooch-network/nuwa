@@ -67,6 +67,7 @@ module nuwa_framework::agent_runner {
     ) {
         let agent_id = object::id(agent_obj);
         let model_provider = *agent::get_agent_model_provider(agent_obj);
+        let temperature = agent::get_agent_temperature(agent_obj);
         
         // Generate system prompt with context
         let prompt = generate_system_prompt(
@@ -84,6 +85,7 @@ module nuwa_framework::agent_runner {
         let chat_request = ai_request::new_chat_request(
             model_provider,
             messages,
+            temperature,
         );
         //Use the agent signer to call the AI service
         let agent_signer = agent::create_agent_signer(agent_obj);  
