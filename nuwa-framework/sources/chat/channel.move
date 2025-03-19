@@ -11,6 +11,7 @@ module nuwa_framework::channel {
     use moveos_std::signer;
     use nuwa_framework::message;
     use nuwa_framework::agent::{Self, Agent};
+    use nuwa_framework::attachment::{Attachment};
 
     friend nuwa_framework::response_action;
     friend nuwa_framework::task_entry;
@@ -240,30 +241,32 @@ module nuwa_framework::channel {
     }
 
     /// Add message to channel - use message_counter as id
-    fun add_message(channel_obj: &mut Object<Channel>, sender: address, content: String, message_type: u8, mentions: vector<address>, reply_to: u64):(ObjectID, u64) {
+    fun add_message(channel_obj: &mut Object<Channel>, sender: address, content: String, message_type: u8, mentions: vector<address>, reply_to: u64, attachments: vector<Attachment>):(ObjectID, u64) {
         let channel_id = object::id(channel_obj);
         let channel = object::borrow_mut(channel_obj);
         let index = channel.message_counter;
-        let msg_id = message::new_message_object(
+        let msg_id = message::new_message_object_with_attachment(
             index,
             channel_id,
             sender,
             content,
             message_type,
             mentions,
-            reply_to
+            reply_to,
+            attachments
         );
         table::add(&mut channel.messages, index, msg_id);
         channel.message_counter = channel.message_counter + 1;
         (msg_id, index)
     }
 
-    public fun send_message(
+    public(friend) fun send_message(
         account: &signer,
         channel_obj: &mut Object<Channel>,
         content: String,
         mentions: vector<address>,
-        reply_to: u64
+        reply_to: u64,
+        attachments: vector<Attachment>
     ):(ObjectID, u64) {
         vector::for_each(mentions, |addr| {
             assert!(is_channel_member(channel_obj, addr), ErrorMentionedUserNotMember);
@@ -291,7 +294,7 @@ module nuwa_framework::channel {
         member.last_active = now;
         channel.last_active = now;
 
-        add_message(channel_obj, sender, content, message::type_normal(), mentions, reply_to)
+        add_message(channel_obj, sender, content, message::type_normal(), mentions, reply_to, attachments)
     }
 
     /// Add AI response to the channel
@@ -301,7 +304,7 @@ module nuwa_framework::channel {
         ai_agent_address: address,
         reply_to: u64
     ):(ObjectID, u64) {
-        add_message(channel_obj, ai_agent_address, response_message, message::type_normal(), vector::empty(), reply_to)
+        add_message(channel_obj, ai_agent_address, response_message, message::type_normal(), vector::empty(), reply_to, vector::empty())
     }
 
     public(friend) fun add_ai_event(
@@ -309,7 +312,7 @@ module nuwa_framework::channel {
         event: String, 
         ai_agent_address: address
     ){
-        add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty(), 0);
+        add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty(), 0, vector::empty());
     }
 
     /// Get all message ids in the channel
@@ -513,6 +516,17 @@ module nuwa_framework::channel {
     public fun delete_channel_for_testing(channel_id: ObjectID) {
         let channel = object::take_object_extend<Channel>(channel_id);
         force_delete_channel(channel);
+    }
+
+    #[test_only]
+    public fun send_message_for_test(
+        account: &signer,
+        channel_obj: &mut Object<Channel>,
+        content: String,
+        mentions: vector<address>,
+        reply_to: u64,
+    ): (ObjectID, u64) {
+        send_message(account, channel_obj, content, mentions, reply_to, vector::empty())
     }
 
 }

@@ -1,8 +1,9 @@
 module nuwa_framework::channel_entry {
     use std::vector;
-    use std::string::{String};
+    use std::string::{Self, String};
     use moveos_std::object::Object;
     use moveos_std::type_info;
+    use moveos_std::decimal_value;
     use rooch_framework::gas_coin::RGas;
     use rooch_framework::account_coin_store;
     use nuwa_framework::channel::{Self, Channel};
@@ -11,10 +12,12 @@ module nuwa_framework::channel_entry {
     use nuwa_framework::config;
     use nuwa_framework::message_for_agent;
     use nuwa_framework::message;
-    
+    use nuwa_framework::attachment;
+
+
     const ErrorInvalidCoinType: u64 = 1;
     const ErrorInvalidToAddress: u64 = 2;
-
+    const ErrorInvalidAmount: u64 = 3;
     
     /// Send a message and trigger AI response if needed
     public entry fun send_message(
@@ -24,7 +27,7 @@ module nuwa_framework::channel_entry {
         mentions: vector<address>,
         reply_to: u64
     ) {
-        let (_msg_id, index) = channel::send_message(caller, channel_obj, content, mentions, reply_to);
+        let (_msg_id, index) = channel::send_message(caller, channel_obj, content, mentions, reply_to, vector::empty());
         let mentioned_ai_agents = vector::empty();
         vector::for_each(mentions, |addr| {
             if (agent::is_agent_account(addr) && !vector::contains(&mentioned_ai_agents, &addr)) {
@@ -52,10 +55,21 @@ module nuwa_framework::channel_entry {
         if (!vector::contains(&mentions, &to)) {
             vector::push_back(&mut mentions, to);
         };
+        assert!(amount > 0, ErrorInvalidAmount);
         //currently only support RGas
         assert!(type_info::type_name<CoinType>() == type_info::type_name<RGas>(), ErrorInvalidCoinType);
-        let (_msg_id, index) = channel::send_message(caller, channel_obj, content, mentions, reply_to);
-        call_agent(caller, channel_obj, index, to, amount);     
+        let coin_type = type_info::type_name<RGas>();
+        let coin_symbol = string::utf8(b"RGas");
+        let coin_decimal = 8;
+
+        let coin_attachment = attachment::new_coin_attachment(
+            coin_type,
+            coin_symbol,
+            to,
+            decimal_value::new(amount, coin_decimal)
+        );
+        let (_msg_id, index) = channel::send_message(caller, channel_obj, content, mentions, reply_to, vector::singleton(coin_attachment));
+        call_agent(caller, channel_obj, index, to, amount); 
     }
 
     fun call_agent(caller: &signer, channel_obj: &mut Object<Channel>, _user_msg_index: u64, ai_addr: address, extra_fee: u256) {

@@ -3,6 +3,7 @@ module nuwa_framework::message {
     use std::string::{String};
     use moveos_std::timestamp;
     use moveos_std::object::{Self, ObjectID};
+    use nuwa_framework::attachment::{Attachment};
 
     friend nuwa_framework::channel;
 
@@ -37,21 +38,33 @@ module nuwa_framework::message {
         /// If the message is not a reply, the value is 0, because the index of 0 is the system event message
         reply_to: u64,
         status: u8,
+        attachments: vector<Attachment>,
     }
-
-    
 
     /// Constructor - message belongs to the sender
     public(friend) fun new_message_object(
         index: u64, 
-        channel_id: ObjectID,  // Added channel_id parameter
+        channel_id: ObjectID,
         sender: address, 
         content: String, 
         message_type: u8,
         mentions: vector<address>,
         reply_to: u64,
     ): ObjectID {
-        let message = new_message(index, channel_id, sender, content, message_type, mentions, reply_to);
+        new_message_object_with_attachment(index, channel_id, sender, content, message_type, mentions, reply_to, vector::empty())
+    }
+
+    public(friend) fun new_message_object_with_attachment(
+        index: u64, 
+        channel_id: ObjectID,
+        sender: address, 
+        content: String, 
+        message_type: u8,
+        mentions: vector<address>,
+        reply_to: u64,
+        attachments: vector<Attachment>,
+    ): ObjectID {
+        let message = new_message(index, channel_id, sender, content, message_type, mentions, reply_to, attachments);
         let msg_obj = object::new(message);
         let msg_id = object::id(&msg_obj);
         object::transfer_extend(msg_obj, sender);
@@ -66,6 +79,7 @@ module nuwa_framework::message {
         message_type: u8,
         mentions: vector<address>,
         reply_to: u64,
+        attachments: vector<Attachment>,
     ): Message {
         Message {
             index,
@@ -77,6 +91,7 @@ module nuwa_framework::message {
             mentions,
             reply_to,
             status: MESSAGE_STATUS_NORMAL,
+            attachments,
         }
     }
 
@@ -146,7 +161,7 @@ module nuwa_framework::message {
         mentions: vector<address>,
         reply_to: u64,
     ): Message {
-        new_message(id, channel_id, sender, content, message_type, mentions, reply_to)
+        new_message(id, channel_id, sender, content, message_type, mentions, reply_to, vector::empty())
     }
 
     #[test]
