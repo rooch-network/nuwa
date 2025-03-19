@@ -1,7 +1,11 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { ConnectButton } from '@roochnetwork/rooch-sdk-kit';
 import { ErrorGuard } from '../ErrorGuard';
 import { Link } from 'react-router-dom';
+import { ProfileSetupModal } from './ProfileSetupModal';
+import { useRoochClient, useCurrentSession, useCurrentWallet } from '@roochnetwork/rooch-sdk-kit';
+import { useNetworkVariable } from '../hooks/useNetworkVariable';
+import { Args } from '@roochnetwork/rooch-sdk';
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,6 +13,36 @@ interface LayoutProps {
 }
 
 export function Layout({ children, showRoomList = false }: LayoutProps) {
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const client = useRoochClient();
+  const session = useCurrentSession();
+  const wallet = useCurrentWallet();
+  const packageId = useNetworkVariable('packageId');
+
+  // Check if user has set up their profile
+  useEffect(() => {
+    const checkProfile = async () => {
+      if (!client || !packageId || !wallet?.wallet) return;
+
+      try {
+        const userAddress = wallet.wallet.getBitcoinAddress().toStr();
+        const result = await client.executeViewFunction({
+          target: `${packageId}::user_profile::exists_profile`,
+          args: [Args.address(userAddress)],
+        });
+
+        const exists = result?.return_values?.[0]?.decoded_value || false;
+        if (!exists) {
+          setShowProfileSetup(true);
+        }
+      } catch (error) {
+        console.error('Failed to check user profile:', error);
+      }
+    };
+
+    checkProfile();
+  }, [client, packageId, wallet?.wallet]);
+
   return (
     <div className="h-screen flex flex-col">
       <header className="flex-none flex items-center justify-between px-6 h-16 border-b bg-white">
@@ -51,7 +85,15 @@ export function Layout({ children, showRoomList = false }: LayoutProps) {
           {children}
         </main>
       </div>
-      
+
+      <ProfileSetupModal
+        isOpen={showProfileSetup}
+        onClose={() => setShowProfileSetup(false)}
+        onSuccess={() => {
+          setShowProfileSetup(false);
+          // You can add success notification or other operations here
+        }}
+      />
     </div>
   );
 }
