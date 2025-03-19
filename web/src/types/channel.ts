@@ -1,5 +1,10 @@
 import { bcs, BcsSerializer } from '@roochnetwork/rooch-sdk';
 
+export interface Attachment {
+  attachment_type: number;
+  attachment_json: string;
+}
+
 export interface Message {
   index: number;
   channel_id: string;
@@ -9,6 +14,7 @@ export interface Message {
   message_type: number;
   mentions: string[];
   reply_to: number;
+  attachments: Attachment[];
 }
 
 export interface Channel {

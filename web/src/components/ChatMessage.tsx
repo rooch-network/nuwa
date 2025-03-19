@@ -11,6 +11,7 @@ import { CheckIcon } from '@heroicons/react/24/solid';
 import { shortenAddress } from '../utils/address';
 import { Link } from 'react-router-dom';
 import { RoochAddress } from '@roochnetwork/rooch-sdk';
+import { MessageAttachment } from './MessageAttachment';
 
 
 // Add interface for parsed action event
@@ -304,6 +305,18 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId, 
                   >
                     {message.content}
                   </ReactMarkdown>
+
+                  {/* Add attachments section */}
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {message.attachments.map((attachment, index) => (
+                        <MessageAttachment 
+                          key={`${message.index}-${index}`}
+                          attachment={attachment}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex flex-col gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">

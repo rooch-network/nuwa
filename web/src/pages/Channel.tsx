@@ -191,6 +191,8 @@ export function ChannelPage() {
     if (!messagesData?.data) {
       return [];
     }
+    
+    console.log('Messages data:', messagesData.data);
 
     return messagesData.data
       .filter(obj => obj?.decoded_value?.value)
@@ -205,7 +207,13 @@ export function ChannelPage() {
           timestamp: Number(value.timestamp),
           message_type: Number(value.message_type),
           mentions: Array.isArray(value.mentions) ? value.mentions.map(String) : [],
-          reply_to: Number(value.reply_to)
+          reply_to: Number(value.reply_to),
+          attachments: Array.isArray(value.attachments.value) 
+            ? value.attachments.value.map((att: any) => ({
+                attachment_type: Number(att[0]),
+                attachment_json: String(att[1])
+              }))
+            : []
         } as Message;
       })
       .filter((msg): msg is Message => msg !== null)
