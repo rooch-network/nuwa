@@ -3,7 +3,7 @@ module nuwa_framework::agent {
     use std::option::{Self, Option};
     use std::vector;
     use moveos_std::object::{Self, Object, ObjectID};
-    use moveos_std::account::{Self, Account};
+    use moveos_std::account::{Self, AccountCap};
     use moveos_std::signer;
     use moveos_std::timestamp;
 
@@ -48,9 +48,8 @@ module nuwa_framework::agent {
         description: String,
         /// Instructions for the agent when the agent is running
         instructions: String,
-        // The Agent account, every agent has its own account
-        //TODO design a AccountCap to manage the agent account
-        account: Object<Account>,
+        // The Agent account cap, the agent can control the account
+        account_cap: AccountCap,
         last_active_timestamp: u64,
         memory_store: MemoryStore,
         model_provider: String,
@@ -77,9 +76,8 @@ module nuwa_framework::agent {
         assert!(name_registry::is_username_available(&username), ErrorUsernameAlreadyRegistered);
         let initial_fee_amount = coin::value(&initial_fee);
         assert!(initial_fee_amount >= config::get_ai_agent_initial_fee(), ErrorInvalidInitialFee);
-        let agent_account = account::create_account();
-        let agent_signer = account::create_signer_with_account(&mut agent_account);
-        //TODO provide a function to get address from account
+        let account_cap = account::create_account_and_return_cap();
+        let agent_signer = account::create_signer_with_account_cap(&mut account_cap);
         let agent_address = signer::address_of(&agent_signer);
         name_registry::register_username_internal(agent_address, username);
         let agent = Agent {
@@ -89,7 +87,7 @@ module nuwa_framework::agent {
             avatar,
             description,
             instructions,
-            account: agent_account,
+            account_cap,
             last_active_timestamp: timestamp::now_milliseconds(),
             memory_store: memory::new_memory_store(),
             model_provider: string::utf8(AI_GPT4O_MODEL),
@@ -197,7 +195,7 @@ module nuwa_framework::agent {
 
     public(friend) fun create_agent_signer(agent: &mut Object<Agent>): signer {
         let agent_ref = object::borrow_mut(agent);
-        account::create_signer_with_account(&mut agent_ref.account)
+        account::create_signer_with_account_cap(&mut agent_ref.account_cap)
     }
 
     public(friend) fun update_last_active_timestamp(agent: &mut Object<Agent>) {
