@@ -16,6 +16,7 @@ module nuwa_framework::message_for_agent {
         timestamp: u64,
         message_type: u8,
         reply_to: u64,
+        status: u8,
     }
 
     /// Message Input Description
@@ -39,6 +40,7 @@ module nuwa_framework::message_for_agent {
                 timestamp: message::get_timestamp(&msg),
                 message_type: message::get_type(&msg),
                 reply_to: message::get_reply_to(&msg),
+                status: message::get_status(&msg),
             });
         });
         let current = vector::pop_back(&mut messages_for_agent);

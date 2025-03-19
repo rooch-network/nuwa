@@ -14,6 +14,13 @@ module nuwa_framework::message {
     const SYSTEM_EVENT_MESSAGE: u8 = 2;
     public fun type_system_event(): u8 { SYSTEM_EVENT_MESSAGE }
 
+    const MESSAGE_STATUS_NORMAL: u8 = 0;
+    public fun status_normal(): u8 { MESSAGE_STATUS_NORMAL }
+    const MESSAGE_STATUS_EDITED: u8 = 1;
+    public fun status_edited(): u8 { MESSAGE_STATUS_EDITED }
+    const MESSAGE_STATUS_DELETED: u8 = 2;
+    public fun status_deleted(): u8 { MESSAGE_STATUS_DELETED }
+
     /// The message object structure
     /// The message object is owned by the sender
     /// But it is no `store` ability, so the owner can't transfer it to another account
@@ -29,6 +36,7 @@ module nuwa_framework::message {
         /// The index of the message being replied to
         /// If the message is not a reply, the value is 0, because the index of 0 is the system event message
         reply_to: u64,
+        status: u8,
     }
 
     
@@ -68,6 +76,7 @@ module nuwa_framework::message {
             message_type,
             mentions,
             reply_to,
+            status: MESSAGE_STATUS_NORMAL,
         }
     }
 
@@ -107,6 +116,10 @@ module nuwa_framework::message {
 
     public fun get_message_type(message: &Message): u8 {
         message.message_type
+    }
+
+    public fun get_status(message: &Message): u8 {
+        message.status
     }
 
     public fun get_messages_by_ids(message_ids: &vector<ObjectID>): vector<Message> {
