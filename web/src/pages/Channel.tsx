@@ -164,8 +164,8 @@ export function ChannelPage() {
     }
   }, [channel, client, packageId, session]);
   
-  // Fetch total message count
-  const { data: messageCountData } = useRoochClientQuery(
+  // Fetch total message count with periodic updates
+  const { data: messageCountData, refetch: refetchMessageCount } = useRoochClientQuery(
     'executeViewFunction',
     {
       target: `${packageId}::channel::get_message_count`,
@@ -173,15 +173,23 @@ export function ChannelPage() {
     },
     {
       enabled: !!packageId && !!channelId,
+      refetchInterval: 2000, // Refetch every 5 seconds
     }
   );
 
   // Update total message count when data is received
   useEffect(() => {
     if (messageCountData?.return_values?.[0]?.decoded_value) {
-      setTotalMessageCount(Number(messageCountData.return_values[0].decoded_value));
+      const newCount = Number(messageCountData.return_values[0].decoded_value);
+      setTotalMessageCount(newCount);
+      
+      // If we're not loading old messages, update current page to show latest messages
+      if (!isLoadingOldMessages) {
+        const newLatestPage = Math.max(0, Math.ceil(newCount / MESSAGES_PER_PAGE) - 1);
+        setCurrentPage(newLatestPage);
+      }
     }
-  }, [messageCountData]);
+  }, [messageCountData, isLoadingOldMessages]);
 
   // Calculate initial page to load the most recent messages
   const initialPage = useMemo(() => {
@@ -439,13 +447,15 @@ export function ChannelPage() {
         throw new Error('Failed to send message'+JSON.stringify(result.execution_info));
       }
 
-      // After successful transaction, refetch messages immediately
-      refetchMessages();
+      // Immediately refetch message count to get the latest count
+      refetchMessageCount();
       
       // Then refetch periodically to get AI responses
       const refetchTimes = [1000, 3000, 6000, 10000];
       refetchTimes.forEach(delay => {
-        setTimeout(() => refetchMessages(), delay);
+        setTimeout(() => {
+          refetchMessages();
+        }, delay);
       });
       
     } catch (error) {
