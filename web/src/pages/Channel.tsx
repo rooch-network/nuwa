@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRoochClient, useRoochClientQuery, useCurrentWallet, useCurrentSession, SessionKeyGuard } from '@roochnetwork/rooch-sdk-kit';
 import { useNetworkVariable } from '../hooks/useNetworkVariable';
@@ -46,6 +46,21 @@ export function ChannelPage() {
 
   // Add loading state for agent info
   const [isAgentInfoLoading, setIsAgentInfoLoading] = useState(true);
+
+  // Add pagination state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const MESSAGES_PER_PAGE = 20;
+
+  // Add state for all messages
+  const [allMessages, setAllMessages] = useState<Message[]>([]);
+
+  // Add total message count state
+  const [totalMessageCount, setTotalMessageCount] = useState(0);
+
+  // Add a ref to track if we're loading old messages
+  const [isLoadingOldMessages, setIsLoadingOldMessages] = useState(false);
 
   const logDebug = (message: string, data?: any) => {
     console.log(`[AI-DEBUG] ${message}`, data || '');
@@ -149,19 +164,52 @@ export function ChannelPage() {
     }
   }, [channel, client, packageId, session]);
   
-  // Fetch channel messages
+  // Fetch total message count
+  const { data: messageCountData } = useRoochClientQuery(
+    'executeViewFunction',
+    {
+      target: `${packageId}::channel::get_message_count`,
+      args: [Args.objectId(channelId || '')],
+    },
+    {
+      enabled: !!packageId && !!channelId,
+    }
+  );
+
+  // Update total message count when data is received
+  useEffect(() => {
+    if (messageCountData?.return_values?.[0]?.decoded_value) {
+      setTotalMessageCount(Number(messageCountData.return_values[0].decoded_value));
+    }
+  }, [messageCountData]);
+
+  // Calculate initial page to load the most recent messages
+  const initialPage = useMemo(() => {
+    if (totalMessageCount === 0) return 0;
+    return Math.max(0, Math.ceil(totalMessageCount / MESSAGES_PER_PAGE) - 1);
+  }, [totalMessageCount]);
+
+  // Update current page when initial page changes
+  useEffect(() => {
+    setCurrentPage(initialPage);
+  }, [initialPage]);
+
+  // Fetch channel messages with pagination
   const { data: messageIdsData, isLoading: isMessageIdsLoading, refetch: refetchMessages } = useRoochClientQuery(
     'executeViewFunction',
     {
-      target: `${packageId}::channel::get_messages`,
-      args: [Args.objectId(channelId || '')],
+      target: `${packageId}::channel::get_messages_paginated`,
+      args: [
+        Args.objectId(channelId || ''),
+        Args.u64(BigInt(currentPage * MESSAGES_PER_PAGE)),
+        Args.u64(BigInt(MESSAGES_PER_PAGE))
+      ],
     },
     {
       enabled: !!packageId && !!channelId,
       refetchInterval: 5000,
     }
   );
-  console.log('Message IDs data response:', messageIdsData);
 
   // Fetch message objects using the IDs
   const messageIds = useMemo(() => {
@@ -184,17 +232,12 @@ export function ChannelPage() {
       enabled: messageIds.length > 0,
     }
   );
-  console.log('Messages data response:', messagesData);
 
-  // Process message objects
-  const messages = useMemo(() => {
-    if (!messagesData?.data) {
-      return [];
-    }
+  // Process message objects and update allMessages
+  useEffect(() => {
+    if (!messagesData?.data) return;
     
-    console.log('Messages data:', messagesData.data);
-
-    return messagesData.data
+    const newMessages = messagesData.data
       .filter(obj => obj?.decoded_value?.value)
       .map(obj => {
         const value = obj?.decoded_value?.value;
@@ -216,9 +259,25 @@ export function ChannelPage() {
             : []
         } as Message;
       })
-      .filter((msg): msg is Message => msg !== null)
-      .sort((a, b) => a.index - b.index);
-  }, [messagesData]);
+      .filter((msg): msg is Message => msg !== null);
+
+    // Merge new messages with existing ones, avoiding duplicates
+    setAllMessages(prevMessages => {
+      const existingIndices = new Set(prevMessages.map(m => m.index));
+      const uniqueNewMessages = newMessages.filter(m => !existingIndices.has(m.index));
+      
+      // If we're loading old messages, prepend them to the list
+      if (isLoadingOldMessages) {
+        return [...uniqueNewMessages, ...prevMessages].sort((a, b) => a.index - b.index);
+      }
+      
+      // Otherwise, append them to the list
+      return [...prevMessages, ...uniqueNewMessages].sort((a, b) => a.index - b.index);
+    });
+  }, [messagesData, isLoadingOldMessages]);
+
+  // Use allMessages instead of messages in the render
+  const messages = allMessages;
   
   // First, extract the isMember query and refetch functionality
   const { 
@@ -248,6 +307,9 @@ export function ChannelPage() {
 
   // Update the auto-scroll effect to be more reliable
   useEffect(() => {
+    // Don't auto-scroll if we're loading old messages
+    if (isLoadingOldMessages) return;
+    
     // Check if we should scroll based on proximity to bottom
     const shouldScroll = () => {
       const container = messagesContainerRef.current;
@@ -269,7 +331,7 @@ export function ChannelPage() {
         }
       });
     }
-  }, [messages, isAiThinking]);  // Also trigger scroll when AI thinking state changes
+  }, [messages, isAiThinking, isLoadingOldMessages]);
   
   // Handle joining the channel
   const handleJoinChannel = async () => {
@@ -377,8 +439,10 @@ export function ChannelPage() {
         throw new Error('Failed to send message'+JSON.stringify(result.execution_info));
       }
 
+      // After successful transaction, refetch messages immediately
       refetchMessages();
       
+      // Then refetch periodically to get AI responses
       const refetchTimes = [1000, 3000, 6000, 10000];
       refetchTimes.forEach(delay => {
         setTimeout(() => refetchMessages(), delay);
@@ -484,6 +548,56 @@ export function ChannelPage() {
     );
   };
 
+  // Update hasMoreMessages based on current page
+  useEffect(() => {
+    setHasMoreMessages(currentPage > 0);
+  }, [currentPage]);
+
+  // Update loadMoreMessages function
+  const loadMoreMessages = async () => {
+    if (isLoadingMore || !hasMoreMessages) return;
+    
+    setIsLoadingMore(true);
+    setIsLoadingOldMessages(true); // Set loading old messages flag
+    setCurrentPage(prev => prev - 1); // Decrease page number to load older messages
+    
+    try {
+      const result = await client.executeViewFunction({
+        target: `${packageId}::channel::get_messages_paginated`,
+        args: [
+          Args.objectId(channelId || ''),
+          Args.u64(BigInt((currentPage - 1) * MESSAGES_PER_PAGE)),
+          Args.u64(BigInt(MESSAGES_PER_PAGE))
+        ],
+      });
+      
+      const newMessageIds = result?.return_values?.[0]?.value?.value;
+      if (!newMessageIds || newMessageIds.length === 0) {
+        setHasMoreMessages(false);
+      }
+    } catch (error) {
+      console.error('Failed to load more messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+      setIsLoadingOldMessages(false); // Reset loading old messages flag
+    }
+  };
+
+  // Reset messages when channel changes
+  useEffect(() => {
+    setAllMessages([]);
+    setTotalMessageCount(0);
+    setHasMoreMessages(true);
+  }, [channelId]);
+
+  // Add scroll handler for loading older messages
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    if (container.scrollTop === 0 && hasMoreMessages && !isLoadingMore) {
+      loadMoreMessages();
+    }
+  }, [hasMoreMessages, isLoadingMore]);
+
   // Loading state
   if (isChannelLoading) {
     return (
@@ -567,6 +681,7 @@ export function ChannelPage() {
         <div 
           ref={messagesContainerRef}
           className="bg-gray-50 rounded-lg border border-gray-200 p-4 flex-1 flex flex-col overflow-auto"
+          onScroll={handleScroll}
         >
           {isMessagesLoading || (isAgentInfoLoading && messages.some(msg => msg.sender === aiAddress)) ? (
             <div className="flex justify-center items-center h-full">
@@ -578,6 +693,28 @@ export function ChannelPage() {
             </div>
           ) : (
             <div className="space-y-4 flex-1">
+              {/* Load older messages button */}
+              {hasMoreMessages && !isLoadingMore && (
+                <div className="flex justify-center py-2">
+                  <button
+                    onClick={loadMoreMessages}
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center space-x-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    <span>Load Older Messages</span>
+                  </button>
+                </div>
+              )}
+              
+              {/* Loading indicator */}
+              {isLoadingMore && (
+                <div className="flex justify-center py-2">
+                  <div className="animate-spin h-6 w-6 border-t-2 border-blue-500 border-r-2 rounded-full"></div>
+                </div>
+              )}
+              
               {Array.isArray(messages) && messages.map(renderMessage)}
               <div ref={messagesEndRef} />
             </div>
