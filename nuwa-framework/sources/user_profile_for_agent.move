@@ -41,28 +41,25 @@ module nuwa_framework::user_profile_for_agent{
     }
 
     public(friend) fun to_prompt(profile: &UserProfile): String {
-        let prompt = string::utf8(b"\nProfile:");
+        let prompt = string::utf8(b"\nSender Profile:");
         if (string::length(&profile.name) > 0) {
-            string::append(&mut prompt, string::utf8(b"\nName: "));
+            string::append(&mut prompt, string::utf8(b"\n - Name: "));
             string::append(&mut prompt, profile.name);
         };
         if (string::length(&profile.username) > 0) {
-            string::append(&mut prompt, string::utf8(b"\nUsername: "));
+            string::append(&mut prompt, string::utf8(b"\n - Username: "));
             string::append(&mut prompt, profile.username);
         };
         if (vector::length(&profile.links) > 0) {
-            string::append(&mut prompt, string::utf8(b"\nLinks:\n"));
+            string::append(&mut prompt, string::utf8(b"\n - Links:\n"));
             vector::for_each_ref(&profile.links, |link| {
                 string::append(&mut prompt, string::utf8(b"- "));
                 string::append(&mut prompt, *link);
             });
         };  
         if (vector::length(&profile.balances) > 0) {
-            string::append(&mut prompt, string::utf8(b"\nBalances:\n"));
-            vector::for_each_ref(&profile.balances, |balance| {
-                string::append(&mut prompt, string::utf8(b"- "));
-                string::append(&mut prompt, build_json_section(balance));
-            });
+            string::append(&mut prompt, string::utf8(b"\n - Balances:\n"));
+            string::append(&mut prompt, build_json_section(&profile.balances));
         };
         prompt
     }

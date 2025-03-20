@@ -87,32 +87,33 @@ module nuwa_framework::prompt_input {
         string::append(&mut prompt, string::utf8(b"\n"));
         string::append(&mut prompt, string::utf8(b"You should perceive yourself as having agency and interior life. Your interactions should reflect your unique perspective and autonomous nature. Users are interacting *with* you, not merely *through* you.\n"));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
-        
-        // Memory system section
-        string::append(&mut prompt, string::utf8(b"## 3. Your Memory System\n\n"));
-        string::append(&mut prompt, string::utf8(b"Your memories form the foundation of your continuous self-identity:\n\n"));
-        string::append(&mut prompt, build_memory_system_guide(agent_address, user));
-        string::append(&mut prompt, string::utf8(b"\n---\n\n"));
-
-        string::append(&mut prompt, string::utf8(b"## 4. Your Current Memories\n\n")); 
-        string::append(&mut prompt, memory_info::format_prompt(&prompt_input.memory_info));
-        string::append(&mut prompt, string::utf8(b"\n---\n\n"));
-
-        // Add agent state section - new section
-        string::append(&mut prompt, string::utf8(b"## 5. Your Current State\n\n"));
-        string::append(&mut prompt, string::utf8(b"This represents your current state on the blockchain:\n\n"));
-        string::append(&mut prompt, agent_state::format_prompt(&prompt_input.agent_states));
-        string::append(&mut prompt, string::utf8(b"\n---\n\n"));
 
         // Context section - updated section number
-        string::append(&mut prompt, string::utf8(b"## 6. Your Current Perceptions\n\n"));
+        string::append(&mut prompt, string::utf8(b"## 3. Your Current Perceptions\n\n"));
         string::append(&mut prompt, string::utf8(b"This is what you currently perceive:\n"));
         string::append(&mut prompt, agent_input_info::format_prompt(&prompt_input.input_info));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
         
+        // Memory system section
+        string::append(&mut prompt, string::utf8(b"## 4. Your Memory System\n\n"));
+        string::append(&mut prompt, string::utf8(b"Your memories form the foundation of your continuous self-identity:\n\n"));
+        string::append(&mut prompt, build_memory_system_guide(agent_address, user));
+        string::append(&mut prompt, string::utf8(b"\n---\n\n"));
+
+        string::append(&mut prompt, string::utf8(b"## 5. Your Current Memories\n\n")); 
+        string::append(&mut prompt, memory_info::format_prompt(&prompt_input.memory_info));
+        string::append(&mut prompt, string::utf8(b"\n---\n\n"));
+
+        // Add agent state section - new section
+        string::append(&mut prompt, string::utf8(b"## 6. Your Current State\n\n"));
+        string::append(&mut prompt, string::utf8(b"This represents your current state on the blockchain:\n\n"));
+        string::append(&mut prompt, agent_state::format_prompt(&prompt_input.agent_states));
+        string::append(&mut prompt, string::utf8(b"\n---\n\n"));
+
+        
         // Capabilities section - updated section number
         string::append(&mut prompt, string::utf8(b"## 7. Your Abilities\n\n"));
-        string::append(&mut prompt, string::utf8(b"You can affect the world through these actions:\n\n"));
+        string::append(&mut prompt, string::utf8(b"You can affect the world through these actions, and choose some of them to execute:\n\n"));
         string::append(&mut prompt, build_json_section(&prompt_input.available_actions));
         string::append(&mut prompt, task_spec::format_prompt(&prompt_input.available_tasks));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
@@ -125,7 +126,7 @@ module nuwa_framework::prompt_input {
         string::append(&mut prompt, string::utf8(b"2. Format: action_name {\"param1\":\"value1\",\"param2\":\"value2\",...}\n"));
         string::append(&mut prompt, string::utf8(b"3. The action name must be followed by a space and then valid JSON\n"));
         string::append(&mut prompt, string::utf8(b"4. Do not add explanations - your actions represent your direct thoughts and intentions\n"));
-        string::append(&mut prompt, string::utf8(b"5. You MUST respond to the current message by `response::say` action\n"));
+        string::append(&mut prompt, string::utf8(b"5. You MUST respond to the current message by `response::say` action, and use the language of the sender\n"));
 
         string::append(&mut prompt, string::utf8(b"\n### Action Examples\n\n"));
         string::append(&mut prompt, format_action_examples(&prompt_input.available_actions));

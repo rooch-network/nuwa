@@ -19,7 +19,7 @@ module nuwa_framework::memory_info {
         let result = string::utf8(b"");
         string::append(&mut result, string::utf8(b"Self-Memories\n"));
         string::append(&mut result, build_json_section(&memory_info.self_memories));
-        string::append(&mut result, string::utf8(b"Relational Memories about current user\n"));
+        string::append(&mut result, string::utf8(b"Relational Memories about the sender\n"));
         string::append(&mut result, build_json_section(&memory_info.user_memories));
         result
     }

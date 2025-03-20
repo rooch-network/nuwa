@@ -34,7 +34,7 @@ module nuwa_framework::agent_tests {
         let test_user_signer = test_helper::create_test_account();
         let test_user = signer::address_of(&test_user_signer);
 
-        user_profile::init_profile(&test_user_signer, string::utf8(b"TestUser"), string::utf8(b"testuser"), string::utf8(b"https://test/avator.png"));
+        user_profile::init_profile(&test_user_signer, string::utf8(b"Alex"), string::utf8(b"alex"), string::utf8(b"https://test/avator.png"));
 
 
         // First interaction: User introduces themselves
@@ -42,7 +42,7 @@ module nuwa_framework::agent_tests {
             1,
             channel_id,
             test_user,
-            string::utf8(b"Hi, I'm Alex. I prefer learning with real code examples and practical projects. I'm very interested in Move smart contracts and blockchain development. Could you help me learn?"),
+            string::utf8(b"Hi. I prefer learning with real code examples and practical projects. I'm very interested in Move smart contracts and blockchain development. Could you help me learn?"),
             message::type_normal(),
             vector::empty(),
             0
