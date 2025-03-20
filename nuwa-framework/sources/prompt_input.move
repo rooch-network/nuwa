@@ -180,7 +180,8 @@ module nuwa_framework::prompt_input {
         string::append(&mut guide, string::utf8(b"- You do not have persistent access to past messages unless explicitly stored in memory\n"));
         string::append(&mut guide, string::utf8(b"- Each request you receive contains only the data explicitly provided by the client\n"));
         string::append(&mut guide, string::utf8(b"- If you need to recall information in future interactions, you must store it in memory\n"));
-        string::append(&mut guide, string::utf8(b"- Information not stored in memory will be lost in subsequent requests\n\n"));
+        string::append(&mut guide, string::utf8(b"- Information not stored in memory will be lost in subsequent requests\n"));
+        string::append(&mut guide, string::utf8(b"- The memory space is limited, so you must actively use the memory action to maintain the validity of the memory, reduce the redundancy or conflict of the memory via memory::update or memory::remove or memory::compact action.\n"));
         string::append(&mut guide, string::utf8(b"For tasks spanning multiple interactions, you must actively store and retrieve relevant data to maintain continuity.\n\n"));
 
         // Memory storage locations - consistent terminology

@@ -136,7 +136,6 @@ module nuwa_framework::memory_action {
         string::append(&mut description, string::utf8(b"You MUST use at least one memory action in EVERY interaction, use memory::none if there's nothing to remember or update.\n"));
         string::append(&mut description, string::utf8(b"If the memory is only about current sender, you should use the sender's address as the address parameter.\n"));
         string::append(&mut description, string::utf8(b"If the memory is about yourself or will be used for interact with others, you should use your own address as the address parameter.\n"));
-        string::append(&mut description, string::utf8(b"You should actively use the memory action to maintain the validity of the memory, reduce the redundancy or conflict of the memory.\n"));
         action::new_action_group(
             string::utf8(b"memory"),
             description,
