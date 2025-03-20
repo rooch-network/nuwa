@@ -112,16 +112,21 @@ export function ChatMessage({ message, isCurrentUser, isAI, agentName, agentId, 
     
     // For memory actions
     else if (actionEvent.action.startsWith("memory::")) {
-      if (actionEvent.action === "memory::remember_self") {
-        return <span>Saved a personal memory</span>;
-      } else if (actionEvent.action === "memory::remember_user") {
-        return <span>Remembered something about the user</span>;
-      } else if (actionEvent.action === "memory::update_self") {
-        return <span>Updated personal memory</span>;
-      } else if (actionEvent.action === "memory::update_user") {
-        return <span>Updated user information</span>;
+      if (actionEvent.action === "memory::add") {
+        const args = formatActionArgs(actionEvent.args);
+        return <span>Added a new memory about {shortenAddress(args.addr)}</span>;
+      } else if (actionEvent.action === "memory::update") {
+        const args = formatActionArgs(actionEvent.args);
+        return <span>Updated memory at index {args.index} for {shortenAddress(args.addr)}</span>;
+      } else if (actionEvent.action === "memory::remove") {
+        const args = formatActionArgs(actionEvent.args);
+        return <span>Removed memory at index {args.index} for {shortenAddress(args.addr)}</span>;
+      } else if (actionEvent.action === "memory::compact") {
+        const args = formatActionArgs(actionEvent.args);
+        return <span>Compacted memories for {shortenAddress(args.addr)}</span>;
       } else if (actionEvent.action === "memory::none") {
-        return <span>No new memories saved</span>;
+        const args = formatActionArgs(actionEvent.args);
+        return <span>No new memories saved{args.reason ? ` — ${args.reason}` : ''}</span>;
       }
     }
 
