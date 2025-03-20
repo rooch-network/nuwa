@@ -10,8 +10,9 @@ module nuwa_framework::memory_action {
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::memory;
     use nuwa_framework::action::{Self, ActionGroup};
-    use nuwa_framework::agent_input_info;
     use nuwa_framework::prompt_input::{Self, PromptInput};
+    use nuwa_framework::memory_info;
+
     friend nuwa_framework::action_dispatcher;
 
     /// Memory action names using more intuitive namespacing
@@ -19,6 +20,19 @@ module nuwa_framework::memory_action {
     public fun action_name_remember_self(): String { string::utf8(ACTION_NAME_REMEMBER_SELF) }
     const ACTION_NAME_REMEMBER_USER: vector<u8> = b"memory::remember_user";    
     public fun action_name_remember_user(): String { string::utf8(ACTION_NAME_REMEMBER_USER) } 
+
+    const ACTION_NAME_ADD: vector<u8> = b"memory::add";
+    public fun action_name_add(): String { string::utf8(ACTION_NAME_ADD) }
+
+    const ACTION_NAME_UPDATE: vector<u8> = b"memory::update";
+    public fun action_name_update(): String { string::utf8(ACTION_NAME_UPDATE) }
+
+    const ACTION_NAME_REMOVE: vector<u8> = b"memory::remove";
+    public fun action_name_remove(): String { string::utf8(ACTION_NAME_REMOVE) }
+
+    const ACTION_NAME_COMPACT: vector<u8> = b"memory::compact";
+    public fun action_name_compact(): String { string::utf8(ACTION_NAME_COMPACT) }
+    
     
     // Add new memory::none action
     const ACTION_NAME_NONE: vector<u8> = b"memory::none";
@@ -53,10 +67,47 @@ module nuwa_framework::memory_action {
         }
     }
 
+    #[data_struct]
+    /// Arguments for adding a memory
+    struct AddMemoryArgs has copy, drop, store {
+        addr: address,
+        content: String,     // Memory content
+    }
+
+    #[data_struct]
+    /// Arguments for updating a memory
+    struct UpdateMemoryArgs has copy, drop, store {
+        addr: address,
+        index: u64,
+        content: String,
+    }
+
+    #[data_struct]
+    /// Arguments for removing a memory
+    struct RemoveMemoryArgs has copy, drop, store {
+        addr: address,
+        index: u64,
+    }
+
+    #[data_struct]
+    /// Arguments for compacting a memory
+    struct CompactMemoryArgs has copy, drop, store {
+        addr: address,
+        content: String,
+    }
 
     // Action examples - simplified examples for better AI understanding
     const REMEMBER_SELF_EXAMPLE: vector<u8> = b"{\"content\":\"I find that I connect well with users who share personal stories\"}";
     const REMEMBER_USER_EXAMPLE: vector<u8> = b"{\"content\":\"User prefers detailed technical explanations\"}";
+
+    const ADD_MEMORY_EXAMPLE: vector<u8> = b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"content\":\"User prefers using Chinese\"}";
+
+    const UPDATE_MEMORY_EXAMPLE: vector<u8> = b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"index\":0,\"content\":\"User prefers using English\"}";
+
+    const REMOVE_MEMORY_EXAMPLE: vector<u8> = b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"index\":0}";
+
+    const COMPACT_MEMORY_EXAMPLE: vector<u8> = b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"content\":\"User prefers using English\"}";
+    
 
     // Add example for memory::none action
     const NONE_EXAMPLE: vector<u8> = b"{\"reason\":null}";
@@ -76,9 +127,14 @@ module nuwa_framework::memory_action {
     }
 
     public(friend) fun get_action_group(): ActionGroup {
+        let description = string::utf8(b"Memory actions for storing and updating personal and user memories.\n");
+        string::append(&mut description, string::utf8(b"You MUST use at least one memory action in EVERY interaction, use memory::none if there's nothing to remember or update.\n"));
+        string::append(&mut description, string::utf8(b"If the memory is only about current sender, you should use the sender's address as the address parameter.\n"));
+        string::append(&mut description, string::utf8(b"If the memory is about yourself or will be used for interact with others, you should use your own address as the address parameter.\n"));
+        string::append(&mut description, string::utf8(b"You should actively use the memory action to maintain the validity of the memory, reduce the redundancy or conflict of the memory.\n"));
         action::new_action_group(
             string::utf8(b"memory"),
-            string::utf8(b"Memory actions for storing and updating personal and user memories. You MUST use at least one memory action in EVERY interaction, use memory::none if there's nothing to remember."),
+            description,
             get_action_descriptions()
         )   
     }
@@ -103,39 +159,100 @@ module nuwa_framework::memory_action {
             string::utf8(NONE_EXAMPLE),
         ));
 
-        // Register remember_self action (AI's memories about itself)
-        let remember_self_args = vector[
+        let add_memory_args = vector[
+            action::new_action_argument(
+                string::utf8(b"addr"),
+                string::utf8(b"address"),
+                string::utf8(b"The address of you or the sender."),
+                true,
+            ),
             action::new_action_argument(
                 string::utf8(b"content"),
                 string::utf8(b"string"),
-                string::utf8(b"The content of your memory about yourself"),
+                string::utf8(b"The content of the memory"),
                 true,
             ),
         ];
 
         vector::push_back(&mut descriptions, action::new_action_description(
-            string::utf8(ACTION_NAME_REMEMBER_SELF),
-            string::utf8(b"Remember something about yourself, Use this to record your own thoughts, feelings, goals, or personal development"),
-            remember_self_args,
-            string::utf8(REMEMBER_SELF_EXAMPLE),
+            string::utf8(ACTION_NAME_ADD),
+            string::utf8(b"Add a new memory, you can use this to record important information about you or the sender."),
+            add_memory_args,
+            string::utf8(ADD_MEMORY_EXAMPLE),
         ));
 
-        // Register remember_user action (AI's memories about the user)
-        let remember_user_args = vector[
+        let update_memory_args = vector[
+            action::new_action_argument(
+                string::utf8(b"addr"),
+                string::utf8(b"address"),
+                string::utf8(b"The address of you or the sender."),
+                true,
+            ),
+            action::new_action_argument(
+                string::utf8(b"index"),
+                string::utf8(b"u64"),
+                string::utf8(b"The index of the memory to update"),
+                true,
+            ),
             action::new_action_argument(
                 string::utf8(b"content"),
                 string::utf8(b"string"),
-                string::utf8(b"The content of your memory about the user"),
+                string::utf8(b"The new content of the memory"),
                 true,
-            ), 
+            ),
         ];
 
         vector::push_back(&mut descriptions, action::new_action_description(
-            string::utf8(ACTION_NAME_REMEMBER_USER),
-            string::utf8(b"Remember something about the current user, Use this to record important information about the user you're speaking with"),
-            remember_user_args,
-            string::utf8(REMEMBER_USER_EXAMPLE),
+            string::utf8(ACTION_NAME_UPDATE),
+            string::utf8(b"Update a existing memory"),
+            update_memory_args,
+            string::utf8(UPDATE_MEMORY_EXAMPLE),
         ));
+
+        let remove_memory_args = vector[
+            action::new_action_argument(
+                string::utf8(b"addr"),
+                string::utf8(b"address"),
+                string::utf8(b"The address of you or the sender."),
+                true,
+            ),
+            action::new_action_argument(
+                string::utf8(b"index"),
+                string::utf8(b"u64"),
+                string::utf8(b"The index of the memory to remove"),
+                true,
+            ),
+        ];
+
+        vector::push_back(&mut descriptions, action::new_action_description(
+            string::utf8(ACTION_NAME_REMOVE),
+            string::utf8(b"Remove a memory"),
+            remove_memory_args,
+            string::utf8(REMOVE_MEMORY_EXAMPLE),
+        ));
+
+        let compact_memory_args = vector[
+            action::new_action_argument(
+                string::utf8(b"addr"),
+                string::utf8(b"address"),
+                string::utf8(b"The address of you or the sender."),
+                true,
+            ),
+            action::new_action_argument(
+                string::utf8(b"content"),
+                string::utf8(b"string"),
+                string::utf8(b"The content of the memory after compacting"),
+                true,
+            ),
+        ];
+
+        vector::push_back(&mut descriptions, action::new_action_description(
+            string::utf8(ACTION_NAME_COMPACT),
+            string::utf8(b"Compact all memories to a single memory, you can use this to summarize all memories, remove redundant memories."),
+            compact_memory_args,
+            string::utf8(COMPACT_MEMORY_EXAMPLE),
+        ));
+    
         descriptions
     }
 
@@ -144,32 +261,48 @@ module nuwa_framework::memory_action {
         let agent_address = agent::get_agent_address(agent);
         let store = agent::borrow_mut_memory_store(agent);
         
-        if (action_name == string::utf8(ACTION_NAME_REMEMBER_SELF)) {
-            // Add memory about self
-            let args_opt = json::from_json_option<RememberSelfArgs>(string::into_bytes(args_json));
-            if (!option::is_some(&args_opt)) {
-                return err_str(b"Invalid arguments for remember_self action")
-            };
-            let args = option::destroy_some(args_opt);
-            memory::add_memory(store, agent_address, args.content);
-            ok(true)
-        } 
-        else if (action_name == string::utf8(ACTION_NAME_REMEMBER_USER)) {
-            // Add memory about current user
-            let args_opt = json::from_json_option<RememberUserArgs>(string::into_bytes(args_json));
-            if (!option::is_some(&args_opt)) {
-                return err_str(b"Invalid arguments for remember_user action")
-            };
-            let args = option::destroy_some(args_opt);
-            let agent_input = prompt_input::get_input_info(prompt);
-            let current_user = agent_input_info::get_sender(agent_input);
-            memory::add_memory(store, current_user, args.content);
+        if (action_name == string::utf8(ACTION_NAME_NONE)) {
             ok(true)
         }
-        else if (action_name == string::utf8(ACTION_NAME_NONE)) {
-            ok(false)
-        }
-        else {
+        else if (action_name == string::utf8(ACTION_NAME_ADD)) {
+            let args_opt = json::from_json_option<AddMemoryArgs>(string::into_bytes(args_json));
+            if (!option::is_some(&args_opt)) {
+                return err_str(b"Invalid arguments for add action")
+            };
+            let args = option::destroy_some(args_opt);
+            memory::add_memory(store, args.addr, args.content);
+            ok(true)
+        } else if (action_name == string::utf8(ACTION_NAME_UPDATE)) {
+            let args_opt = json::from_json_option<UpdateMemoryArgs>(string::into_bytes(args_json));
+            if (!option::is_some(&args_opt)) {
+                return err_str(b"Invalid arguments for update action")
+            };
+            let args = option::destroy_some(args_opt);
+            memory::update_memory(store, args.addr, args.index, args.content);
+            ok(true)
+        } else if (action_name == string::utf8(ACTION_NAME_REMOVE)) {
+            let args_opt = json::from_json_option<RemoveMemoryArgs>(string::into_bytes(args_json));
+            if (!option::is_some(&args_opt)) {
+                return err_str(b"Invalid arguments for remove action")
+            };
+            let args = option::destroy_some(args_opt);
+            memory::remove_memory(store, args.addr, args.index);
+            ok(true)
+        }else if (action_name == string::utf8(ACTION_NAME_COMPACT)) {
+            let args_opt = json::from_json_option<CompactMemoryArgs>(string::into_bytes(args_json));
+            if (!option::is_some(&args_opt)) {
+                return err_str(b"Invalid arguments for compact action")
+            };
+            let args = option::destroy_some(args_opt);
+            let memory_info = prompt_input::get_memory_info(prompt);
+            let original_memories = if (args.addr == agent_address) {
+                *memory_info::get_self_memories(memory_info)
+            } else {
+                *memory_info::get_user_memories(memory_info)
+            };
+            memory::compact_memory(store, args.addr, original_memories, args.content);
+            ok(true)
+        }else {
             err_str(b"Unsupported action")
         }
     }

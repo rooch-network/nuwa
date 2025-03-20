@@ -52,6 +52,43 @@ module nuwa_framework::memory {
         index_table::add(memories, memory);
     }
 
+    /// Update an existing memory in either short-term or long-term memory
+    public fun update_memory(
+        store: &mut MemoryStore,
+        user: address,
+        index: u64,
+        new_content: String,
+    ) {
+        if (!table::contains(&store.memories, user)) {
+            table::add(&mut store.memories, user, index_table::new());
+        };
+        let memories = table::borrow_mut(&mut store.memories, user);
+
+        let memory = Memory {
+            index,
+            content: new_content,
+            timestamp: timestamp::now_milliseconds(),
+        };
+        index_table::upsert(memories, index, memory);
+    }
+
+    public fun remove_memory(store: &mut MemoryStore, user: address, index: u64) {
+        if (!table::contains(&store.memories, user)) {
+            return
+        };
+        let memories = table::borrow_mut(&mut store.memories, user);
+        index_table::remove(memories, index);
+    }
+
+    public fun compact_memory(store: &mut MemoryStore, user: address, original_memory: vector<Memory>, compact_memory: String) {
+        let memories = table::borrow_mut(&mut store.memories, user);
+        vector::for_each(original_memory, |memory| {
+            let memory: Memory = memory;
+            index_table::remove(memories, memory.index);
+        });
+        add_memory(store, user, compact_memory);
+    }
+
     /// Get all memories for a user (both short-term and long-term)
     public fun get_all_memories(
         store: &MemoryStore,
@@ -64,33 +101,6 @@ module nuwa_framework::memory {
 
         let memories = table::borrow(&store.memories, user);
         index_table::get_all(memories)
-    }
-
-    /// Update an existing memory in either short-term or long-term memory
-    public fun update_memory(
-        store: &mut MemoryStore,
-        user: address,
-        index: u64,
-        new_content: String,
-    ) {
-        assert!(table::contains(&store.memories, user), ErrorMemoryNotFound);
-        let memories = table::borrow_mut(&mut store.memories, user);
-
-        let memory = Memory {
-            index,
-            content: new_content,
-            timestamp: timestamp::now_milliseconds(),
-        };
-        index_table::upsert(memories, index, memory);
-    }
-
-    public fun compact_memory(store: &mut MemoryStore, user: address, original_memory: vector<Memory>, compact_memory: String) {
-        let memories = table::borrow_mut(&mut store.memories, user);
-        vector::for_each(original_memory, |memory| {
-            let memory: Memory = memory;
-            index_table::remove(memories, memory.index);
-        });
-        add_memory(store, user, compact_memory);
     }
 
     /// Get relevant memories for AI context

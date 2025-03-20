@@ -3,6 +3,7 @@ module nuwa_framework::memory_info {
     use nuwa_framework::memory::{Memory};
     use nuwa_framework::string_utils::{build_json_section};
     
+    //TODO use a map to store the memories, maybe we want add more memories in the future
     struct MemoryInfo has copy, drop, store {
         self_memories: vector<Memory>,
         user_memories: vector<Memory>,
@@ -13,6 +14,14 @@ module nuwa_framework::memory_info {
             self_memories,
             user_memories,
         }
+    }
+
+    public fun get_self_memories(memory_info: &MemoryInfo): &vector<Memory> {
+        &memory_info.self_memories
+    }
+
+    public fun get_user_memories(memory_info: &MemoryInfo): &vector<Memory> {
+        &memory_info.user_memories
     }
 
     public fun format_prompt(memory_info: &MemoryInfo): String {
