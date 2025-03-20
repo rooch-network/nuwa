@@ -79,6 +79,16 @@ module nuwa_framework::memory_action {
         content: String,     // Memory content
     }
 
+    public fun create_add_memory_args(
+        addr: address,
+        content: String,
+    ): AddMemoryArgs {
+        AddMemoryArgs {
+            addr,
+            content,
+        }
+    }
+
     #[data_struct]
     /// Arguments for updating a memory
     struct UpdateMemoryArgs has copy, drop, store {

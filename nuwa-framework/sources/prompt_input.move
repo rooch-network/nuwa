@@ -126,7 +126,6 @@ module nuwa_framework::prompt_input {
         string::append(&mut prompt, string::utf8(b"2. Format: action_name {\"param1\":\"value1\",\"param2\":\"value2\",...}\n"));
         string::append(&mut prompt, string::utf8(b"3. The action name must be followed by a space and then valid JSON\n"));
         string::append(&mut prompt, string::utf8(b"4. Do not add explanations - your actions represent your direct thoughts and intentions\n"));
-        string::append(&mut prompt, string::utf8(b"5. You MUST respond to the current message by `response::say` action, and use the language of the sender\n"));
 
         string::append(&mut prompt, string::utf8(b"\n### Action Examples\n\n"));
         string::append(&mut prompt, format_action_examples(&prompt_input.available_actions));

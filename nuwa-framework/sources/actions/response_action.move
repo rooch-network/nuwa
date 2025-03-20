@@ -52,12 +52,11 @@ module nuwa_framework::response_action {
     public(friend) fun get_action_descriptions() : vector<ActionDescription> {
         let descriptions = vector::empty();
 
-        // Register channel message action
-        let channel_args = vector[
+        let say_args = vector[
             action::new_action_argument(
                 string::utf8(b"content"),
                 string::utf8(b"string"),
-                string::utf8(b"The message content"),
+                string::utf8(b"The message content, you should use the language of the sender"),
                 true,
             ),
         ];
@@ -66,7 +65,7 @@ module nuwa_framework::response_action {
             action::new_action_description(
                 string::utf8(ACTION_NAME_SAY),
                 string::utf8(b"Use this action to reply to the current message, this message will be visible to everyone in the channel"),
-                channel_args,
+                say_args,
                 string::utf8(SAY_EXAMPLE),
         ));
  
@@ -94,8 +93,9 @@ module nuwa_framework::response_action {
         let channel_id = agent_input_info::get_response_channel_id(agent_input);
         let channel = object::borrow_mut_object_shared<channel::Channel>(channel_id);
         let agent_addr = agent::get_agent_address(agent);
+        let input_data_type = agent_input_info::get_input_data_type(agent_input);
         let input_data_json = agent_input_info::get_input_data_json(agent_input);
-        let input_data_option = message_for_agent::decode_agent_input_option(*input_data_json);
+        let input_data_option = message_for_agent::decode_agent_input_with_type(*input_data_type, *input_data_json);
         let reply_to = if (option::is_some(&input_data_option)) {
             let input_data = option::destroy_some(input_data_option);
             let current_message = message_for_agent::get_current(&input_data);

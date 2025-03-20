@@ -105,6 +105,15 @@ module nuwa_framework::agent_runner {
         };
     }
 
+    public(friend) fun submit_input_info(
+        agent_obj: &mut Object<Agent>,
+        input_info: AgentInputInfo,
+    ) { 
+        agent::append_input(agent_obj, input_info);
+        agent::update_last_active_timestamp(agent_obj);
+        try_process_input(agent_obj);
+    }
+
     public(friend) fun submit_input_internal<I: copy + drop + store>(
         agent_obj: &mut Object<Agent>,
         input: AgentInput<I>,
@@ -126,11 +135,8 @@ module nuwa_framework::agent_runner {
             coin_type,
             decimal_value::new(amount_except_base_fee, decimals),
         );
-
         let input_info = agent_input::into_agent_input_info(input, coin_input_info);
-        agent::append_input(agent_obj, input_info);
-        agent::update_last_active_timestamp(agent_obj);
-        try_process_input(agent_obj);
+        submit_input_info(agent_obj, input_info);
     }
 
     public fun submit_input_by_cap<I: copy + drop + store>(
@@ -154,13 +160,36 @@ module nuwa_framework::agent_runner {
         }
     }
 
-    public(friend) entry fun finish_request(agent_obj: &mut Object<Agent>, request_id: ObjectID) {
+    public(friend) fun finish_request(agent_obj: &mut Object<Agent>, prompt: PromptInput, request_id: ObjectID) {
         agent::finish_request(agent_obj, request_id);
+        check_memory_length(agent_obj, &prompt);
         //continue processing the input
         try_process_input(agent_obj);
     }
 
     fun get_available_actions(): vector<ActionGroup> {
         action_dispatcher::get_action_groups()
+    }
+
+    const COMPACT_MEMORY_LENGTH: u64 = 10;
+
+    fun check_memory_length(agent_obj: &mut Object<Agent>, prompt: &PromptInput) {
+        let memory_store = agent::borrow_memory_store(agent_obj);
+        let agent_addr = agent::get_agent_address(agent_obj);
+        let pre_input_info = prompt_input::get_input_info(prompt);
+        let user_addr = agent_input_info::get_sender(pre_input_info);
+        let response_channel_id = agent_input_info::get_response_channel_id(pre_input_info);
+        let self_memories = memory::get_all_memories(memory_store, agent_addr);
+        let user_memories = memory::get_all_memories(memory_store, user_addr);
+
+        if (vector::length(&self_memories) > COMPACT_MEMORY_LENGTH) {
+            let input_info = agent_input_info::new_raw_message_input_info(user_addr, response_channel_id, string::utf8(b"Please compact the memory about yourself"));
+            submit_input_info(agent_obj, input_info);
+        };
+        
+        if (vector::length(&user_memories) > COMPACT_MEMORY_LENGTH) {
+            let input_info = agent_input_info::new_raw_message_input_info(user_addr, response_channel_id, string::utf8(b"Please compact the memory about the sender"));
+            submit_input_info(agent_obj, input_info);
+        };
     }
 }

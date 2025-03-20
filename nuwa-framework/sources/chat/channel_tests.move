@@ -21,7 +21,7 @@ module nuwa_framework::channel_tests {
         nuwa_framework::genesis::init_for_test();
         let (agent, cap) = agent::create_default_test_agent();
         let ai_account = agent::get_agent_address(agent);
-        timestamp::update_global_time_for_test(1000);
+        timestamp::fast_forward_milliseconds_for_test(1000);
 
         let channel_id = channel::create_ai_home_channel(agent);
         let channel = object::borrow_object(channel_id);
@@ -48,7 +48,7 @@ module nuwa_framework::channel_tests {
         let user = create_account_with_address(@0x42);
         let (agent, cap) = agent::create_default_test_agent();
         let ai_address = agent::get_agent_address(agent);
-        timestamp::update_global_time_for_test(1000);
+        timestamp::fast_forward_milliseconds_for_test(1000);
 
         let channel_id = channel::create_ai_peer_channel(&user, agent);
         let channel = object::borrow_object(channel_id);
@@ -156,7 +156,8 @@ module nuwa_framework::channel_tests {
         nuwa_framework::genesis::init_for_test();
         let user = create_account_with_address(@0x42);
         let (agent, cap) = agent::create_default_test_agent();
-        timestamp::update_global_time_for_test(1000);
+        timestamp::fast_forward_milliseconds_for_test(1000);
+        let now = timestamp::now_milliseconds();
         
         let channel_id = channel::create_ai_peer_channel(
             &user,
@@ -165,8 +166,8 @@ module nuwa_framework::channel_tests {
         
         let channel = object::borrow_object(channel_id);
         let (joined_at, last_active) = channel::get_member_info(channel, signer::address_of(&user));
-        assert!(joined_at == 1000, 0);
-        assert!(last_active == 1000, 1);
+        assert!(joined_at == now, 0);
+        assert!(last_active == now, 1);
 
         channel::delete_channel_for_testing(channel_id);
         agent::destroy_agent_cap(agent, cap);

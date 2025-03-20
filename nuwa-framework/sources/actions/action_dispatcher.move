@@ -69,12 +69,12 @@ module nuwa_framework::action_dispatcher {
         descriptions
     } 
  
-    public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, prompt: PromptInput, response: String) {
+    public(friend) fun dispatch_actions_internal(agent: &mut Object<Agent>, prompt: &PromptInput, response: String) {
         let action_response = parse_line_based_response(&response);
         let actions = action_response.actions;
         let i = 0;
         let len = vector::length(&actions);
-        let agent_input = prompt_input::get_input_info(&prompt);
+        let agent_input = prompt_input::get_input_info(prompt);
         let default_channel_id = agent_input_info::get_response_channel_id(agent_input);
         if (len == 0) {
             //If the AI response format is not correct, reply to the current message
@@ -83,7 +83,7 @@ module nuwa_framework::action_dispatcher {
         };
         while (i < len) {
             let action_call = vector::borrow(&actions, i);
-            execute_action(agent, &prompt, default_channel_id, action_call);
+            execute_action(agent, prompt, default_channel_id, action_call);
             i = i + 1;
         };
     }
@@ -336,7 +336,8 @@ module nuwa_framework::action_dispatcher {
         let channel_id = channel::create_ai_home_channel(agent);
        
         // Using type-specific constructors with serialization
-        let memory_args = memory_action::create_remember_user_args(
+        let memory_args = memory_action::create_add_memory_args(
+            test_addr,
             string::utf8(b"User prefers detailed explanations"), 
         );
         
@@ -345,7 +346,7 @@ module nuwa_framework::action_dispatcher {
         );
 
         let memory_action = create_action_call_with_object(
-            memory_action::action_name_remember_user(),
+            memory_action::action_name_add(),
             memory_args
         );
         
@@ -375,7 +376,7 @@ module nuwa_framework::action_dispatcher {
         let agent_info = agent::get_agent_info(agent);
         let prompt_input = prompt_input::new_prompt_input_for_test(agent_info, agent_input_info);
         // Execute actions
-        dispatch_actions_internal(agent, prompt_input, test_response);
+        dispatch_actions_internal(agent, &prompt_input, test_response);
 
         // Verify memory was added
         let store = agent::borrow_memory_store(agent);

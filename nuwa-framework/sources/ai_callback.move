@@ -47,8 +47,8 @@ module nuwa_framework::ai_callback {
                         let message_content = ai_response::get_message_content(&chat_completion);
 
                         let agent = object::borrow_mut_object_shared<Agent>(agent_id);
-                        action_dispatcher::dispatch_actions_internal(agent, prompt, message_content);
-                        agent_runner::finish_request(agent, request_id);
+                        action_dispatcher::dispatch_actions_internal(agent, &prompt, message_content);
+                        agent_runner::finish_request(agent, prompt, request_id);
                         let refusal = ai_response::get_refusal(&chat_completion);
                         if(option::is_some(&refusal)){
                             option::destroy_some(refusal)
