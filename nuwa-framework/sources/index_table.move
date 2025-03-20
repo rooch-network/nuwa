@@ -37,6 +37,9 @@ module nuwa_framework::index_table {
         };
         if (table.index == index + 1){
             table.index = table.index - 1;
+            if (table.index == 0){
+                return
+            };
             // check if the index slot is empty, if so, decrement the index
             let i = table.index -1;
             while (i >= 0){
