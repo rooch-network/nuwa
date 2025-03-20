@@ -4,7 +4,8 @@ module nuwa_framework::state_providers{
     use nuwa_framework::agent_state::{Self, AgentStates};
     use nuwa_framework::balance_provider;
     use nuwa_framework::channel_provider;
-
+    use nuwa_framework::price_provider;
+    
     //Deprecated
     public fun build_agent_state(_agent: &mut Object<Agent>): AgentStates {
         abort 0
@@ -16,6 +17,8 @@ module nuwa_framework::state_providers{
         agent_state::add_agent_state(&mut agent_states, balance_state);
         let channel_state = channel_provider::get_state(agent);
         agent_state::add_agent_state(&mut agent_states, channel_state);
+        let price_state = price_provider::get_state(agent);
+        agent_state::add_agent_state(&mut agent_states, price_state);
         agent_states 
     }
 }

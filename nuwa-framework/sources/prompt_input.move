@@ -127,7 +127,7 @@ module nuwa_framework::prompt_input {
         string::append(&mut prompt, string::utf8(b"4. Do not add explanations - your actions represent your direct thoughts and intentions\n"));
         string::append(&mut prompt, string::utf8(b"5. You MUST respond to the current message by `response::say` action\n"));
 
-        string::append(&mut prompt, string::utf8(b"### Action Examples\n\n"));
+        string::append(&mut prompt, string::utf8(b"\n### Action Examples\n\n"));
         string::append(&mut prompt, format_action_examples(&prompt_input.available_actions));
     
         string::append(&mut prompt, string::utf8(b"## 9. Core Directive\n\n"));

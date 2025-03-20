@@ -8,6 +8,7 @@ MoveosStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frame
 RoochFramework = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/rooch-framework", rev = "d0a8b58e2c1688d67ba5e1424e591de90bf85162" }
 BitcoinMove = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/bitcoin-move", rev = "d0a8b58e2c1688d67ba5e1424e591de90bf85162" }
 VerityMoveOracles = { git = "https://github.com/usherlabs/verity-move-oracles", subdir = "rooch", rev = "6850988a66151749f713a2496942c09885167a82"}
+gas_market = { git = "https://github.com/rooch-network/rooch", subdir = "apps/gas_market", rev = "3aca2c929149c30ec922db34a368a7a50334953e" }
 
 [addresses]
 nuwa_framework = "_"
@@ -15,6 +16,8 @@ verity = "0xf1290fb0e7e1de7e92e616209fb628970232e85c4c1a264858ff35092e1be231"
 std = "0x1"
 moveos_std = "0x2"
 rooch_framework = "0x3"
+gas_market = "0x701c21bf1c8cd5af8c42983890d8ca55e7a820171b8e744c13f2d9998bf76cc3"
+app_admin = "0x701c21bf1c8cd5af8c42983890d8ca55e7a820171b8e744c13f2d9998bf76cc3"
 
 [dev-addresses]
 nuwa_framework = "0x42"
