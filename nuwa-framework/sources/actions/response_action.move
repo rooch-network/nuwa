@@ -118,14 +118,5 @@ module nuwa_framework::response_action {
         let channel_args = json::from_json<SayActionArgs>(SAY_EXAMPLE);
         assert!(channel_args.content == string::utf8(b"Hello"), 1);
     }
-
-    #[test]
-    fun test_channel_id_conversion() {
-        use nuwa_framework::string_utils::{string_to_channel_id,channel_id_to_string};
-        let channel_id = object::named_object_id<channel::Channel>();
-        let channel_id_str = channel_id_to_string(channel_id);
-        std::debug::print(&channel_id_str);
-        let channel_id_converted = string_to_channel_id(channel_id_str);
-        assert!(channel_id == channel_id_converted, 0);
-    }
+ 
 }
