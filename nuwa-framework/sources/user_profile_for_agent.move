@@ -10,6 +10,7 @@ module nuwa_framework::user_profile_for_agent{
 
     #[data_struct]
     struct UserProfile has copy, drop, store {
+        //TODO remove name, because the name can be repeated, maybe cause the agent confusion
         name: String,
         username: String,
         links: vector<String>,
@@ -42,10 +43,6 @@ module nuwa_framework::user_profile_for_agent{
 
     public(friend) fun to_prompt(profile: &UserProfile): String {
         let prompt = string::utf8(b"\nSender Profile:");
-        if (string::length(&profile.name) > 0) {
-            string::append(&mut prompt, string::utf8(b"\n - Name: "));
-            string::append(&mut prompt, profile.name);
-        };
         if (string::length(&profile.username) > 0) {
             string::append(&mut prompt, string::utf8(b"\n - Username: "));
             string::append(&mut prompt, profile.username);
