@@ -9,9 +9,8 @@ module nuwa_framework::name_registry {
     use rooch_framework::coin_store::{Self, CoinStore};
     use rooch_framework::account_coin_store;
     use rooch_framework::gas_coin::RGas;
-
+    use nuwa_framework::user_input_validator;
     use nuwa_framework::config;
-    use nuwa_framework::user_input_validator::{validate_username};
 
     friend nuwa_framework::agent;
     friend nuwa_framework::genesis;
@@ -170,6 +169,11 @@ module nuwa_framework::name_registry {
             i = i + 1;
         };
         addresses
+    }
+
+    //TODO remove, use user_input_validator::validate_name instead
+    public fun validate_username(username: &String) {
+        user_input_validator::validate_name(username);
     }
     
     //Deprecated TODO remove, use validate_username instead
