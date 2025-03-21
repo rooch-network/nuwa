@@ -19,7 +19,7 @@ module nuwa_framework::agent {
     use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
     use nuwa_framework::config;
     use nuwa_framework::user_profile;
-    
+    use nuwa_framework::user_input_validator::{validate_agent_description, validate_agent_instructions};
     friend nuwa_framework::memory_action;
     friend nuwa_framework::transfer_action;
     friend nuwa_framework::action_dispatcher;
@@ -84,6 +84,9 @@ module nuwa_framework::agent {
 
         // Create a user profile for the agent
         user_profile::init_profile(&agent_signer, name, username, avatar);
+        //The name and username has validated in user_profile::init_profile
+        validate_agent_description(&description);
+        validate_agent_instructions(&instructions);
         
         let agent = Agent {
             agent_address,

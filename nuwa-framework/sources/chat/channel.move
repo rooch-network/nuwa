@@ -12,7 +12,8 @@ module nuwa_framework::channel {
     use nuwa_framework::message;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::attachment::{Attachment};
-
+    use nuwa_framework::user_input_validator::{validate_channel_title, validate_channel_message};
+    
     friend nuwa_framework::response_action;
     friend nuwa_framework::task_entry;
     friend nuwa_framework::channel_entry;
@@ -160,6 +161,7 @@ module nuwa_framework::channel {
         channel_id
     }
 
+    //Deprecated 
     /// Initialize a new user to AI direct message channel
     public fun create_ai_peer_channel(
         user_account: &signer,
@@ -169,6 +171,7 @@ module nuwa_framework::channel {
         create_ai_peer_channel_internal(user_address, agent)
     }
 
+    //Deprecated
     public entry fun create_ai_peer_channel_entry(
         user_account: &signer,
         agent: &mut Object<Agent>,
@@ -183,7 +186,7 @@ module nuwa_framework::channel {
         topic: String,
         join_policy: u8,
     ): ObjectID {
-        //TODO validate topic
+        validate_channel_title(&topic);
         let agent_address = agent::get_agent_address(agent);
         let user_address = signer::address_of(user_account);
         //Only parent channel members can create topic channel
@@ -268,6 +271,7 @@ module nuwa_framework::channel {
         reply_to: u64,
         attachments: vector<Attachment>
     ):(ObjectID, u64) {
+        validate_channel_message(&content);
         vector::for_each(mentions, |addr| {
             assert!(is_channel_member(channel_obj, addr), ErrorMentionedUserNotMember);
         });

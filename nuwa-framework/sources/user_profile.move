@@ -9,7 +9,7 @@ module nuwa_framework::user_profile {
     
     use nuwa_framework::name_registry;
     use nuwa_framework::link_verifier;
-    
+    use nuwa_framework::user_input_validator::{validate_name};
     /// Error codes
     const ErrorInvalidLinkType: u64 = 1;
     const ErrorInvalidLinkUrl: u64 = 2;
@@ -138,6 +138,7 @@ module nuwa_framework::user_profile {
         // Verify that the username is registered in name_registry
         let caller_addr = signer::address_of(caller);
         name_registry::register_username(caller, username);
+        validate_name(&name);
 
         let profile = UserProfile {
             name,
@@ -318,6 +319,7 @@ module nuwa_framework::user_profile {
         profile_obj: &mut Object<UserProfile>,
         name: String,
     ) {
+        validate_name(&name);
         let profile = object::borrow_mut(profile_obj);
         profile.name = name;
     }

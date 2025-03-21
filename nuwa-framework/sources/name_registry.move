@@ -11,6 +11,7 @@ module nuwa_framework::name_registry {
     use rooch_framework::gas_coin::RGas;
 
     use nuwa_framework::config;
+    use nuwa_framework::user_input_validator::{validate_username};
 
     friend nuwa_framework::agent;
     friend nuwa_framework::genesis;
@@ -19,15 +20,7 @@ module nuwa_framework::name_registry {
     const ErrorUsernameAlreadyRegistered: u64 = 1;
     const ErrorUsernameNotRegistered: u64 = 2;
     const ErrorNotOwner: u64 = 3;
-    const ErrorUsernameTooShort: u64 = 4;
-    const ErrorUsernameTooLong: u64 = 5;
-    const ErrorUsernameInvalidChar: u64 = 6;
-    const ErrorUsernameEmpty: u64 = 7;
-    const ErrorUsernameOnlyNumbers: u64 = 8;
-    const ErrorAddressAlreadyRegistered: u64 = 9;
-    // Username constraints
-    const MIN_USERNAME_LENGTH: u64 = 4;
-    const MAX_USERNAME_LENGTH: u64 = 16;
+    const ErrorAddressAlreadyRegistered: u64 = 4;
 
     /// Events
     struct UsernameRegistered has drop, copy, store {
@@ -65,62 +58,6 @@ module nuwa_framework::name_registry {
     fun borrow_mut_registry_object(): &mut Object<NameRegistry> {
         let registry_obj_id = object::named_object_id<NameRegistry>();
         object::borrow_mut_object_shared<NameRegistry>(registry_obj_id)
-    }
-
-    /// Internal function to check if a username meets all requirements
-    /// Returns (is_valid, has_non_number) tuple
-    fun check_username_requirements(username: &String): (bool, bool) {
-        let bytes = string::bytes(username);
-        let length = vector::length(bytes);
-        
-        // Check basic requirements
-        if (length < MIN_USERNAME_LENGTH || length > MAX_USERNAME_LENGTH || length == 0) {
-            return (false, false)
-        };
-        
-        // Check for valid characters
-        let has_non_number = false;
-        let i = 0;
-        while (i < length) {
-            let char_byte = *vector::borrow(bytes, i);
-            let is_lowercase_letter = char_byte >= 97 && char_byte <= 122; // a-z
-            let is_uppercase_letter = char_byte >= 65 && char_byte <= 90;  // A-Z
-            let is_digit = char_byte >= 48 && char_byte <= 57;            // 0-9
-            let is_underscore = char_byte == 95;                          // _
-            
-            if (is_lowercase_letter || is_uppercase_letter || is_underscore) {
-                has_non_number = true;
-            };
-            
-            if (!(is_lowercase_letter || is_uppercase_letter || is_digit || is_underscore)) {
-                return (false, has_non_number)
-            };
-            
-            i = i + 1;
-        };
-        
-        (true, has_non_number)
-    }
-
-    /// Validate a username
-    public fun validate_username(username: &String) {
-        let bytes = string::bytes(username);
-        let length = vector::length(bytes);
-        
-        // Check if username is empty
-        assert!(length > 0, ErrorUsernameEmpty);
-        
-        // Check length constraints
-        assert!(length >= MIN_USERNAME_LENGTH, ErrorUsernameTooShort);
-        assert!(length <= MAX_USERNAME_LENGTH, ErrorUsernameTooLong);
-        
-        let (is_valid, has_non_number) = check_username_requirements(username);
-        
-        // Check if all characters are valid
-        assert!(is_valid, ErrorUsernameInvalidChar);
-        
-        // Username can't be all numbers
-        assert!(has_non_number, ErrorUsernameOnlyNumbers);
     }
 
     /// Register a username for an object
@@ -235,10 +172,11 @@ module nuwa_framework::name_registry {
         addresses
     }
     
+    //Deprecated TODO remove, use validate_username instead
     /// Check if a username is valid (without checking availability)
     public fun is_username_valid(username: &String): bool {
-        let (is_valid, has_non_number) = check_username_requirements(username);
-        is_valid && has_non_number
+        validate_username(username);
+        true
     }
 
     #[test]
