@@ -1,116 +1,72 @@
-import { Agent } from '../types/agent';
-import { formatTimestamp } from '../utils/time';
-import { UserCircleIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
-import { Link } from 'react-router-dom';
-import { shortenAddress } from '../utils/address';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Agent } from "../types/agent";
 
 interface AgentCardProps {
   agent: Agent;
-  onClick?: () => void;
+  userAuthorizedAgentIds: Set<string>;
+  onAgentClick: (agent: Agent) => void;
 }
 
-export function AgentCard({ agent, onClick }: AgentCardProps) {
-  const lastActive = formatTimestamp(agent.lastActiveTimestamp);
-
+export function AgentCard({
+  agent,
+  userAuthorizedAgentIds,
+  onAgentClick,
+}: AgentCardProps) {
   return (
-    <div 
-      className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-      onClick={onClick}
+    <div
+      onClick={() => onAgentClick(agent)}
+      className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
     >
-      <div className="p-5">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="h-12 w-12 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-xl">
-            {agent.character.name}
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{agent.character.name}</h3>
-            <p className="text-sm text-gray-500">@{agent.character.username}</p>
-          </div>
-        </div>
-        
-        {/* Replace plain text with ReactMarkdown */}
-        <div className="text-gray-700 line-clamp-2 mb-4">
-          <ReactMarkdown 
-            remarkPlugins={[remarkGfm]}
-            className="prose prose-sm max-w-none"
-            components={{
-              // Simplified markdown components focused on inline formatting
-              pre: ({children}) => <>{children}</>,
-              code: ({node, inline, className, children, ...props}) => {
-                const match = /language-(\w+)/.exec(className || '');
-                const language = match ? match[1] : '';
-                
-                return inline ? (
-                  <code
-                    className="px-1 py-0.5 rounded bg-gray-100 text-gray-800 text-xs"
-                    {...props}
-                  >
-                    {children}
-                  </code>
-                ) : (
-                  <div className="my-2">
-                    <SyntaxHighlighter
-                      language={language}
-                      style={oneLight}
-                      customStyle={{
-                        backgroundColor: '#f8fafc',
-                        padding: '0.5rem',
-                        borderRadius: '0.25rem',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
-                  </div>
-                );
-              },
-              // Override default paragraph to prevent extra margins
-              p: ({children}) => <p className="m-0">{children}</p>,
-              // Keep links working
-              a: ({node, href, children, ...props}) => (
-                <a 
-                  href={href}
-                  className="text-blue-600 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                  {...props}
-                >
-                  {children}
-                </a>
-              ),
-              // Ensure lists don't break layout
-              ul: ({children}) => <ul className="list-disc pl-4 my-1">{children}</ul>,
-              ol: ({children}) => <ol className="list-decimal pl-4 my-1">{children}</ol>,
-              li: ({children}) => <li className="my-0.5">{children}</li>,
-            }}
+      <h2 className="text-xl font-semibold mb-2">{agent.name}</h2>
+      {agent.description && (
+        <p className="text-gray-600 mb-4 line-clamp-2">{agent.description}</p>
+      )}
+      <div className="flex items-center justify-between text-gray-500 text-sm">
+        <div className="flex items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
           >
-            {agent.character.description}
-          </ReactMarkdown>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+            />
+          </svg>
+          {agent.agentAddress && (
+            <span title={agent.agentAddress} className="text-xs">
+              {agent.agentAddress.substring(0, 8)}...
+              {agent.agentAddress.substring(agent.agentAddress.length - 6)}
+            </span>
+          )}
         </div>
-        
-        <div className="flex justify-between items-center text-sm text-gray-500">
-          <div className="flex items-center gap-1">
-            <UserCircleIcon className="h-4 w-4" />
-            <span>{shortenAddress(agent.address)}</span>
-          </div>
-          <div>Last active: {lastActive}</div>
+        <div className="px-2 py-1 bg-blue-50 rounded text-blue-600 text-xs">
+          {agent.modelProvider}
         </div>
       </div>
-      
-      {agent.homeChannelId && (
-        <div className="border-t border-gray-100 p-3">
-          <Link 
-            to={`/chat/${agent.homeChannelId}`}
-            className="flex items-center justify-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
-            onClick={(e) => e.stopPropagation()}
+      <div className="text-gray-500 text-xs mt-3">
+        Active since: {new Date(agent.createdAt).toLocaleDateString()}
+      </div>
+      {userAuthorizedAgentIds && userAuthorizedAgentIds.has(agent.id) && (
+        <div className="mt-3 flex items-center text-xs text-green-600">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            <ChatBubbleLeftRightIcon className="h-5 w-5" />
-            <span>Chat with {agent.character.name}</span>
-          </Link>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+            />
+          </svg>
+          <span>You have authorization</span>
         </div>
       )}
     </div>
