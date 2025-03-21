@@ -93,7 +93,13 @@ module nuwa_framework::action_dispatcher {
         let action_name = &action_call.action;
         let args = &action_call.args;
         let skip_event = false;
-        let result: Result<bool,String> = if (string_utils::starts_with(action_name, &b"memory::")) {
+        let namespace_index = string::index_of(action_name, &string::utf8(b"::"));
+        let namespace_bytes = if (namespace_index == string::length(action_name)) {
+            b""
+        } else {
+            string::into_bytes(string::sub_string(action_name, 0, namespace_index))
+        };
+        let result: Result<bool,String> = if (namespace_bytes == b"memory") {
             let result = memory_action::execute_internal(agent, prompt, *action_name, *args);
             if(is_ok(&result)){
                 //if the memory action is none, skip the event
@@ -103,13 +109,13 @@ module nuwa_framework::action_dispatcher {
                 };
             };
             result
-        } else if (string_utils::starts_with(action_name, &b"response::")) {
+        } else if (namespace_bytes == b"response") {
             //skip all response actions
             skip_event = true;
             response_action::execute_internal(agent, prompt, *action_name, *args)
-        } else if (string_utils::starts_with(action_name, &b"transfer::")) {
+        } else if (namespace_bytes == b"transfer") {
             transfer_action::execute_internal(agent, prompt, *action_name, *args)
-        } else if (string_utils::starts_with(action_name, &b"task::")) {
+        } else if (namespace_bytes == b"task") {
             task_action::execute_internal(agent, prompt, *action_name, *args)
         } else {
             err_str(b"Unsupported action")
@@ -215,8 +221,8 @@ module nuwa_framework::action_dispatcher {
         let args_str = string_utils::trim(args);
         
         // If doesn't start with {, wrap it
-        if (!string_utils::starts_with(&args_str, &b"{")) {
-            if (string_utils::contains(&args_str, &b":")) {
+        if (!string_utils::starts_with(&args_str, &string::utf8(b"{"))) {
+            if (string_utils::contains(&args_str, &string::utf8(b":"))) {
                 // Might be JSON without braces
                 let result = string::utf8(b"{");
                 string::append(&mut result, args_str);
@@ -236,54 +242,53 @@ module nuwa_framework::action_dispatcher {
 
     /// Try to extract action from a line without proper spacing
     fun try_extract_action(line: &String): Option<ActionCall> {
-        // Common action prefixes we recognize
-        let prefixes = vector[
-            b"memory::", 
-            b"response::", 
-            b"transfer::",
-            b"task::"
-        ];
+        let namespace_separator = string::utf8(b"::");
+        // First check if the line contains a namespace separator
+        if (!string_utils::contains(line, &namespace_separator)) {
+            return option::none()
+        };
+
+        // Find the namespace separator position
+        let separator_pos = string::index_of(line, &namespace_separator);
+        let line_len = string::length(line);
         
-        let i = 0;
-        let len = vector::length(&prefixes);
-        
-        while (i < len) {
-            let prefix = vector::borrow(&prefixes, i);
-            if (string_utils::starts_with(line, prefix)) {
-                // Found a valid prefix, try to split after the action name
-                let line_str = string::bytes(line);
-                let j = vector::length(prefix);
-                let line_len = vector::length(line_str);
-                
-                while (j < line_len) {
-                    if (*vector::borrow(line_str, j) == 0x3A || // :
-                        *vector::borrow(line_str, j) == 0x20) { // space
-                        let action = string::utf8(string_utils::get_substr(line_str, 0, j));
-                        let args = if (j + 1 < line_len) {
-                            string::utf8(string_utils::get_substr(line_str, j + 1, line_len))
-                        } else {
-                            string::utf8(b"{}")
-                        };
-                        
-                        return option::some(create_action_call(
-                            string_utils::trim(&action),
-                            fix_json_args(&args)
-                        ))
-                    };
-                    j = j + 1;
-                };
-                
-                // If we reach here, no separator was found, treat the whole thing as the action name
-                let action = string::utf8(string_utils::get_substr(line_str, 0, line_len));
-                return option::some(create_action_call(
-                    string_utils::trim(&action),
-                    string::utf8(b"{}")
-                ))
+        // Find the end of action name (space or colon)
+        let action_end = separator_pos + string::length(&namespace_separator);
+        while (action_end < line_len) {
+            let curr_char = string::sub_string(line, action_end, action_end + 1);
+            if (curr_char == string::utf8(b" ") || curr_char == string::utf8(b":")) {
+                break
             };
-            i = i + 1;
+            action_end = action_end + 1;
         };
         
-        option::none()
+        // Extract the full action name (namespace::action)
+        let namespace = string::sub_string(line, 0, separator_pos);
+        let action_name = string::sub_string(line, separator_pos + string::length(&namespace_separator), action_end);
+        let full_action = string::utf8(b"");
+        string::append(&mut full_action, namespace);
+        string::append(&mut full_action, namespace_separator);
+        string::append(&mut full_action, action_name);
+        
+        let args = if (action_end < line_len) {
+            let args_start = action_end;
+            // Skip any number of spaces or colons
+            while (args_start < line_len) {
+                let curr_char = string::sub_string(line, args_start, args_start + 1);
+                if (curr_char != string::utf8(b" ") && curr_char != string::utf8(b":")) {
+                    break
+                };
+                args_start = args_start + 1;
+            };
+            string::sub_string(line, args_start, line_len)
+        } else {
+            string::utf8(b"{}")
+        };
+        
+        option::some(create_action_call(
+            string_utils::trim(&full_action),
+            fix_json_args(&args)
+        ))
     }
 
     /// Convert ActionResponse to string format
@@ -462,6 +467,7 @@ module nuwa_framework::action_dispatcher {
         assert!(vector::length(actions) == 2, 1);
         
         let first_action = vector::borrow(actions, 0);
+        //std::debug::print(first_action);
         assert!(get_action_name(first_action) == &string::utf8(b"memory::add"), 2);
         
         let second_action = vector::borrow(actions, 1);
@@ -524,14 +530,6 @@ module nuwa_framework::action_dispatcher {
         let action6_2 = vector::borrow(actions6, 1);
         assert!(get_action_name(action6_1) == &string::utf8(b"response::say"), 15);
         assert!(get_action_name(action6_2) == &string::utf8(b"memory::clear"), 16);
-
-        // Test case 7: Invalid action prefix
-        let response7 = string::utf8(b"invalid::action test\nresponse::say valid action");
-        let result7 = parse_line_based_response(&response7);
-        let actions7 = get_actions(&result7);
-        assert!(vector::length(actions7) == 1, 17); // Should only parse the valid action
-        let action7 = vector::borrow(actions7, 0);
-        assert!(get_action_name(action7) == &string::utf8(b"response::say"), 18);
     }
 
     #[test]
@@ -574,6 +572,7 @@ module nuwa_framework::action_dispatcher {
         let expected1 = string::utf8(b"{\"content\":\"");
         string::append(&mut expected1, string::utf8(b"Hello"));
         string::append(&mut expected1, string::utf8(b"\"}"));
+        std::debug::print(get_action_args(&action1));
         assert!(get_action_args(&action1) == &expected1, 3);
 
         // Test valid action with space
@@ -583,10 +582,12 @@ module nuwa_framework::action_dispatcher {
         let action2 = option::extract(&mut result2);
         assert!(get_action_name(&action2) == &string::utf8(b"memory::remember_user"), 5);
 
-        // Test invalid action prefix
-        let line3 = string::utf8(b"invalid::action test");
+        // Test other action prefix
+        let line3 = string::utf8(b"other::action test");
         let result3 = try_extract_action(&line3);
-        assert!(option::is_none(&result3), 6);
+        assert!(option::is_some(&result3), 6);
+        let action3 = option::extract(&mut result3);
+        assert!(get_action_name(&action3) == &string::utf8(b"other::action"), 7);
 
         // Test action without parameters
         let line4 = string::utf8(b"memory::clear");

@@ -148,7 +148,7 @@ module nuwa_framework::task_spec{
         };
 
         // Name must start with the prefix
-        if (!string_utils::starts_with(name, &TASK_NAME_PREFIX)) {
+        if (!string_utils::starts_with(name, &string::utf8(TASK_NAME_PREFIX))) {
             return false
         };
 
