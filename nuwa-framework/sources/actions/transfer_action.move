@@ -24,6 +24,7 @@ module nuwa_framework::transfer_action {
     /// Arguments for the transfer coin action
     struct TransferActionArgs has copy, drop, store {
         to: address,          
+        //TODO change to DecimalValue
         amount: String,        
         coin_type: String,    
         memo: String,         

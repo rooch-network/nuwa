@@ -14,7 +14,8 @@ module nuwa_framework::agent_cap {
 
     friend nuwa_framework::agent;
 
-    //TODO should we allow AgentCap to be transferred?
+    /// AgentCap is a cap that allows the caller to update the agent's instructions.
+    /// It can be transferred. If the AgentCap is destroyed, the agent's will be an independent agent.
     struct AgentCap has store, key {
         agent_obj_id: ObjectID,
     }
