@@ -348,7 +348,8 @@ module nuwa_framework::agent {
         let agent = object::borrow(agent_obj);
         
         if (!user_profile::exists_profile(agent.agent_address)) {
-            user_profile::init_profile(&agent_signer, agent.name, agent.username, agent.avatar);
+            //TODO remove this after clearing the old agent data.
+            user_profile::init_profile_internal(agent.agent_address, agent.name, agent.username, agent.avatar);
         }else{
             let profile_obj = user_profile::borrow_mut_profile(&agent_signer);
             user_profile::update_user_profile_name(profile_obj, agent.name);
