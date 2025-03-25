@@ -6,7 +6,7 @@ module nuwa_framework::prompt_input {
     use nuwa_framework::agent_state::{Self, AgentStates};
     use nuwa_framework::agent_info::{Self, AgentInfo};
     use nuwa_framework::task_spec::{Self, TaskSpecifications};
-    use nuwa_framework::string_utils::{build_json_section};
+    use nuwa_framework::format_utils::{build_json_section};
     use nuwa_framework::memory_info::{Self, MemoryInfo};
 
     friend nuwa_framework::agent;

@@ -7,7 +7,7 @@ module nuwa_framework::agent_input_info{
     use rooch_framework::coin;
     use rooch_framework::gas_coin::RGas;
 
-    use nuwa_framework::string_utils::{build_json_section};
+    use nuwa_framework::format_utils::{build_json_section};
     use nuwa_framework::task_spec::{Self, TaskSpecifications};
     use nuwa_framework::user_profile_for_agent;
     

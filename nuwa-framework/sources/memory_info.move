@@ -1,7 +1,7 @@
 module nuwa_framework::memory_info {
     use std::string::{Self, String};
     use nuwa_framework::memory::{Memory};
-    use nuwa_framework::string_utils::{build_json_section};
+    use nuwa_framework::format_utils::{build_json_section};
     
     //TODO use a map to store the memories, maybe we want add more memories in the future
     struct MemoryInfo has copy, drop, store {

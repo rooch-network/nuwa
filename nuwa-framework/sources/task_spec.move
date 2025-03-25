@@ -4,7 +4,8 @@ module nuwa_framework::task_spec{
     use std::option::{Self, Option};
     use moveos_std::json;
     use moveos_std::decimal_value::{Self, DecimalValue};
-    use nuwa_framework::string_utils::{Self, build_json_section};
+    use moveos_std::string_utils;
+    use nuwa_framework::format_utils::{build_json_section};
 
     friend nuwa_framework::prompt_input;
 

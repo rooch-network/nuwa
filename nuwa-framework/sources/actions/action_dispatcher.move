@@ -5,12 +5,12 @@ module nuwa_framework::action_dispatcher {
     use moveos_std::json;
     use moveos_std::object::{Object, ObjectID};
     use moveos_std::result::{Self, is_ok, is_err, err_str, Result};
+    use moveos_std::string_utils;
     use nuwa_framework::memory_action;
     use nuwa_framework::response_action;
     use nuwa_framework::transfer_action;
     use nuwa_framework::task_action;
     use nuwa_framework::agent::Agent;
-    use nuwa_framework::string_utils;
     use nuwa_framework::action::{ActionDescription, ActionGroup};
     use nuwa_framework::agent_input_info;
     use nuwa_framework::prompt_input::{Self, PromptInput};

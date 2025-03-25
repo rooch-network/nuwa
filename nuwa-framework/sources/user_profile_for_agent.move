@@ -4,7 +4,7 @@ module nuwa_framework::user_profile_for_agent{
     use rooch_framework::gas_coin::RGas;
     use nuwa_framework::user_profile::{Self, SocialLink};
     use nuwa_framework::balance_state::{Self, BalanceState};
-    use nuwa_framework::string_utils::{build_json_section};
+    use nuwa_framework::format_utils::{build_json_section};
 
     friend nuwa_framework::agent_input_info;
 
