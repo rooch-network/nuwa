@@ -269,10 +269,19 @@ module nuwa_framework::task_spec{
     #[test]
     fun test_task_specs_to_json() {
         let task_specs = example_task_specs(@0x1234567890abcdef);
+        let task_spec = vector::borrow(&task_specs.task_specs, 0);
+        //std::debug::print(&task_specs);
         let json_str = task_specs_to_json(&task_specs);
-        std::debug::print(&json_str);
+        //std::debug::print(&json_str);
         let task_specs2 = task_specs_from_json(json_str);
-        assert!(task_specs == task_specs2, 1);
+        let task_spec2 = vector::borrow(&task_specs2.task_specs, 0);
+        //std::debug::print(&task_specs2);
+        assert!(task_spec.name == task_spec2.name, 1);
+        assert!(task_spec.description == task_spec2.description, 2);
+        assert!(task_spec.arguments == task_spec2.arguments, 3);
+        assert!(task_spec.resolver == task_spec2.resolver, 4);
+        assert!(task_spec.on_chain == task_spec2.on_chain, 5);
+        assert!(decimal_value::is_equal(&task_spec.price, &task_spec2.price), 6);
         validate_task_specifications(&task_specs);
     }
     
