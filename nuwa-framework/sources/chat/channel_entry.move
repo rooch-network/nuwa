@@ -108,4 +108,26 @@ module nuwa_framework::channel_entry {
     ) {
         channel::create_topic_channel(user_account, agent, parent_channel_obj, topic, join_policy);
     }
+
+    public entry fun create_topic_channel_v2(
+        user_account: &signer,
+        parent_channel_obj: &mut Object<Channel>,
+        topic: String,
+        join_policy: u8,
+    ) {
+        channel::create_topic_channel_v2(user_account, parent_channel_obj, topic, join_policy);
+    }
+    public entry fun join_channel(
+        account: &signer,
+        channel_obj: &mut Object<Channel>,
+    ) {
+        channel::join_channel(account, channel_obj);
+    }
+
+    public entry fun leave_channel(
+        account: &signer,
+        channel_obj: &mut Object<Channel>,
+    ) {
+        channel::leave_channel(account, channel_obj);
+    }
 }

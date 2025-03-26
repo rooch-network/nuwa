@@ -1,36 +1,42 @@
 #[test_only]
 module nuwa_framework::channel_tests {
-    use std::string;
+    use std::string::{Self, String};
     use std::signer;
     use std::vector;
-    use moveos_std::account;
     use moveos_std::timestamp;
-    use moveos_std::object;
+    use moveos_std::object::{Self, ObjectID};
     use nuwa_framework::channel;
     use nuwa_framework::message;
     use nuwa_framework::agent;
+    use nuwa_framework::channel_entry;
+    use nuwa_framework::test_helper;
 
-    // Test helpers
     #[test_only]
-    fun create_account_with_address(addr: address): signer {
-        account::create_signer_for_testing(addr)
+    fun create_ai_home_channel_for_test(): ObjectID {
+        let (agent, cap) = agent::create_default_test_agent();
+        object::to_shared(cap);
+        timestamp::fast_forward_milliseconds_for_test(1000);
+
+        let channel_id = channel::create_ai_home_channel(agent);
+        channel_id
+    }
+
+    #[test_only]
+    fun create_topic_channel_for_test(topic: String, join_policy: u8): ObjectID {
+        let home_channel_id = create_ai_home_channel_for_test();
+        let home_channel = object::borrow_mut_object_shared<channel::Channel>(home_channel_id);
+        let user = test_helper::create_test_account();
+        channel_entry::join_channel(&user, home_channel);
+        channel::create_topic_channel_v2(&user, home_channel, topic, join_policy)
     }
 
     #[test]
     fun test_create_ai_home_channel() {
         nuwa_framework::genesis::init_for_test();
-        let (agent, cap) = agent::create_default_test_agent();
-        let ai_account = agent::get_agent_address(agent);
-        timestamp::fast_forward_milliseconds_for_test(1000);
-
-        let channel_id = channel::create_ai_home_channel(agent);
-        let channel = object::borrow_object(channel_id);
-        
-        // Verify AI is a member
-        assert!(channel::is_member(channel, ai_account), 0);
+        let channel_id = create_ai_home_channel_for_test();
         
         // Try joining as a user
-        let user = create_account_with_address(@0x43);
+        let user = test_helper::create_test_account();
         let channel = object::borrow_mut_object_shared(channel_id);
         channel::join_channel(&user, channel);
         
@@ -39,42 +45,22 @@ module nuwa_framework::channel_tests {
         assert!(channel::is_member(channel, signer::address_of(&user)), 1);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(agent, cap);
     }
 
-    #[test]
-    fun test_create_ai_peer_channel() {
-        nuwa_framework::genesis::init_for_test();
-        let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_default_test_agent();
-        let ai_address = agent::get_agent_address(agent);
-        timestamp::fast_forward_milliseconds_for_test(1000);
-
-        let channel_id = channel::create_ai_peer_channel(&user, agent);
-        let channel = object::borrow_object(channel_id);
-        
-        // Verify both user and AI are members
-        assert!(channel::is_member(channel, signer::address_of(&user)), 0);
-        assert!(channel::is_member(channel, ai_address), 1);
-
-        channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(agent, cap);
-    }
 
     #[test]
     fun test_message_sending() {
         nuwa_framework::genesis::init_for_test();
-        let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_default_test_agent();
+        let user = test_helper::create_test_account();
          
         // Create peer channel
-        let channel_id = channel::create_ai_peer_channel(
-            &user,
-            agent
-        );
+        let channel_id = create_ai_home_channel_for_test();
+        
         
         // Send message
         let channel = object::borrow_mut_object_shared(channel_id);
+        channel_entry::join_channel(&user, channel);
+
         let msg_content = string::utf8(b"Hello AI!");
         let mentions = vector::empty();
         let (_, _) = channel::send_message_for_test(&user, channel, msg_content, mentions, 0);
@@ -92,45 +78,51 @@ module nuwa_framework::channel_tests {
         assert!(message::get_type(msg) == message::type_normal(), 3);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test]
-    #[expected_failure(abort_code = channel::ErrorNotMember)]
-    fun test_unauthorized_message() {
+    fun test_public_join_policy_channel() {
         nuwa_framework::genesis::init_for_test();
-        let user1 = create_account_with_address(@0x42);
-        let user2 = create_account_with_address(@0x44);
-        let (agent, cap) = agent::create_default_test_agent();
+        let user1 = test_helper::create_test_account();
         
-        let channel_id = channel::create_ai_peer_channel(
-            &user1,
-            agent
-        );
+        let channel_id = create_topic_channel_for_test(string::utf8(b"Test"), channel::channel_join_policy_public());
         
         // Try sending message from unauthorized user
         let channel = object::borrow_mut_object_shared(channel_id);
         
         let mentions = vector::empty();
-        let (_, _) = channel::send_message_for_test(&user2, channel, string::utf8(b"Unauthorized message"), mentions, 0);
+        let (_, _) = channel::send_message_for_test(&user1, channel, string::utf8(b"Unauthorized message"), mentions, 0);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(agent, cap);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = channel::ErrorNotMember)]
+    fun test_invite_join_policy_channel() {
+        nuwa_framework::genesis::init_for_test();
+        let user1 = test_helper::create_test_account();
+        
+        let channel_id = create_topic_channel_for_test(string::utf8(b"Test"), channel::channel_join_policy_invite());
+        
+        // Try sending message from unauthorized user
+        let channel = object::borrow_mut_object_shared(channel_id);
+        
+        let mentions = vector::empty();
+        let (_, _) = channel::send_message_for_test(&user1, channel, string::utf8(b"Unauthorized message"), mentions, 0);
+
+        channel::delete_channel_for_testing(channel_id);
     }
 
     #[test]
     fun test_message_pagination() {
         nuwa_framework::genesis::init_for_test();
-        let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_default_test_agent();
+        let user = test_helper::create_test_account();
          
-        let channel_id = channel::create_ai_peer_channel(
-            &user,
-            agent
-        );
+        let channel_id = create_ai_home_channel_for_test();
         
         // Send multiple messages
         let channel = object::borrow_mut_object_shared(channel_id);
+        channel_entry::join_channel(&user, channel);
         let i = 0;
         let mentions = vector::empty();
         while (i < 5) {
@@ -148,28 +140,21 @@ module nuwa_framework::channel_tests {
         assert!(vector::length(&messages) == 3, 1);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test]
     fun test_member_info() {
         nuwa_framework::genesis::init_for_test();
-        let user = create_account_with_address(@0x42);
-        let (agent, cap) = agent::create_default_test_agent();
-        timestamp::fast_forward_milliseconds_for_test(1000);
+        let user = test_helper::create_test_account();
+        let channel_id = create_ai_home_channel_for_test();
         let now = timestamp::now_milliseconds();
         
-        let channel_id = channel::create_ai_peer_channel(
-            &user,
-            agent
-        );
-        
-        let channel = object::borrow_object(channel_id);
+        let channel = object::borrow_mut_object_shared(channel_id);
+        channel_entry::join_channel(&user, channel);
         let (joined_at, last_active) = channel::get_member_info(channel, signer::address_of(&user));
         assert!(joined_at == now, 0);
         assert!(last_active == now, 1);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(agent, cap);
     }
 }

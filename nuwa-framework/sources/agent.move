@@ -157,6 +157,11 @@ module nuwa_framework::agent {
         get_agent_info(agent_obj)
     }
 
+    public fun get_agent_id_by_address(agent_addr: address): ObjectID {
+        let agent_obj_id = object::account_named_object_id<Agent>(agent_addr);
+        agent_obj_id
+    }
+
     /// Get agent's address
     public fun get_agent_address(agent: &Object<Agent>): address {
         let agent_ref = object::borrow(agent);

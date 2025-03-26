@@ -13,7 +13,8 @@ module nuwa_framework::channel {
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::attachment::{Attachment};
     use nuwa_framework::user_input_validator::{validate_channel_title, validate_channel_message};
-    
+    use nuwa_framework::user_joined_channels;
+
     friend nuwa_framework::response_action;
     friend nuwa_framework::task_entry;
     friend nuwa_framework::channel_entry;
@@ -115,10 +116,9 @@ module nuwa_framework::channel {
             join_policy: CHANNEL_JOIN_POLICY_PUBLIC,
         };
 
-        // Add AI as member
-        add_member_internal(&mut channel, creator, now);
         // Every AI can only have one AI_HOME channel
         let channel_obj = object::new_account_named_object(creator, channel);
+        join_channel_internal(creator, &mut channel_obj, now);
         let channel_id = object::id(&channel_obj);
         object::to_shared(channel_obj);
         channel_id
@@ -151,11 +151,11 @@ module nuwa_framework::channel {
             join_policy: CHANNEL_JOIN_POLICY_INVITE,
         };
 
-        // Add both user and AI as members
-        add_member_internal(&mut channel, creator, now);
-        add_member_internal(&mut channel, user_address, now);
         let id = generate_peer_channel_id(agent_address, user_address);
+
         let channel_obj = object::new_with_id(id, channel);
+        join_channel_internal(creator, &mut channel_obj, now);
+        join_channel_internal(user_address, &mut channel_obj, now);
         let channel_id = object::id(&channel_obj);
         object::to_shared(channel_obj);
         channel_id
@@ -180,14 +180,24 @@ module nuwa_framework::channel {
     }
 
     public fun create_topic_channel(
+        _user_account: &signer,
+        _agent: &mut Object<Agent>,
+        _parent_channel_obj: &mut Object<Channel>,
+        _topic: String,
+        _join_policy: u8,
+    ): ObjectID {
+        abort ErrorDeprecatedFunction
+    }
+
+
+    public fun create_topic_channel_v2(
         user_account: &signer,
-        agent: &mut Object<Agent>,
         parent_channel_obj: &mut Object<Channel>,
         topic: String,
         join_policy: u8,
     ): ObjectID {
         validate_channel_title(&topic);
-        let agent_address = agent::get_agent_address(agent);
+    
         let user_address = signer::address_of(user_account);
         //Only parent channel members can create topic channel
         assert!(is_channel_member(parent_channel_obj, user_address), ErrorNotMember);
@@ -195,6 +205,9 @@ module nuwa_framework::channel {
         let parent_channel = object::borrow_mut(parent_channel_obj);
         //Only AI_HOME channel can create topic channel
         assert!(parent_channel.channel_type == CHANNEL_TYPE_AI_HOME, ErrorInvalidChannelType);
+        //The creator of the parent channel is ai agent
+        let agent_address = parent_channel.creator;
+
         let now = timestamp::now_milliseconds();
         let channel = Channel {
             parent_channel: option::some(parent_channel_id),
@@ -211,11 +224,11 @@ module nuwa_framework::channel {
             join_policy: join_policy,
         };
         
-        add_member_internal(&mut channel, user_address, now);
-        add_member_internal(&mut channel, agent_address, now);
         let channel_obj = object::new(channel);
         let channel_id = object::id(&channel_obj);
         table::add(&mut parent_channel.topics, topic, channel_id);
+        join_channel_internal(user_address, &mut channel_obj, now);
+        join_channel_internal(agent_address, &mut channel_obj, now);
         object::to_shared(channel_obj);
         channel_id
     }
@@ -272,32 +285,36 @@ module nuwa_framework::channel {
         attachments: vector<Attachment>
     ):(ObjectID, u64) {
         validate_channel_message(&content);
+        let channel_id = object::id(channel_obj);
         vector::for_each(mentions, |addr| {
             assert!(is_channel_member(channel_obj, addr), ErrorMentionedUserNotMember);
         });
         let sender = signer::address_of(account);
         let now = timestamp::now_milliseconds();
+    
         let channel = object::borrow_mut(channel_obj);
 
         if(reply_to > 0) {
             assert!(table::contains(&channel.messages, reply_to), ErrorInvalidReplyTo);
         };
 
-        if (!table::contains(&channel.members, sender)) {
+        assert!(channel.status == CHANNEL_STATUS_ACTIVE, ErrorChannelInactive);
+       
+        if (table::contains(&channel.members, sender)) {
+             // Update member's last active time
+            let member = table::borrow_mut(&mut channel.members, sender);
+            member.last_active = now;
+            channel.last_active = now;
+        }else{
             // If sender is not a member, check the join policy, and add them as a member if the policy is public
             if (channel.join_policy == CHANNEL_JOIN_POLICY_PUBLIC) {
-                add_member_internal(channel, sender, now);
+                join_channel_internal(sender, channel_obj, now);
             } else {
                 abort ErrorNotMember
             };
         };
-        assert!(channel.status == CHANNEL_STATUS_ACTIVE, ErrorChannelInactive);
         
-        // Update member's last active time
-        let member = table::borrow_mut(&mut channel.members, sender);
-        member.last_active = now;
-        channel.last_active = now;
-
+        user_joined_channels::active_in_channel(sender, channel_id, now);
         add_message(channel_obj, sender, content, message::type_normal(), mentions, reply_to, attachments)
     }
 
@@ -414,7 +431,7 @@ module nuwa_framework::channel {
         channel: &mut Channel, 
         member_addr: address,
         now: u64,
-    ) {
+    ) : bool {
         if (!table::contains(&channel.members, member_addr)) {
             let member = Member {
                 address: member_addr,
@@ -422,9 +439,33 @@ module nuwa_framework::channel {
                 last_active: now,
             };
             table::add(&mut channel.members, member_addr, member);
+            true
+        } else {
+            false
         }
     }
 
+    fun join_channel_internal(
+        member_addr: address,
+        channel_obj: &mut Object<Channel>,
+        now: u64,
+    ) {
+        let channel_id = object::id(channel_obj);
+        let channel = object::borrow_mut(channel_obj);
+        let is_added = add_member_internal(channel, member_addr, now);
+
+        if (is_added) {
+            let is_ai_home = channel.channel_type == CHANNEL_TYPE_AI_HOME;
+        
+            // We only record AI_HOME channel to user_joined_channels
+            if (is_ai_home) {
+                let agent_id = agent::get_agent_id_by_address(channel.creator);
+                user_joined_channels::join_channel(member_addr, channel_id, agent_id, now);
+            }
+        }
+    }
+
+    //TODO change to friend
     /// Join channel for AI_HOME type
     public fun join_channel(
         account: &signer,
@@ -433,19 +474,36 @@ module nuwa_framework::channel {
         let sender = signer::address_of(account);
         let channel = object::borrow_mut(channel_obj);
         
-        // Only AI_HOME channels can be joined directly
-        assert!(channel.channel_type != CHANNEL_TYPE_AI_PEER, ErrorNotAuthorized);
+        // Only public channels can be joined directly
+        assert!(channel.join_policy == CHANNEL_JOIN_POLICY_PUBLIC, ErrorNotAuthorized);
         
         let now = timestamp::now_milliseconds();
-        add_member_internal(channel, sender, now);
+        join_channel_internal(sender, channel_obj, now); 
     }
 
+    //Deprecated TODO
     /// Entry function for joining a channel
     public entry fun join_channel_entry(
         account: &signer,
         channel_obj: &mut Object<Channel>,
     ) {
         join_channel(account, channel_obj);
+    }
+
+    public(friend) fun leave_channel(
+        account: &signer,
+        channel_obj: &mut Object<Channel>,
+    ) {
+        let sender = signer::address_of(account);
+        let channel_id = object::id(channel_obj);
+        let channel = object::borrow_mut(channel_obj);
+        if (table::contains(&channel.members, sender)) {
+            table::remove(&mut channel.members, sender);
+        };
+        let is_ai_home = channel.channel_type == CHANNEL_TYPE_AI_HOME;
+        if (is_ai_home) {
+            user_joined_channels::leave_channel(sender, channel_id);
+        }
     }
 
     // ==================== Getters ====================
