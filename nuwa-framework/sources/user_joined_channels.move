@@ -1,7 +1,7 @@
 module nuwa_framework::user_joined_channels {
     use std::vector;
     use moveos_std::object::{Self, Object, ObjectID};
-    use moveos_std::timestamp;
+    
 
     friend nuwa_framework::channel;
 
@@ -78,6 +78,8 @@ module nuwa_framework::user_joined_channels {
         joined_channels
     }
 
+    #[test_only]
+    use moveos_std::timestamp;
 
     #[test]
     fun test_join_and_leave_channel() {
