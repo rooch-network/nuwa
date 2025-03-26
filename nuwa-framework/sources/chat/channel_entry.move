@@ -50,12 +50,12 @@ module nuwa_framework::channel_entry {
         to: address,
         amount: u256,
     ) {
-        //Currently only support send coin to agent
-        assert!(agent::is_agent_account(to), ErrorInvalidToAddress);
-        if (!vector::contains(&mentions, &to)) {
+        assert!(amount > 0, ErrorInvalidAmount);
+        let is_transfer_to_agent = agent::is_agent_account(to);
+        //if the transfer is to an agent, we ensure the agent is in the mentions
+        if (is_transfer_to_agent && !vector::contains(&mentions, &to)) {
             vector::push_back(&mut mentions, to);
         };
-        assert!(amount > 0, ErrorInvalidAmount);
         //currently only support RGas
         assert!(type_info::type_name<CoinType>() == type_info::type_name<RGas>(), ErrorInvalidCoinType);
         let coin_type = type_info::type_name<RGas>();
@@ -69,7 +69,21 @@ module nuwa_framework::channel_entry {
             decimal_value::new(amount, coin_decimal)
         );
         let (_msg_id, index) = channel::send_message(caller, channel_obj, content, mentions, reply_to, vector::singleton(coin_attachment));
-        call_agent(caller, channel_obj, index, to, amount); 
+        if (is_transfer_to_agent) {
+            call_agent(caller, channel_obj, index, to, amount); 
+        }else{
+            let mentioned_ai_agents = vector::empty();
+            vector::for_each(mentions, |addr| {
+                if (agent::is_agent_account(addr) && !vector::contains(&mentioned_ai_agents, &addr)) {
+                    vector::push_back(&mut mentioned_ai_agents, addr);
+                }
+            });
+            if (vector::length(&mentioned_ai_agents) > 0) {
+                //we only call the first mentioned ai agent
+                let agent_address = *vector::borrow(&mentioned_ai_agents, 0);
+                call_agent(caller, channel_obj, index, agent_address, 0);
+            };
+        };
     }
 
     fun call_agent(caller: &signer, channel_obj: &mut Object<Channel>, _user_msg_index: u64, ai_addr: address, extra_fee: u256) {
