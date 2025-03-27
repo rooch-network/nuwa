@@ -276,7 +276,7 @@ module nuwa_framework::memory_action {
         let store = agent::borrow_mut_memory_store(agent);
         
         if (action_name == string::utf8(ACTION_NAME_NONE)) {
-            ok(true)
+            ok(false)
         }
         else if (action_name == string::utf8(ACTION_NAME_ADD)) {
             let args_opt = json::from_json_option<AddMemoryArgs>(string::into_bytes(args_json));
