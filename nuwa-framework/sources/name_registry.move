@@ -65,7 +65,7 @@ module nuwa_framework::name_registry {
         let lowercase_username = to_lower_case(&username);
         
         // Validate the username
-        validate_username(&lowercase_username);
+        user_input_validator::validate_name(&lowercase_username);
         
         let registry_mut = borrow_mut_registry_object();
         
@@ -171,17 +171,6 @@ module nuwa_framework::name_registry {
         addresses
     }
 
-    //TODO remove, use user_input_validator::validate_name instead
-    public fun validate_username(username: &String) {
-        user_input_validator::validate_name(username);
-    }
-    
-    //Deprecated TODO remove, use validate_username instead
-    /// Check if a username is valid (without checking availability)
-    public fun is_username_valid(username: &String): bool {
-        validate_username(username);
-        true
-    }
 
     #[test]
     fun test_registry() {
