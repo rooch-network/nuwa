@@ -94,7 +94,7 @@ module nuwa_framework::channel_entry {
         let message_ids = channel::get_last_messages(channel_obj, message_limit);
         let messages = message::get_messages_by_ids(&message_ids);
         
-        let message_input = message_for_agent::new_agent_input_v2(messages);
+        let message_input = message_for_agent::new_agent_input(messages);
         let agent = agent::borrow_mut_agent_by_address(ai_addr);
         agent_runner::submit_input_internal(agent, message_input, fee);
     }

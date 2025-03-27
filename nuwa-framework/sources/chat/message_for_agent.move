@@ -10,20 +10,9 @@ module nuwa_framework::message_for_agent {
     use nuwa_framework::task_spec;
     use nuwa_framework::attachment::{Attachment};
 
-    //TODO deprecated
-    #[data_struct]
-    struct MessageForAgent has copy, drop, store{
-        index: u64,
-        sender: address,
-        content: String,
-        timestamp: u64,
-        message_type: u8,
-        reply_to: u64,
-        status: u8,
-    }
 
     #[data_struct]
-    struct MessageForAgentV2 has copy, drop, store {
+    struct MessageForAgent has copy, drop, store {
         index: u64,
         sender: address,
         content: String,
@@ -43,51 +32,12 @@ module nuwa_framework::message_for_agent {
         current: MessageForAgent,
     }
 
-    #[data_struct]
-    struct MessageInputV2 has copy, drop, store {
-        history: vector<MessageForAgentV2>,
-        current: MessageForAgentV2,
-    }
-
     public fun new_agent_input(messages: vector<Message>) : AgentInput<MessageInput> {
         let channel_id = message::get_channel_id(vector::borrow(&messages,0));
         let messages_for_agent = vector::empty();
         vector::for_each(messages, |msg| {
             let msg: Message = msg;
             vector::push_back(&mut messages_for_agent, MessageForAgent {
-                index: message::get_index(&msg),
-                sender: message::get_sender(&msg),
-                content: message::get_content(&msg),
-                timestamp: message::get_timestamp(&msg),
-                message_type: message::get_type(&msg),
-                reply_to: message::get_reply_to(&msg),
-                status: message::get_status(&msg),
-            });
-        });
-        let current = vector::pop_back(&mut messages_for_agent);
-        let description = string::utf8(b"Receive a message from a channel(");
-        string::append(&mut description, object::to_string(&channel_id));
-        string::append(&mut description, string::utf8(b")\n"));
-        string::append(&mut description, string::utf8(MESSAGE_INPUT_DESCRIPTION));
-        let app_task_specs = task_spec::empty_task_specifications();
-        agent_input::new_agent_input(
-            current.sender,
-            channel_id,
-            description,
-            MessageInput {
-                history: messages_for_agent,
-                current,
-            },
-            app_task_specs
-        )
-    }
-
-    public fun new_agent_input_v2(messages: vector<Message>) : AgentInput<MessageInputV2> {
-        let channel_id = message::get_channel_id(vector::borrow(&messages,0));
-        let messages_for_agent = vector::empty();
-        vector::for_each(messages, |msg| {
-            let msg: Message = msg;
-            vector::push_back(&mut messages_for_agent, MessageForAgentV2 {
                 index: message::get_index(&msg),
                 sender: message::get_sender(&msg),
                 content: message::get_content(&msg),
@@ -108,7 +58,7 @@ module nuwa_framework::message_for_agent {
             current.sender,
             channel_id,
             description,
-            MessageInputV2 {
+            MessageInput {
                 history: messages_for_agent,
                 current,
             },
