@@ -385,6 +385,17 @@ module nuwa_framework::channel {
         channel_ref.message_counter
     }
 
+    /// Get message count for a batch of channels
+    public fun get_message_count_batch(channels: vector<ObjectID>): vector<u64> {
+        let message_counts = vector::empty<u64>();
+        vector::for_each(channels, |channel_id| {
+            let channel_obj = object::borrow_object<Channel>(channel_id);
+            let channel = object::borrow(channel_obj);
+            vector::push_back(&mut message_counts, channel.message_counter);
+        });
+        message_counts
+    }
+
     /// Get last N messages from the channel
     public fun get_last_messages(channel_obj: &Object<Channel>, limit: u64): vector<ObjectID> {
         let channel = object::borrow(channel_obj);
