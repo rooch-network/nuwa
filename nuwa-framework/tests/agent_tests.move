@@ -50,7 +50,7 @@ module nuwa_framework::agent_tests {
         
         let coin_input = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000u256);
 
-        let agent_input = message_for_agent::new_agent_input(vector[test_message]);
+        let agent_input = message_for_agent::new_agent_input_v2(vector[test_message]);
         std::debug::print(&agent_input);
         
         let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input);

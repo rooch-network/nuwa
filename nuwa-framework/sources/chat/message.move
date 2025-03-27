@@ -137,6 +137,10 @@ module nuwa_framework::message {
         message.status
     }
 
+    public fun get_attachments(message: &Message): &vector<Attachment> {
+        &message.attachments
+    }
+
     public fun get_messages_by_ids(message_ids: &vector<ObjectID>): vector<Message> {
         let messages = vector::empty<Message>();
         let i = 0;
