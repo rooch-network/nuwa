@@ -172,8 +172,7 @@ module nuwa_framework::message {
     fun test_message_creation() {
         use std::string;
         use std::vector;
-        //TODO provide a test function to generate ObjectID in object.move
-        let test_channel_id = object::named_object_id<Message>();
+        let test_channel_id = object::derive_object_id_for_test();
         let mentions = vector::empty();
         vector::push_back(&mut mentions, @0x43);
         let msg_id = new_message_object(
