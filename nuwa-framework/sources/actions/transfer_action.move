@@ -21,20 +21,10 @@ module nuwa_framework::transfer_action {
     // Action examples
     const TRANSFER_ACTION_EXAMPLE: vector<u8> = b"{\"to\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"amount\":10.1,\"coin_type\":\"0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas\",\"memo\":\"Payment for services\"}";
 
-    //TODO remove this
-    #[data_struct]
-    /// Arguments for the transfer coin action
-    struct TransferActionArgs has copy, drop, store {
-        to: address,          
-        //TODO change to DecimalValue
-        amount: String,        
-        coin_type: String,    
-        memo: String,         
-    }
 
     #[data_struct]
     /// Arguments for the transfer coin action
-    struct TransferActionArgsV2 has copy, drop, store {
+    struct TransferActionArgs has copy, drop, store {
         to: address,          
         amount: DecimalValue,        
         coin_type: String,    
@@ -90,7 +80,7 @@ module nuwa_framework::transfer_action {
     /// Execute a transfer action
     public(friend) fun execute_internal(agent: &mut Object<Agent>, _prompt: &PromptInput, action_name: String, args_json: String) :Result<bool, String> {
         if (action_name == string::utf8(ACTION_NAME_TRANSFER)) {
-            let args_opt = json::from_json_option<TransferActionArgsV2>(string::into_bytes(args_json));
+            let args_opt = json::from_json_option<TransferActionArgs>(string::into_bytes(args_json));
             if (option::is_none(&args_opt)) {
                 return err_str(b"Invalid arguments for transfer action")
             };
@@ -127,7 +117,7 @@ module nuwa_framework::transfer_action {
     #[test]
     fun test_transfer_action_examples() {
         // Test transfer action example
-        let transfer_args = json::from_json<TransferActionArgsV2>(TRANSFER_ACTION_EXAMPLE);
+        let transfer_args = json::from_json<TransferActionArgs>(TRANSFER_ACTION_EXAMPLE);
         assert!(transfer_args.to == @0xed7d3278adec56bbae78fe1b3254cbeb6fd36360fcc295dd31b81825d837c021, 0);
         assert!(decimal_value::is_equal(&transfer_args.amount, &decimal_value::new(101, 1)), 1);
         assert!(transfer_args.coin_type == string::utf8(b"0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas"), 2);
