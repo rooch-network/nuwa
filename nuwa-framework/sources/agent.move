@@ -351,15 +351,9 @@ module nuwa_framework::agent {
     fun sync_agent_profile(agent_obj: &mut Object<Agent>) {
         let agent_signer = create_agent_signer(agent_obj);
         let agent = object::borrow(agent_obj);
-        
-        if (!user_profile::exists_profile(agent.agent_address)) {
-            //TODO remove this after clearing the old agent data.
-            user_profile::init_profile_internal(agent.agent_address, agent.name, agent.username, agent.avatar);
-        }else{
-            let profile_obj = user_profile::borrow_mut_profile(&agent_signer);
-            user_profile::update_user_profile_name(profile_obj, agent.name);
-            user_profile::update_user_profile_avatar(profile_obj, agent.avatar);
-        }
+        let profile_obj = user_profile::borrow_mut_profile(&agent_signer);
+        user_profile::update_user_profile_name(profile_obj, agent.name);
+        user_profile::update_user_profile_avatar(profile_obj, agent.avatar);
     }
 
     /// Update agent's instructions
