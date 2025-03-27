@@ -17,12 +17,6 @@ module nuwa_framework::memory_action {
 
     /// Memory action names using more intuitive namespacing
 
-    //TODO deprecated
-    const ACTION_NAME_REMEMBER_SELF: vector<u8> = b"memory::remember_self";
-    public fun action_name_remember_self(): String { string::utf8(ACTION_NAME_REMEMBER_SELF) }
-    //TODO deprecated
-    const ACTION_NAME_REMEMBER_USER: vector<u8> = b"memory::remember_user";    
-    public fun action_name_remember_user(): String { string::utf8(ACTION_NAME_REMEMBER_USER) } 
 
     const ACTION_NAME_ADD: vector<u8> = b"memory::add";
     public fun action_name_add(): String { string::utf8(ACTION_NAME_ADD) }
@@ -41,36 +35,6 @@ module nuwa_framework::memory_action {
     const ACTION_NAME_NONE: vector<u8> = b"memory::none";
     public fun action_name_none(): String { string::utf8(ACTION_NAME_NONE) }
 
-
-    //TODO deprecated
-    #[data_struct]
-    /// Arguments for adding a memory about oneself
-    struct RememberSelfArgs has copy, drop, store {
-        content: String,     // Memory content
-    }
-
-    public fun create_remember_self_args(
-        content: String,
-    ): RememberSelfArgs {
-        RememberSelfArgs {
-            content,
-        }
-    }
-
-    //TODO deprecated
-    #[data_struct]
-    /// Arguments for adding a memory about a user
-    struct RememberUserArgs has copy, drop, store {
-        content: String,     // Memory content
-    }
-
-    public fun create_remember_user_args(
-        content: String,
-    ): RememberUserArgs {
-        RememberUserArgs {
-            content,
-        }
-    }
 
     #[data_struct]
     /// Arguments for adding a memory
