@@ -4,8 +4,6 @@ module nuwa_framework::user_joined_channels {
     friend nuwa_framework::channel;
 
     struct UserChannelStore has key {
-        //TODO deprecated
-        joined_channel_ids: vector<ObjectID>,
     }
 
     struct JoinedChannel has store, copy, drop {
@@ -19,7 +17,6 @@ module nuwa_framework::user_joined_channels {
         let user_channel_store_object_id = object::account_named_object_id<UserChannelStore>(user_address);
         if (!object::exists_object(user_channel_store_object_id)) {
             let user_channel_store_obj = object::new_account_named_object(user_address, UserChannelStore{
-                joined_channel_ids: vector[]
             });
             object::transfer_extend(user_channel_store_obj, user_address);
         };
@@ -51,11 +48,6 @@ module nuwa_framework::user_joined_channels {
         };
         let joined_channel: &mut JoinedChannel = object::borrow_mut_field(user_channel_store_obj, channel_id);
         joined_channel.active_at = now;
-    }
-
-    //TODO deprecated
-    public fun get_joined_channels(_user_address: address): vector<JoinedChannel> {
-        abort 0 
     }
 
     public fun get_joined_channel_count(user_address: address): u64 {
