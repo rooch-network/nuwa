@@ -1,14 +1,14 @@
 [package]
 name = "NuwaFramework"
-version = "0.0.1"
+version = "1.0.0"
 
 [dependencies]
-MoveStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/move-stdlib", rev = "abf5d43c6cb51a8b9145606ccb665b3e372051b5" }
-MoveosStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/moveos-stdlib", rev = "abf5d43c6cb51a8b9145606ccb665b3e372051b5" }
-RoochFramework = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/rooch-framework", rev = "abf5d43c6cb51a8b9145606ccb665b3e372051b5" }
-BitcoinMove = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/bitcoin-move", rev = "abf5d43c6cb51a8b9145606ccb665b3e372051b5" }
+MoveStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/move-stdlib", rev = "808e4da863512c613888f97f0d8bd40552e4eb39" }
+MoveosStdlib = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/moveos-stdlib", rev = "808e4da863512c613888f97f0d8bd40552e4eb39" }
+RoochFramework = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/rooch-framework", rev = "808e4da863512c613888f97f0d8bd40552e4eb39" }
+BitcoinMove = { git = "https://github.com/rooch-network/rooch", subdir = "frameworks/bitcoin-move", rev = "808e4da863512c613888f97f0d8bd40552e4eb39" }
 VerityMoveOracles = { git = "https://github.com/usherlabs/verity-move-oracles", subdir = "rooch", rev = "6850988a66151749f713a2496942c09885167a82"}
-gas_market = { git = "https://github.com/rooch-network/rooch", subdir = "apps/gas_market", rev = "abf5d43c6cb51a8b9145606ccb665b3e372051b5" }
+gas_market = { git = "https://github.com/rooch-network/rooch", subdir = "apps/gas_market", rev = "808e4da863512c613888f97f0d8bd40552e4eb39" }
 
 [addresses]
 nuwa_framework = "_"
