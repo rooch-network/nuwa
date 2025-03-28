@@ -5,6 +5,7 @@ module nuwa_framework::agent_input{
     use moveos_std::object::{ObjectID};
     use nuwa_framework::agent_input_info::{Self, AgentInputInfo, CoinInputInfo};
     use nuwa_framework::task_spec::{TaskSpecifications};
+    use nuwa_framework::user_profile_for_agent::{UserProfile};
 
     struct AgentInput<I> has copy, drop, store {
         sender: address,
@@ -55,9 +56,10 @@ module nuwa_framework::agent_input{
         (sender, response_channel_id, input_description, input_data, app_task_specs)
     }
 
-    public fun into_agent_input_info<I: drop>(input: AgentInput<I>, coin_input_info: CoinInputInfo) : AgentInputInfo {
+    public fun into_agent_input_info<I: drop>(input: AgentInput<I>, sender_profile: UserProfile, coin_input_info: CoinInputInfo) : AgentInputInfo {
         agent_input_info::new(
             input.sender,
+            sender_profile,
             input.response_channel_id,
             coin_input_info,
             input.input_description,

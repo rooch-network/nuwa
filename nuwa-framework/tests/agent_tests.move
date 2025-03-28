@@ -14,6 +14,7 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::message_for_agent;
     use nuwa_framework::prompt_input;
     use nuwa_framework::user_profile;
+    use nuwa_framework::user_profile_for_agent;
     use nuwa_framework::test_helper;
     
     #[test]
@@ -52,8 +53,9 @@ module nuwa_framework::agent_tests {
 
         let agent_input = message_for_agent::new_agent_input(vector[test_message]);
         std::debug::print(&agent_input);
-        
-        let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input);
+
+        let sender_profile = user_profile_for_agent::get_user_profile(test_user);
+        let agent_input_info = agent_input::into_agent_input_info(agent_input, sender_profile, coin_input);
         
         // Get first prompt
         let prompt_input = agent_runner::generate_system_prompt(agent, agent_input_info);

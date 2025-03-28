@@ -9,7 +9,7 @@ module nuwa_framework::agent_input_info{
 
     use nuwa_framework::format_utils::{build_json_section};
     use nuwa_framework::task_spec::{Self, TaskSpecifications};
-    use nuwa_framework::user_profile_for_agent;
+    use nuwa_framework::user_profile_for_agent::{Self, UserProfile};
     
     friend nuwa_framework::prompt_input;
 
@@ -21,6 +21,7 @@ module nuwa_framework::agent_input_info{
 
     struct AgentInputInfo has copy, drop, store {
         sender: address,
+        sender_profile: UserProfile,
         response_channel_id: ObjectID,
         coin_input_info: CoinInputInfo,
         input_description: String,
@@ -29,9 +30,10 @@ module nuwa_framework::agent_input_info{
         app_task_specs: TaskSpecifications,
     }
 
-    public fun new(sender: address, response_channel_id: ObjectID, coin_input_info: CoinInputInfo, input_description: String, input_data_type: String, input_data_json: String, app_task_specs: TaskSpecifications) : AgentInputInfo {
+    public fun new(sender: address, sender_profile: UserProfile, response_channel_id: ObjectID, coin_input_info: CoinInputInfo, input_description: String, input_data_type: String, input_data_json: String, app_task_specs: TaskSpecifications) : AgentInputInfo {
         AgentInputInfo {
             sender,
+            sender_profile,
             response_channel_id,
             coin_input_info,
             input_description,
@@ -41,11 +43,11 @@ module nuwa_framework::agent_input_info{
         }
     }
 
-    public fun new_raw_message_input_info(sender: address, response_channel_id: ObjectID, input_description: String) : AgentInputInfo {
+    public fun new_raw_message_input_info(sender: address, sender_profile: UserProfile, response_channel_id: ObjectID, input_description: String) : AgentInputInfo {
         let input_data_type = string::utf8(b"");
         let input_data_json = string::utf8(b"");
         let coin_input_info = new_coin_input_info_by_type<RGas>(0);
-        new(sender, response_channel_id, coin_input_info, input_description, input_data_type, input_data_json, task_spec::empty_task_specifications())
+        new(sender, sender_profile, response_channel_id, coin_input_info, input_description, input_data_type, input_data_json, task_spec::empty_task_specifications())
     }
 
     public fun new_coin_input_info(
@@ -69,6 +71,10 @@ module nuwa_framework::agent_input_info{
 
     public fun get_sender(info: &AgentInputInfo): address {
         info.sender
+    }
+
+    public fun get_sender_profile(info: &AgentInputInfo): &UserProfile {
+        &info.sender_profile
     }
 
     public fun get_response_channel_id(info: &AgentInputInfo): ObjectID {
@@ -95,9 +101,7 @@ module nuwa_framework::agent_input_info{
         let result = string::utf8(b"\nInput Context:\n ");
         string::append(&mut result, string::utf8(b"\nSender: "));
         string::append(&mut result, address::to_bech32_string(info.sender));
-        //TODO put the profile into the PromptInput
-        let profile = user_profile_for_agent::get_user_profile(info.sender);
-        string::append(&mut result, user_profile_for_agent::to_prompt(&profile));
+        string::append(&mut result, user_profile_for_agent::to_prompt(&info.sender_profile));
         string::append(&mut result, string::utf8(b"\n"));
         string::append(&mut result, string::utf8(b"\nInput Description:\n"));
         string::append(&mut result, info.input_description);
@@ -138,6 +142,7 @@ module nuwa_framework::agent_input_info{
         let coin_input_info = new_coin_input_info_by_type<RGas>(rgas_amount);
         let input_data_type = type_info::type_name<I>();
         let input_data_json = string::utf8(json::to_json(&input_data));
-        new(sender, response_channel_id, coin_input_info, input_description, input_data_type, input_data_json, task_spec::empty_task_specifications())
+        let sender_profile = user_profile_for_agent::get_user_profile(sender);
+        new(sender, sender_profile, response_channel_id, coin_input_info, input_description, input_data_type, input_data_json, task_spec::empty_task_specifications())
     }
 }

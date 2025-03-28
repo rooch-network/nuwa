@@ -27,6 +27,7 @@ module nuwa_framework::agent_runner {
     use nuwa_framework::channel::{Self, Channel};
     use nuwa_framework::memory;
     use nuwa_framework::memory_info;
+    use nuwa_framework::user_profile_for_agent;
 
     friend nuwa_framework::channel_entry;
     friend nuwa_framework::ai_callback;
@@ -135,7 +136,9 @@ module nuwa_framework::agent_runner {
             coin_type,
             decimal_value::new(amount_except_base_fee, decimals),
         );
-        let input_info = agent_input::into_agent_input_info(input, coin_input_info);
+        let sender = agent_input::get_sender(&input);
+        let sender_profile = user_profile_for_agent::get_user_profile(sender);
+        let input_info = agent_input::into_agent_input_info(input, sender_profile, coin_input_info);
         submit_input_info(agent_obj, input_info);
     }
 
@@ -178,17 +181,19 @@ module nuwa_framework::agent_runner {
         let agent_addr = agent::get_agent_address(agent_obj);
         let pre_input_info = prompt_input::get_input_info(prompt);
         let user_addr = agent_input_info::get_sender(pre_input_info);
+        //We refetch the sender profile to make sure it's up to date
+        let sender_profile = user_profile_for_agent::get_user_profile(user_addr);
         let response_channel_id = agent_input_info::get_response_channel_id(pre_input_info);
         let self_memories = memory::get_all_memories(memory_store, agent_addr);
         let user_memories = memory::get_all_memories(memory_store, user_addr);
 
         if (vector::length(&self_memories) > COMPACT_MEMORY_LENGTH) {
-            let input_info = agent_input_info::new_raw_message_input_info(user_addr, response_channel_id, string::utf8(b"Please compact the memory about yourself"));
+            let input_info = agent_input_info::new_raw_message_input_info(user_addr, sender_profile, response_channel_id, string::utf8(b"Please compact the memory about yourself"));
             submit_input_info(agent_obj, input_info);
         };
         
         if (vector::length(&user_memories) > COMPACT_MEMORY_LENGTH) {
-            let input_info = agent_input_info::new_raw_message_input_info(user_addr, response_channel_id, string::utf8(b"Please compact the memory about the sender"));
+            let input_info = agent_input_info::new_raw_message_input_info(user_addr, sender_profile, response_channel_id, string::utf8(b"Please compact the memory about the sender"));
             submit_input_info(agent_obj, input_info);
         };
     }

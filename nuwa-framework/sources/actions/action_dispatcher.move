@@ -329,6 +329,7 @@ module nuwa_framework::action_dispatcher {
         use nuwa_framework::message;
         use nuwa_framework::agent_input;
         use nuwa_framework::message_for_agent;
+        use nuwa_framework::user_profile_for_agent;
         use rooch_framework::gas_coin::RGas;
 
         // Initialize
@@ -377,7 +378,9 @@ module nuwa_framework::action_dispatcher {
         );
         let coin_input_info = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000000000000u256);
         let agent_input = message_for_agent::new_agent_input(vector[message]);
-        let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input_info);
+
+        let sender_profile = user_profile_for_agent::get_user_profile(test_addr);
+        let agent_input_info = agent_input::into_agent_input_info(agent_input, sender_profile, coin_input_info);
         let agent_info = agent::get_agent_info(agent);
         let prompt_input = prompt_input::new_prompt_input_for_test(agent_info, agent_input_info);
         // Execute actions
