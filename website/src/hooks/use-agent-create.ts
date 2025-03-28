@@ -52,7 +52,7 @@ export function useCreateAgent({
         ],
       });
 
-      // agentTx.setMaxGas(5_00000000);
+      agentTx.setMaxGas(5_00000000);
 
       const agentResult = await client.signAndExecuteTransaction({
         transaction: agentTx,
