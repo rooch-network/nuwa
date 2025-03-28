@@ -40,7 +40,7 @@ import {
       mutationFn: async (args) => {
         const agentTx = new Transaction();
         agentTx.callFunction({
-          target: `${packageId}::channel_entry::create_topic_channel_v2`,
+          target: `${packageId}::channel_entry::create_topic_channel`,
           args: [
             Args.objectId(args.channelId),
             Args.string(args.topic),
