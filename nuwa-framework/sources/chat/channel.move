@@ -91,9 +91,7 @@ module nuwa_framework::channel {
         let channel_id = object::account_named_object_id<Channel>(agent_address);
         assert!(!object::exists_object(channel_id), ErrorChannelAlreadyExists);
         
-        let agent_username = *agent::get_agent_username(agent);
-        let title = string::utf8(b"Home channel for ");
-        string::append(&mut title, agent_username);
+        let title = string::utf8(b"Home channel");
         let creator = agent_address;
         let now = timestamp::now_milliseconds();
         
