@@ -17,7 +17,7 @@ module nuwa_framework::channel_tests {
         object::to_shared(cap);
         timestamp::fast_forward_milliseconds_for_test(1000);
 
-        let channel_id = channel::create_ai_home_channel(agent);
+        let channel_id = channel::create_ai_home_channel_for_test(agent);
         channel_id
     }
 
@@ -27,7 +27,7 @@ module nuwa_framework::channel_tests {
         let home_channel = object::borrow_mut_object_shared<channel::Channel>(home_channel_id);
         let user = test_helper::create_test_account();
         channel_entry::join_channel(&user, home_channel);
-        channel::create_topic_channel_v2(&user, home_channel, topic, join_policy)
+        channel::create_topic_channel(&user, home_channel, topic, join_policy)
     }
 
     #[test]

@@ -29,7 +29,7 @@ module nuwa_framework::agent_tests {
         );
         
         // Create AI home channel
-        let channel_id = channel::create_ai_home_channel(agent);
+        let channel_id = channel::create_ai_home_channel_for_test(agent);
        
         let test_user_signer = test_helper::create_test_account();
         let test_user = signer::address_of(&test_user_signer);

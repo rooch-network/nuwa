@@ -338,7 +338,7 @@ module nuwa_framework::action_dispatcher {
         let test_addr = @0x42;
        
 
-        let channel_id = channel::create_ai_home_channel(agent);
+        let channel_id = channel::create_ai_home_channel_for_test(agent);
        
         // Using type-specific constructors with serialization
         let memory_args = memory_action::create_add_memory_args(

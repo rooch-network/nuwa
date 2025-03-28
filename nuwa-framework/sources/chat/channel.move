@@ -1,10 +1,7 @@
 module nuwa_framework::channel {
     use std::string::{Self, String};
     use std::vector;
-    use std::bcs;
-    use std::hash;
     use std::option::{Self, Option};
-    use moveos_std::address;
     use moveos_std::table::{Self, Table};
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::timestamp;
@@ -19,6 +16,7 @@ module nuwa_framework::channel {
     friend nuwa_framework::task_entry;
     friend nuwa_framework::channel_entry;
     friend nuwa_framework::agent_runner;
+    friend nuwa_framework::agent_entry;
     
     // Error codes
     const ErrorChannelNotFound: u64 = 1;
@@ -39,14 +37,12 @@ module nuwa_framework::channel {
     const CHANNEL_STATUS_BANNED: u8 = 2;
 
 
-    // Channel type constants with built-in visibility
+    // Channel type constants
     const CHANNEL_TYPE_AI_HOME: u8 = 0;   // AI's home channel, always public
-    const CHANNEL_TYPE_AI_PEER: u8 = 1;   // 1:1 AI-User channel, other users cannot join
-    const CHANNEL_TYPE_TOPIC: u8 = 2;     // Topic channel, other users can join
+    const CHANNEL_TYPE_TOPIC: u8 = 1;     // Topic channel
 
     // Public functions to expose channel types
     public fun channel_type_ai_home(): u8 { CHANNEL_TYPE_AI_HOME }
-    public fun channel_type_ai_peer(): u8 { CHANNEL_TYPE_AI_PEER }
     public fun channel_type_topic(): u8 { CHANNEL_TYPE_TOPIC }
 
     const CHANNEL_JOIN_POLICY_PUBLIC: u8 = 0;
@@ -88,7 +84,7 @@ module nuwa_framework::channel {
     }
 
     /// Initialize a new AI home channel
-    public fun create_ai_home_channel(
+    public(friend) fun create_ai_home_channel(
         agent: &mut Object<Agent>,
     ): ObjectID {
         let agent_address = agent::get_agent_address(agent);
@@ -129,68 +125,7 @@ module nuwa_framework::channel {
         object::account_named_object_id<Channel>(agent_address)
     }
 
-    public(friend) fun create_ai_peer_channel_internal(user_address: address, agent: &mut Object<Agent>): ObjectID {
-        let agent_address = agent::get_agent_address(agent);
-        let creator = agent_address;
-        let title = string::utf8(b"Direct message with ");
-        string::append(&mut title, *agent::get_agent_username(agent));
-        let now = timestamp::now_milliseconds();
-        
-        let channel = Channel {
-            parent_channel: option::none(), 
-            title,
-            creator,  
-            members: table::new(),
-            messages: table::new(),
-            topics: table::new(),
-            message_counter: 0,
-            created_at: now,
-            last_active: now,
-            status: CHANNEL_STATUS_ACTIVE,
-            channel_type: CHANNEL_TYPE_AI_PEER,
-            join_policy: CHANNEL_JOIN_POLICY_INVITE,
-        };
-
-        let id = generate_peer_channel_id(agent_address, user_address);
-
-        let channel_obj = object::new_with_id(id, channel);
-        join_channel_internal(creator, &mut channel_obj, now);
-        join_channel_internal(user_address, &mut channel_obj, now);
-        let channel_id = object::id(&channel_obj);
-        object::to_shared(channel_obj);
-        channel_id
-    }
-
-    //Deprecated 
-    /// Initialize a new user to AI direct message channel
-    public fun create_ai_peer_channel(
-        user_account: &signer,
-        agent: &mut Object<Agent>,
-    ): ObjectID {
-        let user_address = signer::address_of(user_account);
-        create_ai_peer_channel_internal(user_address, agent)
-    }
-
-    //Deprecated
-    public entry fun create_ai_peer_channel_entry(
-        user_account: &signer,
-        agent: &mut Object<Agent>,
-    ) {
-        let _id = create_ai_peer_channel(user_account, agent);
-    }
-
     public fun create_topic_channel(
-        _user_account: &signer,
-        _agent: &mut Object<Agent>,
-        _parent_channel_obj: &mut Object<Channel>,
-        _topic: String,
-        _join_policy: u8,
-    ): ObjectID {
-        abort ErrorDeprecatedFunction
-    }
-
-
-    public fun create_topic_channel_v2(
         user_account: &signer,
         parent_channel_obj: &mut Object<Channel>,
         topic: String,
@@ -231,29 +166,6 @@ module nuwa_framework::channel {
         join_channel_internal(agent_address, &mut channel_obj, now);
         object::to_shared(channel_obj);
         channel_id
-    }
-
-    public fun get_ai_peer_channel_id(agent: &Object<Agent>, user_address: address): Option<ObjectID> {
-        let id = generate_peer_channel_id(agent::get_agent_address(agent), user_address);
-        let channel_obj_id = object::custom_object_id<address, Channel>(id);
-        if (object::exists_object(channel_obj_id)) {
-            option::some(channel_obj_id)
-        } else {
-            option::none()
-        }
-    }
-
-    fun generate_ai_peer_channel_id(agent: &Object<Agent>, user_address: address): ObjectID {
-        let id = generate_peer_channel_id(agent::get_agent_address(agent), user_address);
-        object::custom_object_id<address, Channel>(id)
-    }
-
-    fun generate_peer_channel_id(agent_address: address, user_address: address): address {
-        let bytes = vector::empty<u8>();
-        vector::append(&mut bytes, bcs::to_bytes(&agent_address));
-        vector::append(&mut bytes, bcs::to_bytes(&user_address));
-        let hash = hash::sha3_256(bytes);
-        address::from_bytes(hash)
     }
 
     /// Add message to channel - use message_counter as id
@@ -476,8 +388,7 @@ module nuwa_framework::channel {
         }
     }
 
-    //TODO change to friend
-    /// Join channel for AI_HOME type
+    /// Join channel
     public fun join_channel(
         account: &signer,
         channel_obj: &mut Object<Channel>,
@@ -490,15 +401,6 @@ module nuwa_framework::channel {
         
         let now = timestamp::now_milliseconds();
         join_channel_internal(sender, channel_obj, now); 
-    }
-
-    //Deprecated TODO
-    /// Entry function for joining a channel
-    public entry fun join_channel_entry(
-        account: &signer,
-        channel_obj: &mut Object<Channel>,
-    ) {
-        join_channel(account, channel_obj);
     }
 
     public(friend) fun leave_channel(
@@ -585,6 +487,13 @@ module nuwa_framework::channel {
     }
 
     #[test_only]
+    public fun create_ai_home_channel_for_test(
+        agent: &mut Object<Agent>,
+    ): ObjectID {
+        create_ai_home_channel(agent)
+    }
+
+    #[test_only]
     /// Public test helper function to delete a channel
     public fun delete_channel_for_testing(channel_id: ObjectID) {
         let channel = object::take_object_extend<Channel>(channel_id);
@@ -601,5 +510,4 @@ module nuwa_framework::channel {
     ): (ObjectID, u64) {
         send_message(account, channel_obj, content, mentions, reply_to, vector::empty())
     }
-
 }
