@@ -7,11 +7,6 @@ module nuwa_framework::state_providers{
     use nuwa_framework::price_provider;
     use nuwa_framework::global_provider;
     
-    //Deprecated
-    public fun build_agent_state(_agent: &mut Object<Agent>): AgentStates {
-        abort 0
-    }
-
     public fun get_agent_state(agent: &Object<Agent>): AgentStates {
         let agent_states = agent_state::new_agent_states();
         let global_state = global_provider::get_state(agent);

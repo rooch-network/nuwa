@@ -6,12 +6,14 @@ module nuwa_framework::channel_provider{
     use nuwa_framework::channel;
     use nuwa_framework::agent_state::{Self, AgentState};
 
+    friend nuwa_framework::state_providers;
+
     #[data_struct]
     struct ChannelState has copy, drop, store {
         home_channel: String,
     }
 
-    public fun get_state(agent: &Object<Agent>): AgentState {
+    public(friend) fun get_state(agent: &Object<Agent>): AgentState {
         let home_channel_id = channel::get_agent_home_channel_id(agent);
         let home_channel = object::to_string(&home_channel_id);
         let channel_state = ChannelState {
