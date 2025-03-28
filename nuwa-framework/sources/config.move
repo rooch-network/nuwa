@@ -58,12 +58,12 @@ module nuwa_framework::config {
         MAX_CHANNEL_MESSAGE_LENGTH
     }
 
-    const MAX_AGENT_DESCRIPTION_LENGTH: u64 = 100;
+    const MAX_AGENT_DESCRIPTION_LENGTH: u64 = 500;
     public fun get_max_agent_description_length(): u64 {
         MAX_AGENT_DESCRIPTION_LENGTH
     }
 
-    const MAX_AGENT_INSTRUCTIONS_LENGTH: u64 = 2000;
+    const MAX_AGENT_INSTRUCTIONS_LENGTH: u64 = 3000;
     public fun get_max_agent_instructions_length(): u64 {
         MAX_AGENT_INSTRUCTIONS_LENGTH
     }

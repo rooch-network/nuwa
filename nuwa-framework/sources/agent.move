@@ -7,6 +7,7 @@ module nuwa_framework::agent {
     use moveos_std::signer;
     use moveos_std::timestamp;
     use moveos_std::decimal_value::{Self, DecimalValue};
+    use moveos_std::string_utils;
 
     use rooch_framework::coin::{Self, Coin};
     use rooch_framework::account_coin_store;
@@ -82,8 +83,9 @@ module nuwa_framework::agent {
         let agent_address = signer::address_of(&agent_signer);
         account_coin_store::deposit<RGas>(agent_address, initial_fee);
 
+        let lowercase_username = string_utils::to_lower_case(&username);
         // Create a user profile for the agent
-        user_profile::init_profile(&agent_signer, name, username, avatar);
+        user_profile::init_profile(&agent_signer, name, lowercase_username, avatar);
         //The name and username has validated in user_profile::init_profile
         validate_agent_description(&description);
         validate_agent_instructions(&instructions);
@@ -91,7 +93,7 @@ module nuwa_framework::agent {
         let agent = Agent {
             agent_address,
             name,
-            username,
+            username: lowercase_username,
             avatar,
             description,
             instructions,
@@ -419,6 +421,12 @@ module nuwa_framework::agent {
     ) {
         let task_specs = task_spec::task_specs_from_json(task_specs_json);
         update_agent_task_specs(cap, task_specs);
+    }
+
+    entry fun fix_agent_username(agent_obj: &mut Object<Agent>) {
+        let agent = object::borrow_mut(agent_obj);
+        let lowercase_username = string_utils::to_lower_case(&agent.username);
+        agent.username = lowercase_username;
     }
 
 
