@@ -38,7 +38,7 @@ UseChannelJoinResult,
     mutationFn: async (args) => {
       const agentTx = new Transaction();
       agentTx.callFunction({
-        target: `${packageId}::channel_entry::join_channel_entry`,
+        target: `${packageId}::channel_entry::join_channel`,
         args: [
           Args.objectId(args.id),
         ],
