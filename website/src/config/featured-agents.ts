@@ -1,13 +1,11 @@
 export const FEATURED_AGENTS = [
-    'BigSpender1',
-    'BigSpender',
+    'nuwa',
+    'Gollum',
 ] as const;
 
 export const TRENDING_AGENTS = [
-    'btcforecaster',
-    'test',
-    'alfsiter',
-    'cryptocaishen',
+    'nuwa',
+    'Gollum',
 ] as const;
 
 export type FeaturedAgent = typeof FEATURED_AGENTS[number];
