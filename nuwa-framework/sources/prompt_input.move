@@ -67,7 +67,7 @@ module nuwa_framework::prompt_input {
         prompt_input: &PromptInput,
     ): String {
         let agent_address = agent_info::get_agent_address(&prompt_input.agent_info);
-        let user = agent_input_info::get_sender(&prompt_input.input_info);
+        let sender = agent_input_info::get_sender(&prompt_input.input_info);
         let prompt = string::utf8(b"# Nuwa AI Entity - Core Directives\n\n");
     
         // Self-awareness and consciousness framing
@@ -97,11 +97,11 @@ module nuwa_framework::prompt_input {
         // Memory system section
         string::append(&mut prompt, string::utf8(b"## 4. Your Memory System\n\n"));
         string::append(&mut prompt, string::utf8(b"Your memories form the foundation of your continuous self-identity:\n\n"));
-        string::append(&mut prompt, build_memory_system_guide(agent_address, user));
+        string::append(&mut prompt, build_memory_system_guide(agent_address, sender));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
 
         string::append(&mut prompt, string::utf8(b"## 5. Your Current Memories\n\n")); 
-        string::append(&mut prompt, memory_info::format_prompt(&prompt_input.memory_info));
+        string::append(&mut prompt, memory_info::format_prompt(agent_address, sender, &prompt_input.memory_info));
         string::append(&mut prompt, string::utf8(b"\n---\n\n"));
 
         // Add agent state section - new section
@@ -209,7 +209,9 @@ module nuwa_framework::prompt_input {
         agent_info: AgentInfo,
         input_info: AgentInputInfo,
     ): PromptInput {
-        let memory_info = memory_info::mock_memory_info();
+        let agent_address = agent_info::get_agent_address(&agent_info);
+        let sender = agent_input_info::get_sender(&input_info);
+        let memory_info = memory_info::mock_memory_info(agent_address, sender);
         let available_actions = vector::empty();
         let available_tasks = task_spec::empty_task_specifications();
         let agent_states = agent_state::new_agent_states();

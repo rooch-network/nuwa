@@ -2,10 +2,6 @@ module nuwa_framework::agent_state{
     use std::string::{Self, String};
     use std::vector;
 
-    friend nuwa_framework::state_providers;
-    friend nuwa_framework::agent;
-    friend nuwa_framework::prompt_input;
-
     #[data_struct]
     struct AgentState has copy, drop, store {
         description: String,
@@ -34,7 +30,7 @@ module nuwa_framework::agent_state{
         vector::push_back(&mut agent_states.states, agent_state);
     }
 
-    public(friend) fun format_prompt(agent_states: &AgentStates): String {
+    public fun format_prompt(agent_states: &AgentStates): String {
         let prompt = string::utf8(b"Your current states:\n");
        
         vector::for_each(agent_states.states, |state| {

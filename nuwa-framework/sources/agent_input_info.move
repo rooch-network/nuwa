@@ -101,7 +101,7 @@ module nuwa_framework::agent_input_info{
         let result = string::utf8(b"\nInput Context:\n ");
         string::append(&mut result, string::utf8(b"\nSender: "));
         string::append(&mut result, address::to_bech32_string(info.sender));
-        string::append(&mut result, user_profile_for_agent::to_prompt(&info.sender_profile));
+        string::append(&mut result, user_profile_for_agent::format_prompt(&info.sender_profile));
         string::append(&mut result, string::utf8(b"\n"));
         string::append(&mut result, string::utf8(b"\nInput Description:\n"));
         string::append(&mut result, info.input_description);

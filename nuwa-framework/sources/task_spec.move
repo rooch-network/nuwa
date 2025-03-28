@@ -7,8 +7,6 @@ module nuwa_framework::task_spec{
     use moveos_std::string_utils;
     use nuwa_framework::format_utils::{build_json_section};
 
-    friend nuwa_framework::prompt_input;
-
     const MAX_TASK_SPECIFICATIONS: u64 = 5;
     const TASK_NAME_PREFIX: vector<u8> = b"task::";
 
@@ -239,7 +237,7 @@ module nuwa_framework::task_spec{
         task_spec.price
     }
 
-    public(friend) fun format_prompt(task_specs: &TaskSpecifications): String {
+    public fun format_prompt(task_specs: &TaskSpecifications): String {
         if (vector::length(&task_specs.task_specs) == 0) {
             return string::utf8(b"")
         };

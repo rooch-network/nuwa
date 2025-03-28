@@ -4,7 +4,6 @@ module nuwa_framework::agent_info {
     use moveos_std::json;
     use moveos_std::object::{ObjectID};
     use moveos_std::decimal_value::{DecimalValue};
-    friend nuwa_framework::prompt_input;
 
     #[data_struct]
     struct AgentInfo has copy, drop, store {
@@ -96,7 +95,7 @@ module nuwa_framework::agent_info {
         instructions: String,
     }
 
-    public(friend) fun format_prompt(agent_info: &AgentInfo): String {
+    public fun format_prompt(agent_info: &AgentInfo): String {
         let prompt_agent_info = PromptAgentInfo {
             name: agent_info.name,
             username: agent_info.username,

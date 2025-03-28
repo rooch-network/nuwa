@@ -1,44 +1,53 @@
 module nuwa_framework::memory_info {
     use std::string::{Self, String};
+    use moveos_std::address;
+    use moveos_std::simple_map::{Self, SimpleMap};
     use nuwa_framework::memory::{Memory};
     use nuwa_framework::format_utils::{build_json_section};
     
-    //TODO use a map to store the memories, maybe we want add more memories in the future
     struct MemoryInfo has copy, drop, store {
-        self_memories: vector<Memory>,
-        user_memories: vector<Memory>,
+        simple_map: SimpleMap<address, vector<Memory>>,
     }
     
-    public fun new(self_memories: vector<Memory>, user_memories: vector<Memory>): MemoryInfo {
+    public fun new(): MemoryInfo {
         MemoryInfo {
-            self_memories,
-            user_memories,
+            simple_map: simple_map::new(),
         }
     }
 
-    public fun get_self_memories(memory_info: &MemoryInfo): &vector<Memory> {
-        &memory_info.self_memories
+    public fun add_memory(memory_info: &mut MemoryInfo, addr: address, memories: vector<Memory>) {
+        simple_map::add(&mut memory_info.simple_map, addr, memories);
     }
 
-    public fun get_user_memories(memory_info: &MemoryInfo): &vector<Memory> {
-        &memory_info.user_memories
+    public fun get_memories(memory_info: &MemoryInfo, addr: &address): &vector<Memory> {
+        simple_map::borrow(&memory_info.simple_map, addr)
     }
 
-    public fun format_prompt(memory_info: &MemoryInfo): String {
-        let result = string::utf8(b"");
-        string::append(&mut result, string::utf8(b"Self-Memories\n"));
-        string::append(&mut result, build_json_section(&memory_info.self_memories));
-        string::append(&mut result, string::utf8(b"Relational Memories about the sender\n"));
-        string::append(&mut result, build_json_section(&memory_info.user_memories));
+    public fun contains_memories(memory_info: &MemoryInfo, addr: &address) : bool {
+        simple_map::contains_key(&memory_info.simple_map, addr)
+    }
+
+    public fun format_prompt(agent_address: address, sender: address, memory_info: &MemoryInfo): String {
+        let result = string::utf8(b"Your Memories about yourself:\n");
+        let self_memories = simple_map::borrow(&memory_info.simple_map, &agent_address);
+        string::append(&mut result, build_json_section(self_memories));
+        string::append(&mut result, string::utf8(b"Your Memories about the sender("));
+        string::append(&mut result, address::to_bech32_string(sender));
+        string::append(&mut result, string::utf8(b"):\n"));
+        let user_memories = simple_map::borrow(&memory_info.simple_map, &sender);
+        string::append(&mut result, build_json_section(user_memories));
         result
     }
 
     #[test_only]
-    public fun mock_memory_info(): MemoryInfo {
+    public fun mock_memory_info(agent_address: address, sender: address): MemoryInfo {
         use std::vector;
         let self_memories = vector::empty();
         let user_memories = vector::empty();
-        new(self_memories, user_memories)
+        let memory_info = new();
+        add_memory(&mut memory_info, agent_address, self_memories);
+        add_memory(&mut memory_info, sender, user_memories);
+        memory_info
     }
 
 }

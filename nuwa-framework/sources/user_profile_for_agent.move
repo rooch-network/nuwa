@@ -6,8 +6,6 @@ module nuwa_framework::user_profile_for_agent{
     use nuwa_framework::balance_state::{Self, BalanceState};
     use nuwa_framework::format_utils::{build_json_section};
 
-    friend nuwa_framework::agent_input_info;
-
     #[data_struct]
     struct UserProfile has copy, drop, store {
         username: String,
@@ -39,7 +37,7 @@ module nuwa_framework::user_profile_for_agent{
         }
     }
 
-    public(friend) fun to_prompt(profile: &UserProfile): String {
+    public fun format_prompt(profile: &UserProfile): String {
         let prompt = string::utf8(b"\nSender Profile:");
         if (string::length(&profile.username) > 0) {
             string::append(&mut prompt, string::utf8(b"\n - Username: "));

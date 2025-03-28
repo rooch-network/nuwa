@@ -48,7 +48,9 @@ module nuwa_framework::agent_runner {
         let user_addr = agent_input_info::get_sender(&agent_input_info);
         let self_memories = memory::get_all_memories(memory_store, agent_addr);
         let user_memories = memory::get_all_memories(memory_store, user_addr);
-        let memory_info = memory_info::new(self_memories, user_memories);
+        let memory_info = memory_info::new();
+        memory_info::add_memory(&mut memory_info, agent_addr, self_memories);
+        memory_info::add_memory(&mut memory_info, user_addr, user_memories);
 
         let task_specs = agent::get_agent_task_specs(agent);
         task_spec::merge_task_specifications(&mut task_specs, *agent_input_info::get_app_task_specs(&agent_input_info));

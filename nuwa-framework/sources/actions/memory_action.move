@@ -236,7 +236,6 @@ module nuwa_framework::memory_action {
 
     /// Execute memory actions
     public(friend) fun execute_internal(agent: &mut Object<Agent>, prompt: &PromptInput, action_name: String, args_json: String) :Result<bool, String> {
-        let agent_address = agent::get_agent_address(agent);
         let store = agent::borrow_mut_memory_store(agent);
         
         if (action_name == string::utf8(ACTION_NAME_NONE)) {
@@ -273,13 +272,13 @@ module nuwa_framework::memory_action {
             };
             let args = option::destroy_some(args_opt);
             let memory_info = prompt_input::get_memory_info(prompt);
-            let original_memories = if (args.addr == agent_address) {
-                *memory_info::get_self_memories(memory_info)
-            } else {
-                *memory_info::get_user_memories(memory_info)
-            };
-            memory::compact_memory(store, args.addr, original_memories, args.content);
-            ok(true)
+            if (memory_info::contains_memories(memory_info, &args.addr)){
+                let original_memories = *memory_info::get_memories(memory_info, &args.addr);
+                memory::compact_memory(store, args.addr, original_memories, args.content);
+                ok(true)
+            }else{
+                err_str(b"Invalid compact memory address arg")
+            }
         }else {
             err_str(b"Unsupported action")
         }
@@ -318,22 +317,39 @@ module nuwa_framework::memory_action {
         let prompt_input = prompt_input::new_prompt_input_for_test(agent_info, agent_input_info);
 
         // Test memory::add action
-        let add_memory_json = string::utf8(b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"content\":\"User likes detailed explanations\"}");
+        let add_memory_args = AddMemoryArgs{
+            addr: test_addr,
+            content: string::utf8(b"User likes detailed explanations"),
+        };
+        let add_memory_json = string::utf8(json::to_json(&add_memory_args));
         let result = execute_internal(agent_obj, &prompt_input, string::utf8(ACTION_NAME_ADD), add_memory_json);
         assert!(result::is_ok(&result), 1);
 
         // Test memory::update action
-        let update_memory_json = string::utf8(b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"index\":0,\"content\":\"User prefers detailed explanations\"}");
+        let update_memory_args = UpdateMemoryArgs{
+            addr: test_addr,
+            index: 0,
+            content: string::utf8(b"User prefers detailed explanations"),
+        };
+        let update_memory_json = string::utf8(json::to_json(&update_memory_args));
         let result = execute_internal(agent_obj, &prompt_input, string::utf8(ACTION_NAME_UPDATE), update_memory_json);
         assert!(result::is_ok(&result), 2);
 
         // Test memory::remove action
-        let remove_memory_json = string::utf8(b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"index\":0}");
+        let remove_memory_args = RemoveMemoryArgs{
+            addr: test_addr,
+            index: 0,
+        };
+        let remove_memory_json = string::utf8(json::to_json(&remove_memory_args));
         let result = execute_internal(agent_obj, &prompt_input, string::utf8(ACTION_NAME_REMOVE), remove_memory_json);
         assert!(result::is_ok(&result), 3);
 
         // Test memory::compact action
-        let compact_memory_json = string::utf8(b"{\"addr\":\"rooch1a47ny79da3tthtnclcdny4xtadhaxcmqlnpfthf3hqvztkphcqssqd8edv\",\"content\":\"User prefers detailed explanations\"}");
+        let compact_memory_args = CompactMemoryArgs{
+            addr: test_addr,
+            content: string::utf8(b"User prefers detailed explanations"),
+        };
+        let compact_memory_json = string::utf8(json::to_json(&compact_memory_args));
         let result = execute_internal(agent_obj, &prompt_input, string::utf8(ACTION_NAME_COMPACT), compact_memory_json);
         assert!(result::is_ok(&result), 4);
 
