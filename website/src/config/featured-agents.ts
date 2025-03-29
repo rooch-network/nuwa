@@ -1,9 +1,12 @@
 export const FEATURED_AGENTS = [
-    'nuwa',
-    'gollum',
+    'nevertransfer',
+    'trustedpay',
+    'govmind',
 ] as const;
 
 export const TRENDING_AGENTS = [
+    'nuwa',
+    'gollum',
     'caishen',
     'oraclebite',
 ] as const;
