@@ -1,5 +1,5 @@
 {
-    "package_id": "0xb5ee31dafd362db98685b17aaf3fb8b20f36746cd0b34a4086fbdf39f13a1c3b",
+    "package_id": "0x8a09278c76149377ab2d949a042c7e1cf49df31f6ff6dfc2ef93956538360ed2",
     "openai_api_key": "sk-proj-",
     "agent_address": "Your local rooch account address",
     "poll_interval": 10,
