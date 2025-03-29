@@ -14,7 +14,19 @@ This is a web page summary task agent example based on the Rooch Nuwa framework,
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11+ (Required)
+  - For Ubuntu users: You need to upgrade Python to 3.11+ first:
+    ```bash
+    # Add deadsnakes PPA
+    sudo add-apt-repository ppa:deadsnakes/ppa
+    sudo apt update
+    
+    # Install Python 3.11
+    sudo apt install python3.11 python3.11-venv python3.11-dev
+    
+    # Install pip for Python 3.11
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+    ```
 - Rooch CLI tool
 - OpenAI API key
 - Playwright (for web content scraping)
@@ -33,6 +45,11 @@ source venv/bin/activate
 
 # Windows
 .\venv\Scripts\activate
+```
+
+Note: On macOS, it's recommended to use `python3` command instead of `python` to ensure you're using the correct Python version in your virtual environment. If you encounter any issues with `python` command, you can unalias it in your virtual environment:
+```bash
+unalias python
 ```
 
 ### Dependencies Installation

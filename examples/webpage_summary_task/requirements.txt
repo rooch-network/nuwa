@@ -1,4 +1,4 @@
-browser-use
+browser-use==0.1.40
 langchain-openai
 openai
 playwright
