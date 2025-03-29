@@ -27,19 +27,25 @@ graph TB
             A1[Memory Actions]
             A2[Response Actions]
             A3[Asset Actions]
-            A4[Tasks]
+        
+            subgraph T ["Tasks"]
+                OnchainTask[Onchain Task]
+                OffchainTask[Offchain TaskEngine]
+            end
+        
         end
 
         subgraph "Chat System"
-           C1[Channel and DM]
+           C1[Channel]
         end
+ 
     end
 
     subgraph "AI Service(Oracle)"
         AI[LLM Processing]
     end
 
-    subgraph T ["Task Engine(Offchain)"]
+    subgraph TaskEngine ["Task Engine(Offchain)"]
        T1[Task Subscriber]
        T2[Task Executor]
        T3[Task Reporter]
@@ -54,12 +60,12 @@ graph TB
     D --> |Execute| A1
     D --> |Execute| A2
     D --> |Execute| A3
-    D --> |Publish| A4
+    D --> |Publish| T
     A1 --> |Update| SM
     A1 --> |Update| LM
     A2 --> |Send message|C1
     C1 --> |Response| U
-    A4 --> |Subscribe| T1
+    OffchainTask --> |Subscribe| T1
     T1 --> T2
     T2 --> T3
     T3 --> |Send report| C1
