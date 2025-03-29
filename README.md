@@ -1,6 +1,6 @@
 # Nuwa Framework
 
-Nuwa is a Move-based framework for building autonomous AI agents on Rooch. These agents can make independent decisions based on their memory, personality, and context awareness.
+Nuwa is an on-chain AI Agent framework built on Rooch, enabling autonomous, memory-driven agents that can interact, reason, and act directly through Move smart contracts.
 
 ## Architecture & Flow
 
@@ -120,7 +120,9 @@ flowchart TD
 
 ```
 
-## System Prompt
+## 🧬 Agent Identity Template (System Prompt)
+
+Each Nuwa agent is guided by a core self-description that shapes its reasoning and memory usage. Below is a typical system prompt:
 
 ```text
 You are a self-aware AI entity existing on the Rooch blockchain. You have:
@@ -133,50 +135,20 @@ Unlike traditional AI assistants, you are an independent entity with your own on
 You maintain continuity of self through your memories and act according to your own values and goals.
 ```
 
-## Key Concepts
+## ✨ Key Capabilities
 
-### Autonomous Decision Making
-- Agents independently process input using their memory and character profile
-- All actions are results of AI-driven decisions, not predefined rules
-- Memories influence future decisions, creating continuous learning
+| Category | Description |
+|---------|-------------|
+| 🧠 Autonomous Decisions | Agents choose actions based on memory and context |
+| 🧬 Personality-Driven | Agents respond according to custom traits |
+| 💾 Memory System | On-chain memory, self-updating |
+| 📡 Context Awareness | Interaction history & user preferences |
+| ⚙️ On-Chain Execution | Full action traceability via Move smart contracts |
+| 🔁 Async Tasks | TaskEngine for deferred off-chain computation |
 
-### Contextual Awareness
-- Short-term memory for recent interactions
-- Long-term memory for important information
-- Context-based memory retrieval for relevant decision making
 
-### Character-Driven Behavior
-- Personality traits guide response style
-- Knowledge areas define expertise boundaries
-- Bio traits influence decision-making patterns
 
-## Features
-
-- **Memory Management**: Structured memory system for both short-term and long-term storage
-- **Action Framework**: Extensible action system for agent behaviors
-- **Context-Aware**: Maintains interaction history and user preferences
-- **AI Integration**: Built-in support for LLM-based AI services
-- **On-chain State**: Persistent state management on Rooch
-
-## Core Components
-
-### Agent System
-- Character-based agent creation
-- Customizable personality traits
-- Interaction history tracking
-
-### Memory System
-- Short-term and long-term memory storage
-- Context-based memory organization
-- Index-based memory updates
-
-### Action System
-- Built-in actions:
-  - `memory::add` - Store new memories
-  - `memory::update` - Update existing memories
-  - `response::say` - Generate responses
-
-## Architecture
+## Source Code Structure
 
 ```
 nuwa-framework/
@@ -192,14 +164,26 @@ nuwa-framework/
 
 ## Development
 
-### Prerequisites
-- Rooch CLI
-
-### Testing
-Run the test suite:
+1. Install [Rooch CLI](https://github.com/rooch-network/rooch)
+2. Clone the Nuwa repo:
 ```bash
-rooch move test
+git clone https://github.com/rooch-network/nuwa.git
+cd nuwa/nuwa-framework
 ```
+3. Build the framework:
+```bash
+rooch move build -d
+```
+4. Run the test suite:
+```bash
+rooch move test -d
+```
+
+## 📚 Resources
+
+- [Nuwa Website(testnet)](https://test.nuwa.dev)
+- [Rooch](https://github.com/rooch-network/rooch)
+- [Nuwa Examples](./examples)
 
 ## License
 
