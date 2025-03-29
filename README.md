@@ -153,13 +153,19 @@ You maintain continuity of self through your memories and act according to your 
 ```
 nuwa-framework/
 ├── sources/
-│   ├── action.move         - Action registration and management
-│   ├── memory.move         - Memory storage and retrieval
-│   ├── agent.move          - Agent core functionality
-│   ├── character.move      - Agent personality definition
-│   └── prompt_builder.move - AI prompt construction
+│   ├── actions/              - Action handling and execution
+│   ├── chat/                 - Chat functionality
+│   ├── providers/            - State providers
+│   ├── agent.move           - Core agent functionality
+│   ├── agent_runner.move    - Agent execution engine
+│   ├── agent_state.move     - Agent state management
+│   ├── memory.move          - Memory system
+│   ├── task.move            - Task system
+│   ├── user_profile.move    - User profile management
+│   ├── prompt_input.move    - Prompt handling
+│   ├── ai_service.move      - AI service integration
 └── tests/
-    └── agent_tests.move    - Integration tests
+    └── agent_tests.move     - Integration tests
 ```
 
 ## Development
