@@ -1,10 +1,8 @@
-import { Box, Typography } from '@mui/material';
-
 const Profile = () => {
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h5">个人资料页面</Typography>
-        </Box>
+        <div className="p-4">
+            <h1 className="text-xl font-semibold">个人资料页面</h1>
+        </div>
     );
 };
 

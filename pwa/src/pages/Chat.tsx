@@ -1,10 +1,8 @@
-import { Box, Typography } from '@mui/material';
-
 const Chat = () => {
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h5">聊天页面</Typography>
-        </Box>
+        <div className="p-4">
+            <h1 className="text-xl font-semibold">聊天页面</h1>
+        </div>
     );
 };
 
