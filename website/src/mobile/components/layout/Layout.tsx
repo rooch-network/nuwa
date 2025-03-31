@@ -4,7 +4,7 @@ const Layout = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="flex flex-col h-screen pt-[env(safe-area-inset-top)] pb-[calc(56px+env(safe-area-inset-bottom))]">
+        <div className="flex flex-col h-screen pt-[env(safe-area-inset-top)] pb-[calc(56px+env(safe-area-inset-top))]">
             <div className="flex-grow overflow-auto">
                 <Outlet />
             </div>

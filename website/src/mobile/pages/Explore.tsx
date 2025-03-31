@@ -1,7 +1,7 @@
-import { AgentCard } from '../components/AgentCard';
-import useAllAgents from '../hooks/use-all-agents';
-import { SEO } from '../components/layout/SEO';
-import { Agent } from '../types/agent';
+import { AgentCard } from '../../components/AgentCard';
+import useAllAgents from '../../hooks/use-all-agents';
+import { SEO } from '../../components/layout/SEO';
+import { Agent } from '../../types/agent';
 
 const Explore = () => {
     const { agents, isPending, isError } = useAllAgents();

@@ -17,6 +17,7 @@ import { RiskWarningModal } from './components/RiskWarningModal'
 import { useConnectionStatus } from '@roochnetwork/rooch-sdk-kit'
 import { LoadingScreen } from './components/layout/LoadingScreen'
 import { NotFound } from './pages/NotFound'
+import MobileApp from './mobile/App'
 
 // preload AgentChat component
 const AgentChat = lazy(() => import('./pages/AgentChat').then(module => {
@@ -38,6 +39,11 @@ function AppContent() {
   const location = useLocation()
   const connectionStatus = useConnectionStatus()
   const [showRiskWarning, setShowRiskWarning] = useState(false)
+  const isMobile = window.innerWidth <= 768
+
+  if (isMobile) {
+    return <MobileApp />;
+  }
 
   // Scroll to top when route changes
   useEffect(() => {
