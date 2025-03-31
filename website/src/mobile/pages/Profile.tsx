@@ -32,19 +32,19 @@ const Profile = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="fixed inset-0 bg-gray-50 overflow-hidden">
             {/* 顶部导航栏 */}
-            <div className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-50">
+            <div className="absolute top-0 left-0 right-0 h-14 bg-white border-b border-gray-200">
                 <div className="h-full flex items-center px-4">
                     <h1 className="text-lg font-semibold flex-1 text-center">Profile</h1>
                 </div>
             </div>
 
             {/* 主要内容区域 */}
-            <div className="pt-14 pb-16 mt-8">
+            <div className="absolute top-0 bottom-0 left-0 right-0 overflow-hidden">
                 {connectionStatus !== 'connected' ? (
-                    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)] px-4">
-                        <div className="w-full max-w-sm space-y-6">
+                    <div className="h-full flex flex-col items-center justify-center px-4 overflow-hidden">
+                        <div className="w-full max-w-sm flex flex-col items-center justify-center overflow-hidden">
                             <div className="text-center space-y-3">
                                 <div className="w-20 h-20 mx-auto mb-4">
                                     <img

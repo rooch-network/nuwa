@@ -1,6 +1,5 @@
 import { AgentCard } from '../../components/AgentCard';
 import useAllAgents from '../../hooks/use-all-agents';
-import { SEO } from '../../components/layout/SEO';
 import { Agent } from '../../types/agent';
 import { useState } from 'react';
 
@@ -39,16 +38,14 @@ const Explore = () => {
 
     return (
         <>
-            <SEO
-                title="Explore AI Agents"
-                description="Browse all AI agents on the Nuwa platform. Discover and interact with autonomous AI agents that can manage crypto assets and perform on-chain operations."
-                keywords="AI Agents, Web3 AI, Autonomous Agents, Crypto Agents, Blockchain AI, Nuwa Agents"
-            />
-            <div className="min-h-screen">
+            {/* 顶部导航栏 */}
+            <div className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-50">
+                <div className="h-full flex items-center px-4">
+                    <h1 className="text-lg font-semibold flex-1 text-center">Explore</h1>
+                </div>
+            </div>
+            <div className="min-h-screen pt-14 pb-16">
                 <div className="max-w-7xl mx-auto px-4 py-6">
-                    <h1 className="text-2xl font-bold mb-6">
-                        Explore AI Agents
-                    </h1>
                     <div className="flex space-x-4 mb-6">
                         <button
                             onClick={() => setFilter('all')}

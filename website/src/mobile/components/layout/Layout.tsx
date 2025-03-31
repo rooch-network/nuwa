@@ -8,7 +8,7 @@ const Layout = () => {
             <div className="flex-grow overflow-auto">
                 <Outlet />
             </div>
-            <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg pb-[env(safe-area-inset-bottom)]">
+            <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg pb-[env(safe-area-inset-bottom)] z-20">
                 <nav className="flex justify-around items-center h-14">
                     <button
                         onClick={() => navigate('/chat')}

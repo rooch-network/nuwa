@@ -9,6 +9,16 @@
   }
 }
 
+/* 隐藏滚动条 */
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -57,8 +67,6 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
-
-
 
 @media (prefers-color-scheme: light) {
   :root {
