@@ -14,22 +14,41 @@ export default defineConfig({
         short_name: 'Nuwa',
         description: 'Nuwa Mobile PWA Application',
         theme_color: '#ffffff',
+        start_url: '/',
+        display: 'standalone',
+        background_color: '#ffffff',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'nuwa-icon-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'nuwa-icon-512x512.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'nuwa-icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/api\./i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              }
+            }
           }
         ]
       }

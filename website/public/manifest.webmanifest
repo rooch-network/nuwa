@@ -1,0 +1,29 @@
+{
+    "name": "Nuwa Mobile",
+    "short_name": "Nuwa",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "lang": "en",
+    "scope": "/",
+    "description": "Nuwa Mobile PWA Application",
+    "theme_color": "#ffffff",
+    "icons": [
+        {
+            "src": "nuwa-icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "nuwa-icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "nuwa-icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
