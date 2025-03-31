@@ -319,55 +319,6 @@ def process_response_summary(response_vec: Dict[str, Any]) -> str:
         return f"Error processing response: {str(e)}"
     return "No response content"
 
-def extract_username_from_params(params: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
-    """Extract agent and user usernames from request parameters."""
-    agent_username = None
-    user_username = None
-    
-    try:
-        # Try to parse body if it exists
-        if 'body' in params:
-            body = params['body']
-            try:
-                # Try to parse as JSON
-                body_json = json.loads(body)
-                
-                # Check for agent username in different possible locations
-                if 'agent' in body_json:
-                    agent_username = body_json['agent'].get('username')
-                elif 'agent_username' in body_json:
-                    agent_username = body_json['agent_username']
-                
-                # Check for user username in different possible locations
-                if 'user' in body_json:
-                    user_username = body_json['user'].get('username')
-                elif 'user_username' in body_json:
-                    user_username = body_json['user_username']
-                elif 'username' in body_json:
-                    user_username = body_json['username']
-                
-            except json.JSONDecodeError:
-                # If not JSON, try to find usernames in the raw body
-                body_str = str(body).lower()
-                if 'agent' in body_str and 'username' in body_str:
-                    # Try to extract agent username using string manipulation
-                    agent_start = body_str.find('agent') + len('agent')
-                    agent_end = body_str.find('username', agent_start)
-                    if agent_end != -1:
-                        agent_username = body[agent_end:agent_end+50].split('"')[1]
-                
-                if 'user' in body_str and 'username' in body_str:
-                    # Try to extract user username using string manipulation
-                    user_start = body_str.find('user') + len('user')
-                    user_end = body_str.find('username', user_start)
-                    if user_end != -1:
-                        user_username = body[user_end:user_end+50].split('"')[1]
-    
-    except Exception as e:
-        print(f"Error extracting usernames: {e}")
-    
-    return agent_username, user_username
-
 def display_request_list(requests: List[Dict[str, Any]], show_details: bool = False) -> None:
     """Display a list of Oracle requests in a compact format."""
     print("\n===== Oracle Request List =====\n")
@@ -406,14 +357,6 @@ def display_request_list(requests: List[Dict[str, Any]], show_details: bool = Fa
             print("\n   Details:")
             if 'amount' in value:
                 print(f"   - Amount: {value['amount']} (Gas)")
-            
-            # Extract and display usernames
-            if params:
-                agent_username, user_username = extract_username_from_params(params)
-                if agent_username:
-                    print(f"   - Agent Username: {agent_username}")
-                if user_username:
-                    print(f"   - User Username: {user_username}")
             
             # Show full response if available
             if response_vec:
