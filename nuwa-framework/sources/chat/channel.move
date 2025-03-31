@@ -6,6 +6,7 @@ module nuwa_framework::channel {
     use moveos_std::object::{Self, Object, ObjectID};
     use moveos_std::timestamp;
     use moveos_std::signer;
+    use moveos_std::event;
     use nuwa_framework::message;
     use nuwa_framework::agent::{Self, Agent};
     use nuwa_framework::attachment::{Attachment};
@@ -83,6 +84,11 @@ module nuwa_framework::channel {
         join_policy: u8,
     }
 
+    struct NewChannelEvent has store, copy, drop {
+        channel_id: ObjectID,
+        channel_type: u8,
+    }
+
     /// Initialize a new AI home channel
     public(friend) fun create_ai_home_channel(
         agent: &mut Object<Agent>,
@@ -115,6 +121,11 @@ module nuwa_framework::channel {
         join_channel_internal(creator, &mut channel_obj, now);
         let channel_id = object::id(&channel_obj);
         object::to_shared(channel_obj);
+        let event = NewChannelEvent {
+            channel_id,
+            channel_type: CHANNEL_TYPE_AI_HOME,
+        };
+        event::emit(event);
         channel_id
     }
 
@@ -163,6 +174,11 @@ module nuwa_framework::channel {
         join_channel_internal(user_address, &mut channel_obj, now);
         join_channel_internal(agent_address, &mut channel_obj, now);
         object::to_shared(channel_obj);
+        let event = NewChannelEvent {
+            channel_id,
+            channel_type: CHANNEL_TYPE_TOPIC,
+        };
+        event::emit(event);
         channel_id
     }
 
