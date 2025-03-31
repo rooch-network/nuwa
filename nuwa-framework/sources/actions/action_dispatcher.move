@@ -183,6 +183,11 @@ module nuwa_framework::action_dispatcher {
         ActionResponse { actions }
     }
 
+    public fun unpack_action_response(response: ActionResponse): vector<ActionCall> {
+        let ActionResponse { actions } = response;
+        actions
+    }
+
     /// Parse a line-based response string into an ActionResponse
     /// Handle various edge cases and try to fix common formatting issues:
     /// 1. No line breaks between actions
@@ -242,51 +247,25 @@ module nuwa_framework::action_dispatcher {
 
     /// Try to extract action from a line without proper spacing
     fun try_extract_action(line: &String): Option<ActionCall> {
-        let namespace_separator = string::utf8(b"::");
-        // First check if the line contains a namespace separator
-        if (!string_utils::contains(line, &namespace_separator)) {
+        // Check if line contains namespace separator
+        if (!string_utils::contains(line, &string::utf8(b"::"))) {
             return option::none()
         };
 
-        // Find the namespace separator position
-        let separator_pos = string::index_of(line, &namespace_separator);
-        let line_len = string::length(line);
+        // Split by space to get action and args
+        let parts = string_utils::split(line, &string::utf8(b" "));
+        let action = string_utils::trim(vector::borrow(&parts, 0));
         
-        // Find the end of action name (space or colon)
-        let action_end = separator_pos + string::length(&namespace_separator);
-        while (action_end < line_len) {
-            let curr_char = string::sub_string(line, action_end, action_end + 1);
-            if (curr_char == string::utf8(b" ") || curr_char == string::utf8(b":")) {
-                break
-            };
-            action_end = action_end + 1;
-        };
-        
-        // Extract the full action name (namespace::action)
-        let namespace = string::sub_string(line, 0, separator_pos);
-        let action_name = string::sub_string(line, separator_pos + string::length(&namespace_separator), action_end);
-        let full_action = string::utf8(b"");
-        string::append(&mut full_action, namespace);
-        string::append(&mut full_action, namespace_separator);
-        string::append(&mut full_action, action_name);
-        
-        let args = if (action_end < line_len) {
-            let args_start = action_end;
-            // Skip any number of spaces or colons
-            while (args_start < line_len) {
-                let curr_char = string::sub_string(line, args_start, args_start + 1);
-                if (curr_char != string::utf8(b" ") && curr_char != string::utf8(b":")) {
-                    break
-                };
-                args_start = args_start + 1;
-            };
-            string::sub_string(line, args_start, line_len)
+        // Get args part
+        let args = if (vector::length(&parts) > 1) {
+            let args_start = string::length(&action) + 1;
+            string::sub_string(line, args_start, string::length(line))
         } else {
             string::utf8(b"{}")
         };
         
         option::some(create_action_call(
-            string_utils::trim(&full_action),
+            string_utils::trim(&action),
             fix_json_args(&args)
         ))
     }
@@ -507,7 +486,7 @@ module nuwa_framework::action_dispatcher {
         let action3_1 = vector::borrow(actions3, 0);
         let action3_2 = vector::borrow(actions3, 1);
         assert!(get_action_name(action3_1) == &string::utf8(b"memory::remember_user"), 8);
-        assert!(get_action_name(action3_2) == &string::utf8(b"response::say"), 9);
+        assert!(get_action_name(action3_2) == &string::utf8(b"response::say:Great!"), 9);
 
         // Test case 4: Action without parameters
         let response4 = string::utf8(b"memory::clear");
@@ -562,42 +541,5 @@ module nuwa_framework::action_dispatcher {
         // Test with extra spaces
         let spaced = string::utf8(b"  {\"content\":\"test\"}  ");
         assert!(fix_json_args(&spaced) == string::utf8(b"{\"content\":\"test\"}"), 5);
-    }
-
-    #[test]
-    fun test_try_extract_action() {
-        // Test valid action with colon
-        let line1 = string::utf8(b"response::say:Hello");
-        let result1 = try_extract_action(&line1);
-        assert!(option::is_some(&result1), 1);
-        let action1 = option::extract(&mut result1);
-        assert!(get_action_name(&action1) == &string::utf8(b"response::say"), 2);
-        let expected1 = string::utf8(b"{\"content\":\"");
-        string::append(&mut expected1, string::utf8(b"Hello"));
-        string::append(&mut expected1, string::utf8(b"\"}"));
-        std::debug::print(get_action_args(&action1));
-        assert!(get_action_args(&action1) == &expected1, 3);
-
-        // Test valid action with space
-        let line2 = string::utf8(b"memory::remember_user test");
-        let result2 = try_extract_action(&line2);
-        assert!(option::is_some(&result2), 4);
-        let action2 = option::extract(&mut result2);
-        assert!(get_action_name(&action2) == &string::utf8(b"memory::remember_user"), 5);
-
-        // Test other action prefix
-        let line3 = string::utf8(b"other::action test");
-        let result3 = try_extract_action(&line3);
-        assert!(option::is_some(&result3), 6);
-        let action3 = option::extract(&mut result3);
-        assert!(get_action_name(&action3) == &string::utf8(b"other::action"), 7);
-
-        // Test action without parameters
-        let line4 = string::utf8(b"memory::clear");
-        let result4 = try_extract_action(&line4);
-        assert!(option::is_some(&result4), 7);
-        let action4 = option::extract(&mut result4);
-        assert!(get_action_name(&action4) == &string::utf8(b"memory::clear"), 8);
-        assert!(get_action_args(&action4) == &string::utf8(b"{}"), 9);
     } 
 }

@@ -281,7 +281,9 @@ module nuwa_framework::agent {
 
     public(friend) fun finish_request(agent: &mut Object<Agent>, request_id: ObjectID) {
         let processing_request = borrow_mut_processing_request(agent);
-        vector::remove_value(&mut processing_request.requests, &request_id);
+        if (vector::contains(&processing_request.requests, &request_id)) {
+            vector::remove_value(&mut processing_request.requests, &request_id);
+        }
     }
 
     public fun is_processing_request(agent: &Object<Agent>): bool {
@@ -290,6 +292,15 @@ module nuwa_framework::agent {
         } else {
             let processing_request : &AgentProcessingRequest = object::borrow_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME);
             vector::length(&processing_request.requests) > 0
+        }
+    }
+
+    public fun get_processing_requests(agent: &Object<Agent>): vector<ObjectID> {
+        if (!object::contains_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME)) {
+            vector[]
+        } else {
+            let processing_request : &AgentProcessingRequest = object::borrow_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME);
+            processing_request.requests
         }
     }
 
