@@ -8,7 +8,6 @@ module nuwa_framework::memory_action {
     use moveos_std::result::{ok, err_str, Result};
 
     use nuwa_framework::agent::{Self, Agent};
-    use nuwa_framework::memory;
     use nuwa_framework::action::{Self, ActionGroup};
     use nuwa_framework::prompt_input::{Self, PromptInput};
     use nuwa_framework::memory_info;
@@ -236,7 +235,6 @@ module nuwa_framework::memory_action {
 
     /// Execute memory actions
     public(friend) fun execute_internal(agent: &mut Object<Agent>, prompt: &PromptInput, action_name: String, args_json: String) :Result<bool, String> {
-        let store = agent::borrow_mut_memory_store(agent);
         
         if (action_name == string::utf8(ACTION_NAME_NONE)) {
             ok(false)
@@ -247,7 +245,7 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for add action")
             };
             let args = option::destroy_some(args_opt);
-            memory::add_memory(store, args.addr, args.content);
+            agent::add_memory(agent, args.addr, args.content);
             ok(true)
         } else if (action_name == string::utf8(ACTION_NAME_UPDATE)) {
             let args_opt = json::from_json_option<UpdateMemoryArgs>(string::into_bytes(args_json));
@@ -255,7 +253,7 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for update action")
             };
             let args = option::destroy_some(args_opt);
-            memory::update_memory(store, args.addr, args.index, args.content);
+            agent::update_memory(agent, args.addr, args.index, args.content);
             ok(true)
         } else if (action_name == string::utf8(ACTION_NAME_REMOVE)) {
             let args_opt = json::from_json_option<RemoveMemoryArgs>(string::into_bytes(args_json));
@@ -263,7 +261,7 @@ module nuwa_framework::memory_action {
                 return err_str(b"Invalid arguments for remove action")
             };
             let args = option::destroy_some(args_opt);
-            memory::remove_memory(store, args.addr, args.index);
+            agent::remove_memory(agent, args.addr, args.index);
             ok(true)
         }else if (action_name == string::utf8(ACTION_NAME_COMPACT)) {
             let args_opt = json::from_json_option<CompactMemoryArgs>(string::into_bytes(args_json));
@@ -274,7 +272,7 @@ module nuwa_framework::memory_action {
             let memory_info = prompt_input::get_memory_info(prompt);
             if (memory_info::contains_memories(memory_info, &args.addr)){
                 let original_memories = *memory_info::get_memories(memory_info, &args.addr);
-                memory::compact_memory(store, args.addr, original_memories, args.content);
+                agent::compact_memory(agent, args.addr, original_memories, args.content);
                 ok(true)
             }else{
                 err_str(b"Invalid compact memory address arg")

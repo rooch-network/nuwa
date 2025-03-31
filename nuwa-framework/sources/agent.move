@@ -8,6 +8,7 @@ module nuwa_framework::agent {
     use moveos_std::timestamp;
     use moveos_std::decimal_value::{Self, DecimalValue};
     use moveos_std::string_utils;
+    use moveos_std::event;
 
     use rooch_framework::coin::{Self, Coin};
     use rooch_framework::account_coin_store;
@@ -72,6 +73,13 @@ module nuwa_framework::agent {
     /// The processing request of the agent
     struct AgentProcessingRequest has key, store {
         requests: vector<ObjectID>,
+    }
+
+    struct AgentCompactMemoryEvent has store, copy, drop {
+        agent_address: address,
+        memory_key: address,
+        original_memory: vector<memory::Memory>,
+        compact_memory: String,
     }
 
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
@@ -218,6 +226,36 @@ module nuwa_framework::agent {
         
         // Get all memories about this specific user
         memory::get_all_memories(memory_store, user_address)
+    }
+
+    public(friend) fun add_memory(agent: &mut Object<Agent>, addr: address, content: String) {
+        let store = borrow_mut_memory_store(agent);
+        memory::add_memory(store, addr, content);
+    }
+
+    public(friend) fun update_memory(agent: &mut Object<Agent>, addr: address, index: u64, content: String) {
+        let store = borrow_mut_memory_store(agent);
+        memory::update_memory(store, addr, index, content);
+    }
+
+    public(friend) fun remove_memory(agent: &mut Object<Agent>, addr: address, index: u64) {
+        let store = borrow_mut_memory_store(agent);
+        memory::remove_memory(store, addr, index);
+    }
+
+    public(friend) fun compact_memory(agent: &mut Object<Agent>, addr: address, original_memory: vector<memory::Memory>, compact_memory: String) {
+        let agent_address = get_agent_address(agent);
+        let store = borrow_mut_memory_store(agent);
+        memory::compact_memory(store, addr, original_memory, compact_memory);
+        let event = AgentCompactMemoryEvent {
+            agent_address,
+            memory_key: addr,
+            original_memory,
+            compact_memory,
+        };
+        let handle = event::custom_event_handle_id<address, AgentCompactMemoryEvent>(agent_address);
+        event::emit_with_handle(handle, event);
+
     }
 
     // ============== Internal functions ==============
