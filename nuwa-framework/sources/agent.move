@@ -75,6 +75,12 @@ module nuwa_framework::agent {
         requests: vector<ObjectID>,
     }
 
+    struct NewAgentEvent has store, copy, drop {
+        agent_address: address,
+        agent_id: ObjectID,
+        agent_cap_id: ObjectID,
+    }
+
     struct AgentCompactMemoryEvent has store, copy, drop {
         agent_address: address,
         memory_key: address,
@@ -131,8 +137,15 @@ module nuwa_framework::agent {
         let agent_obj = object::new_account_named_object(agent_address, agent);
         let agent_obj_id = object::id(&agent_obj);
         let agent_cap = agent_cap::new_agent_cap(agent_obj_id);
+        let agent_cap_id = object::id(&agent_cap);
         set_agent_cap_property(&mut agent_obj, &agent_cap);
         object::to_shared(agent_obj);
+        let event = NewAgentEvent {
+            agent_address,
+            agent_id: agent_obj_id,
+            agent_cap_id,
+        };
+        event::emit(event);
         agent_cap
     } 
 
