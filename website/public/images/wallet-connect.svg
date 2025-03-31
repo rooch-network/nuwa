@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 背景圆形 -->
+    <circle cx="40" cy="40" r="38" fill="#F3F4F6" stroke="#E5E7EB" stroke-width="2"/>
+    
+    <!-- 钱包图标 -->
+    <path d="M25 30H55C56.1046 30 57 30.8954 57 32V48C57 49.1046 56.1046 50 55 50H25C23.8954 50 23 49.1046 23 48V32C23 30.8954 23.8954 30 25 30Z" 
+          stroke="#6B7280" 
+          stroke-width="3" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+    
+    <!-- 钱包扣 -->
+    <path d="M25 35H55" 
+          stroke="#6B7280" 
+          stroke-width="3" 
+          stroke-linecap="round"/>
+    
+    <!-- 连接点 -->
+    <circle cx="40" cy="40" r="4" fill="#8B5CF6"/>
+    <circle cx="40" cy="40" r="8" stroke="#8B5CF6" stroke-width="2" stroke-dasharray="4 4"/>
+</svg> 

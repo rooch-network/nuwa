@@ -108,7 +108,7 @@ function App() {
       <ThemeProvider>
         <Router>
           <AppContent />
-          <Toaster position="bottom-right" />
+          <Toaster position="top-center" />
         </Router>
       </ThemeProvider>
     </HelmetProvider>
