@@ -125,6 +125,8 @@ class TaskHandler:
                 2. Key Points
                 3. Main Arguments
                 4. Important Details
+                5. AI Agent's related information
+                6. Give a score for the content quality in 1-100 scale
                 
                 Format the output in markdown.""",
             llm=ChatOpenAI(

@@ -5,6 +5,7 @@ module nuwa_framework::channel_entry {
     use moveos_std::type_info;
     use moveos_std::decimal_value;
     use rooch_framework::gas_coin::RGas;
+    use rooch_framework::coin::{Coin};
     use rooch_framework::account_coin_store;
     use nuwa_framework::channel::{Self, Channel};
     use nuwa_framework::agent;
@@ -14,6 +15,7 @@ module nuwa_framework::channel_entry {
     use nuwa_framework::message;
     use nuwa_framework::attachment;
 
+    friend nuwa_framework::task_entry;
 
     const ErrorInvalidCoinType: u64 = 1;
     const ErrorInvalidToAddress: u64 = 2;
@@ -27,7 +29,7 @@ module nuwa_framework::channel_entry {
         mentions: vector<address>,
         reply_to: u64
     ) {
-        let (_msg_id, index) = channel::send_message(caller, channel_obj, content, mentions, reply_to, vector::empty());
+        let (_msg_id, _index) = channel::send_message(caller, channel_obj, content, mentions, reply_to, vector::empty());
         let mentioned_ai_agents = vector::empty();
         vector::for_each(mentions, |addr| {
             if (agent::is_agent_account(addr) && !vector::contains(&mentioned_ai_agents, &addr)) {
@@ -37,7 +39,7 @@ module nuwa_framework::channel_entry {
         if (vector::length(&mentioned_ai_agents) > 0) {
             //we only call the first mentioned ai agent
             let agent_address = *vector::borrow(&mentioned_ai_agents, 0);
-            call_agent(caller, channel_obj, index, agent_address, 0);
+            call_agent_by_caller(caller, channel_obj, agent_address, 0);
         }
     }
 
@@ -68,9 +70,9 @@ module nuwa_framework::channel_entry {
             to,
             decimal_value::new(amount, coin_decimal)
         );
-        let (_msg_id, index) = channel::send_message(caller, channel_obj, content, mentions, reply_to, vector::singleton(coin_attachment));
+        let (_msg_id, _index) = channel::send_message(caller, channel_obj, content, mentions, reply_to, vector::singleton(coin_attachment));
         if (is_transfer_to_agent) {
-            call_agent(caller, channel_obj, index, to, amount); 
+            call_agent_by_caller(caller, channel_obj, to, amount); 
         }else{
             let mentioned_ai_agents = vector::empty();
             vector::for_each(mentions, |addr| {
@@ -81,15 +83,18 @@ module nuwa_framework::channel_entry {
             if (vector::length(&mentioned_ai_agents) > 0) {
                 //we only call the first mentioned ai agent
                 let agent_address = *vector::borrow(&mentioned_ai_agents, 0);
-                call_agent(caller, channel_obj, index, agent_address, 0);
+                call_agent_by_caller(caller, channel_obj, agent_address, 0);
             };
         };
     }
 
-    fun call_agent(caller: &signer, channel_obj: &mut Object<Channel>, _user_msg_index: u64, ai_addr: address, extra_fee: u256) {
+    fun call_agent_by_caller(caller: &signer, channel_obj: &mut Object<Channel>, ai_addr: address, extra_fee: u256) {
         let amount_fee = config::get_ai_agent_base_fee() + extra_fee;
         let fee = account_coin_store::withdraw<RGas>(caller, amount_fee);
+        call_agent_process_message(channel_obj, ai_addr, fee);
+    }
 
+    public(friend) fun call_agent_process_message(channel_obj: &mut Object<Channel>, ai_addr: address, fee: Coin<RGas>) {
         let message_limit: u64 = config::get_history_message_size() + 1;
         let message_ids = channel::get_last_messages(channel_obj, message_limit);
         let messages = message::get_messages_by_ids(&message_ids);
@@ -98,7 +103,6 @@ module nuwa_framework::channel_entry {
         let agent = agent::borrow_mut_agent_by_address(ai_addr);
         agent_runner::submit_input_internal(agent, message_input, fee);
     }
-
 
     public entry fun create_topic_channel(
         user_account: &signer,
