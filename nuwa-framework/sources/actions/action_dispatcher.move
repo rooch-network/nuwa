@@ -315,6 +315,7 @@ module nuwa_framework::action_dispatcher {
         nuwa_framework::genesis::init_for_test();
 
         let (agent, cap) = agent::create_default_test_agent();
+        let agent_address = agent::get_agent_address(agent);
         let test_addr = @0x42;
        
 
@@ -356,7 +357,7 @@ module nuwa_framework::action_dispatcher {
             0
         );
         let coin_input_info = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000000000000u256);
-        let agent_input = message_for_agent::new_agent_input(vector[message]);
+        let agent_input = message_for_agent::new_agent_input_with_agent_address(agent_address, vector[message]);
 
         let sender_profile = user_profile_for_agent::get_user_profile(test_addr);
         let agent_input_info = agent_input::into_agent_input_info(agent_input, sender_profile, coin_input_info);

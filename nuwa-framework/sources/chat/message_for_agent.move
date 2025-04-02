@@ -10,6 +10,7 @@ module nuwa_framework::message_for_agent {
     use nuwa_framework::task_spec;
     use nuwa_framework::attachment::{Attachment};
 
+    const ErrorDeprecatedFunction: u64 = 1;
 
     #[data_struct]
     struct MessageForAgent has copy, drop, store {
@@ -32,7 +33,11 @@ module nuwa_framework::message_for_agent {
         current: MessageForAgent,
     }
 
-    public fun new_agent_input(messages: vector<Message>) : AgentInput<MessageInput> {
+    public fun new_agent_input(_messages: vector<Message>) : AgentInput<MessageInput> {
+        abort ErrorDeprecatedFunction
+    } 
+
+    public fun new_agent_input_with_agent_address(agent_address: address, messages: vector<Message>) : AgentInput<MessageInput> {
         let channel_id = message::get_channel_id(vector::borrow(&messages,0));
         let messages_for_agent = vector::empty();
         vector::for_each(messages, |msg| {
@@ -48,7 +53,16 @@ module nuwa_framework::message_for_agent {
                 attachments: *message::get_attachments(&msg),
             });
         });
-        let current = vector::pop_back(&mut messages_for_agent);
+        let length = vector::length(&messages_for_agent);
+        let current_idx = length - 1;
+        while (current_idx >= 0) {
+            let current = vector::borrow(&messages_for_agent, current_idx);
+            if (current.sender != agent_address && current.message_type == message::type_normal()) {
+                break
+            };
+            current_idx = current_idx - 1;
+        };
+        let current = vector::remove(&mut messages_for_agent, current_idx);
         let description = string::utf8(b"Receive a message from a channel(");
         string::append(&mut description, object::to_string(&channel_id));
         string::append(&mut description, string::utf8(b")\n"));
@@ -65,7 +79,7 @@ module nuwa_framework::message_for_agent {
             app_task_specs
         )
     }
-    
+
     public fun decode_agent_input(input_data_json: String) : MessageInput {
         json::from_json<MessageInput>(string::into_bytes(input_data_json))
     }

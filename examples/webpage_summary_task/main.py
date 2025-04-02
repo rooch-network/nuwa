@@ -269,7 +269,7 @@ class TaskHandler:
             command = [
                 "rooch", "move", "run",
                 "--sender", self.default_account,
-                "--function", f"{self.config['package_id']}::task_entry::resolve_task",
+                "--function", f"{self.config['package_id']}::task_entry::resolve_task_and_call_agent",
                 "--args", f"object:{task_id}",
                 "--args", f"string:{result}",
                 "--json"

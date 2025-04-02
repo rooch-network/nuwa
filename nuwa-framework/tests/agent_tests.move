@@ -31,6 +31,7 @@ module nuwa_framework::agent_tests {
         );
 
         let agent_id = object::id(agent);
+        let agent_address = agent::get_agent_address(agent);
         //release the agent reference
         let _ = agent;
         agent::update_agent_temperature(&mut cap, 19);
@@ -58,7 +59,7 @@ module nuwa_framework::agent_tests {
         
         let coin_input = agent_input_info::new_coin_input_info_by_type<RGas>(1000000000u256);
 
-        let agent_input = message_for_agent::new_agent_input(vector[test_message]);
+        let agent_input = message_for_agent::new_agent_input_with_agent_address(agent_address, vector[test_message]);
         std::debug::print(&agent_input);
 
         let sender_profile = user_profile_for_agent::get_user_profile(test_user);

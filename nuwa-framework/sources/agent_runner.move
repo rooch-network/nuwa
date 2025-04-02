@@ -127,11 +127,14 @@ module nuwa_framework::agent_runner {
         let coin_symbol = coin::symbol_by_type<RGas>();
         let decimals = coin::decimals_by_type<RGas>();
         let amount = coin::value(&fee);
-        assert!(amount >= config::get_ai_agent_base_fee(), ErrorInsufficientBaseFee);
         let agent_addr = agent::get_agent_address(agent_obj);
         account_coin_store::deposit<RGas>(agent_addr, fee);
 
-        let amount_except_base_fee = amount - config::get_ai_agent_base_fee();
+        let amount_except_base_fee = if (amount > config::get_ai_agent_base_fee()) {
+            amount - config::get_ai_agent_base_fee()
+        } else {
+            0
+        };
 
         let coin_input_info = agent_input_info::new_coin_input_info(
             coin_symbol,
