@@ -8,6 +8,7 @@ module nuwa_framework::agent {
     use moveos_std::timestamp;
     use moveos_std::decimal_value::{Self, DecimalValue};
     use moveos_std::string_utils;
+    use moveos_std::event;
 
     use rooch_framework::coin::{Self, Coin};
     use rooch_framework::account_coin_store;
@@ -74,6 +75,30 @@ module nuwa_framework::agent {
         requests: vector<ObjectID>,
     }
 
+    struct NewAgentEvent has store, copy, drop {
+        agent_address: address,
+        agent_id: ObjectID,
+        agent_cap_id: ObjectID,
+    }
+
+    struct AgentCompactMemoryEvent has store, copy, drop {
+        agent_address: address,
+        memory_key: address,
+        original_memory: vector<memory::Memory>,
+        compact_memory: String,
+    }
+
+    struct AgentInstructionUpdateEvent has store, copy, drop {
+        agent_address: address,
+        old_instructions: String,
+        new_instructions: String,
+    }
+
+    struct AgentCapDestroyEvent has store, copy, drop {
+        agent_address: address,
+        agent_cap_id: ObjectID,
+    }
+
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
 
     public fun create_agent_with_initial_fee(name: String, username: String, avatar: String, description: String, instructions: String, initial_fee: Coin<RGas>) : Object<AgentCap> {
@@ -112,8 +137,15 @@ module nuwa_framework::agent {
         let agent_obj = object::new_account_named_object(agent_address, agent);
         let agent_obj_id = object::id(&agent_obj);
         let agent_cap = agent_cap::new_agent_cap(agent_obj_id);
+        let agent_cap_id = object::id(&agent_cap);
         set_agent_cap_property(&mut agent_obj, &agent_cap);
         object::to_shared(agent_obj);
+        let event = NewAgentEvent {
+            agent_address,
+            agent_id: agent_obj_id,
+            agent_cap_id,
+        };
+        event::emit(event);
         agent_cap
     } 
 
@@ -188,10 +220,17 @@ module nuwa_framework::agent {
     }
 
     public entry fun destroy_agent_cap(agent_obj: &mut Object<Agent>, cap: Object<AgentCap>) {
+        let agent_cap_id = object::id(&cap);
+        let agent_address = get_agent_address(agent_obj);
         let agent_obj_id = agent_cap::get_agent_obj_id(&cap);
         assert!(object::id(agent_obj) == agent_obj_id, ErrorInvalidAgentCap);
         agent_cap::destroy_agent_cap(cap);
         remove_agent_cap_property(agent_obj);
+        let event = AgentCapDestroyEvent {
+            agent_address,
+            agent_cap_id,
+        };
+        event::emit(event);
     }
 
     public fun is_agent_account(addr: address): bool {
@@ -218,6 +257,36 @@ module nuwa_framework::agent {
         
         // Get all memories about this specific user
         memory::get_all_memories(memory_store, user_address)
+    }
+
+    public(friend) fun add_memory(agent: &mut Object<Agent>, addr: address, content: String) {
+        let store = borrow_mut_memory_store(agent);
+        memory::add_memory(store, addr, content);
+    }
+
+    public(friend) fun update_memory(agent: &mut Object<Agent>, addr: address, index: u64, content: String) {
+        let store = borrow_mut_memory_store(agent);
+        memory::update_memory(store, addr, index, content);
+    }
+
+    public(friend) fun remove_memory(agent: &mut Object<Agent>, addr: address, index: u64) {
+        let store = borrow_mut_memory_store(agent);
+        memory::remove_memory(store, addr, index);
+    }
+
+    public(friend) fun compact_memory(agent: &mut Object<Agent>, addr: address, original_memory: vector<memory::Memory>, compact_memory: String) {
+        let agent_address = get_agent_address(agent);
+        let store = borrow_mut_memory_store(agent);
+        memory::compact_memory(store, addr, original_memory, compact_memory);
+        let event = AgentCompactMemoryEvent {
+            agent_address,
+            memory_key: addr,
+            original_memory,
+            compact_memory,
+        };
+        let handle = event::custom_event_handle_id<address, AgentCompactMemoryEvent>(agent_address);
+        event::emit_with_handle(handle, event);
+
     }
 
     // ============== Internal functions ==============
@@ -380,7 +449,14 @@ module nuwa_framework::agent {
         let agent_obj_id = agent_cap::get_agent_obj_id(cap);
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
+        let old_instructions = agent.instructions;
         agent.instructions = new_instructions;
+        let event = AgentInstructionUpdateEvent {
+            agent_address: agent.agent_address,
+            old_instructions,
+            new_instructions,
+        };
+        event::emit(event);
     }
 
     /// Update agent's temperature
