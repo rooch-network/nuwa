@@ -2,7 +2,7 @@ export const FEATURED_AGENTS = [
     'nevertransfer',
     'trustedpay',
     'govmind',
-    'summurai',
+    'dobby',
 ] as const;
 
 export const TRENDING_AGENTS = [
