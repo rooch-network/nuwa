@@ -17,6 +17,7 @@ import { RiskWarningModal } from './components/RiskWarningModal'
 import { useConnectionStatus } from '@roochnetwork/rooch-sdk-kit'
 import { LoadingScreen } from './components/layout/LoadingScreen'
 import { NotFound } from './pages/NotFound'
+import { AgentDebugger } from './pages/AgentDebugger'
 
 // preload AgentChat component
 const AgentChat = lazy(() => import('./pages/AgentChat').then(module => {
@@ -82,6 +83,7 @@ function AppContent() {
               <Route path="/docs/:docId" element={<DocPage />} />
               <Route path="/getrgas" element={<GetRGAS />} />
               <Route path="/getrgas-testnet" element={<GetRGASTestnet />} />
+              <Route path="/agent/:identifier/debug" element={<AgentDebugger />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

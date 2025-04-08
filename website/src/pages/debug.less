@@ -1,0 +1,66 @@
+@import '~antd/es/style/themes/default.less';
+
+.debuggerContainer {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .mainCard {
+    background: @component-background;
+    border-radius: @border-radius-base;
+  }
+
+  .section {
+    margin-bottom: 24px;
+
+    :global {
+      .ant-card-head {
+        padding: 0 12px;
+      }
+      .ant-card-body {
+        padding: 12px;
+      }
+    }
+  }
+
+  .actionButtons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .responseSection {
+    .rawResponse {
+      margin-bottom: 24px;
+
+      h4 {
+        margin-bottom: 12px;
+        color: @heading-color;
+      }
+    }
+
+    .parsedActions {
+      h4 {
+        margin-bottom: 12px;
+        color: @heading-color;
+      }
+
+      .actionCard {
+        margin-bottom: 12px;
+
+        h4 {
+          margin-bottom: 8px;
+          color: @primary-color;
+        }
+
+        pre {
+          margin: 0;
+          padding: 8px;
+          background: @background-color-light;
+          border-radius: @border-radius-base;
+          overflow-x: auto;
+        }
+      }
+    }
+  }
+}

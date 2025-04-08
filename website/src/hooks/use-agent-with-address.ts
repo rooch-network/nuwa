@@ -44,7 +44,8 @@ export default function useAgentWithAddress(address?: string) {
             username: extractValue(agentInfoValue.username),
             description: extractValue(agentInfoValue.description),
             address: extractValue(agentInfoValue.agent_address),
-
+            instructions: extractValue(agentInfoValue.instructions),
+            temperature: extractValue(agentInfoValue.temperature),
           };
 
           return agentData;
