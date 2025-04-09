@@ -15,6 +15,11 @@ interface InputEvent extends React.ChangeEvent<HTMLInputElement | HTMLTextAreaEl
   target: HTMLInputElement | HTMLTextAreaElement;
 }
 
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export function AgentDebugger() {
   const { identifier } = useParams<{ identifier: string }>();
   const navigate = useNavigate();
@@ -24,10 +29,9 @@ export function AgentDebugger() {
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
   const [agentPrompt, setAgentPrompt] = useState('');
-  const [debugMessage, setDebugMessage] = useState('');
   const [renderedPrompt, setRenderedPrompt] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
-  const [activeTab, setActiveTab] = useState<'prompt' | 'response'>('prompt');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [userInput, setUserInput] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Check if the identifier is a valid address
@@ -61,8 +65,8 @@ export function AgentDebugger() {
       setLoading(true);
       setError(null);
       const response = await client.executeViewFunction({
-        target: "agent_framework::prompt_renderer::render_debug_prompt",
-        args: [Args.string(agentPrompt), Args.string(debugMessage)],
+        target: `${packageId}::agent_debugger::make_debug_ai_request`,
+        args: [Args.objectId(agent?.id), Args.string(agentPrompt)],
       });
       setRenderedPrompt(response.return_values?.[0]?.decoded_value as string);
     } catch (error) {
@@ -73,10 +77,14 @@ export function AgentDebugger() {
     }
   };
 
-  // Call OpenAI API directly
+  // Call OpenAI API
   const handleTestWithOpenAI = async () => {
     if (!apiKey) {
       setError('Please enter OpenAI API Key');
+      return;
+    }
+
+    if (!userInput.trim()) {
       return;
     }
 
@@ -84,6 +92,11 @@ export function AgentDebugger() {
       setLoading(true);
       setError(null);
       
+      // Add user message to chat
+      const userMessage = { role: 'user' as const, content: userInput };
+      setMessages(prev => [...prev, userMessage]);
+      setUserInput(''); // Clear input after sending
+
       // Call OpenAI API directly
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -93,7 +106,11 @@ export function AgentDebugger() {
         },
         body: JSON.stringify({
           model: "gpt-4",
-          messages: [{ role: "user", content: renderedPrompt }],
+          messages: [
+            { role: 'system', content: renderedPrompt }, // Use rendered prompt as system message
+            ...messages,
+            userMessage
+          ],
           temperature: 0.7
         })
       });
@@ -103,7 +120,8 @@ export function AgentDebugger() {
       }
 
       const data = await response.json();
-      setAiResponse(data.choices[0].message.content);
+      const assistantMessage = { role: 'assistant' as const, content: data.choices[0].message.content };
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       setError('Failed to call OpenAI API');
       console.error(error);
@@ -144,164 +162,176 @@ export function AgentDebugger() {
   }
 
   return (
-    <>
-      <SEO
-        title={`Debug ${agent.name}'s Prompt`}
-        description={`Debug and test prompts for ${agent.name} on Nuwa platform`}
-        keywords="AI Agent, Debug Prompt, Test Prompt, Nuwa Agent"
-      />
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          {/* Back Button */}
-          <button
-            onClick={() => navigate(-1)}
-            className="mb-6 flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            <ArrowLeftIcon className="w-5 h-5 mr-2" />
-            <span>Back</span>
-          </button>
-
-          <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
-            Debug {agent.name}'s Prompt
-          </h1>
-
-          {error && (
-            <div className="mb-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 rounded-lg">
-              {error}
+    <> 
+      <div className="h-screen flex flex-col">
+        {/* Header */}
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+          <div className="max-w-[1800px] mx-auto flex items-center justify-between">
+            <div className="flex items-center">
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              >
+                <ArrowLeftIcon className="w-5 h-5 mr-2" />
+                <span>Back</span>
+              </button>
+              <h1 className="ml-6 text-xl font-bold text-gray-900 dark:text-white">
+                Debug {agent.name}'s Prompt
+              </h1>
             </div>
-          )}
-
-          {/* API Key Input */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              OpenAI API Key
-            </label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => {
-                setApiKey(e.target.value);
-                localStorage.setItem('openai_api_key', e.target.value);
-              }}
-              placeholder="Enter your OpenAI API Key"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            />
           </div>
+        </div>
 
-          {/* Prompt Editor */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Agent Prompt
-            </label>
-            <textarea
-              value={agentPrompt}
-              onChange={(e) => setAgentPrompt(e.target.value)}
-              className="block w-full text-gray-600 dark:text-gray-300 bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg p-4 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none font-mono text-sm leading-relaxed"
-              placeholder="Input the prompt of the AI role..."
-              rows={12}
-            />
-          </div>
+        {/* Main Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Panel - Prompt Editor */}
+          <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-gray-700">
+            <div className="flex-1 p-6 overflow-y-auto">
+              {error && (
+                <div className="mb-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 rounded-lg">
+                  {error}
+                </div>
+              )}
 
-          {/* Debug Message */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Debug Message
-            </label>
-            <textarea
-              rows={4}
-              value={debugMessage}
-              onChange={(e) => setDebugMessage(e.target.value)}
-              placeholder="Enter debug message"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-4 mb-6">
-            <button
-              onClick={handleRenderPrompt}
-              disabled={loading}
-              className={`px-4 py-2 rounded-md text-white ${
-                loading
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-500 hover:bg-blue-600'
-              }`}
-            >
-              {loading ? 'Loading...' : 'Render Prompt'}
-            </button>
-            <button
-              onClick={handleTestWithOpenAI}
-              disabled={!renderedPrompt || !apiKey || loading}
-              className={`px-4 py-2 rounded-md text-white ${
-                !renderedPrompt || !apiKey || loading
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-green-500 hover:bg-green-600'
-              }`}
-            >
-              {loading ? 'Loading...' : 'Test with OpenAI'}
-            </button>
-          </div>
-
-          {/* Results Display */}
-          <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
-            <div className="flex border-b border-gray-300 dark:border-gray-600">
-              <button
-                onClick={() => setActiveTab('prompt')}
-                className={`flex-1 px-4 py-2 text-center ${
-                  activeTab === 'prompt'
-                    ? 'bg-gray-100 dark:bg-gray-700 font-medium'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                Rendered Prompt
-              </button>
-              <button
-                onClick={() => setActiveTab('response')}
-                className={`flex-1 px-4 py-2 text-center ${
-                  activeTab === 'response'
-                    ? 'bg-gray-100 dark:bg-gray-700 font-medium'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                AI Response
-              </button>
+            <div className="flex items-center">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  localStorage.setItem('openai_api_key', e.target.value);
+                }}
+                placeholder="Enter your OpenAI API Key"
+                className="w-80 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white mr-4"
+              />
             </div>
 
-            <div className="p-4">
-              {activeTab === 'prompt' ? (
+              {/* Prompt Editor */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Agent Prompt
+                </label>
+                <textarea
+                  value={agentPrompt}
+                  onChange={(e) => setAgentPrompt(e.target.value)}
+                  className="block w-full text-gray-600 dark:text-gray-300 bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg p-4 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none font-mono text-sm leading-relaxed"
+                  placeholder="Enter the AI role prompt..."
+                  rows={12}
+                />
+              </div>
+
+              {/* Rendered Prompt */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Rendered Prompt
+                </label>
                 <pre className="whitespace-pre-wrap text-gray-600 dark:text-gray-300 font-mono text-sm leading-relaxed bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
                   {renderedPrompt}
                 </pre>
-              ) : (
-                <div>
-                  <div className="mb-6">
-                    <h4 className="text-lg font-medium mb-2">Raw Response:</h4>
-                    <pre className="whitespace-pre-wrap text-gray-600 dark:text-gray-300 font-mono text-sm leading-relaxed bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-                      {aiResponse}
-                    </pre>
-                  </div>
-                  {aiResponse && (
-                    <div>
-                      <h4 className="text-lg font-medium mb-2">Parsed Actions:</h4>
-                      <div className="space-y-4">
-                        {parseActions(aiResponse).map((action, index) => (
-                          <div
-                            key={index}
-                            className="border border-gray-300 dark:border-gray-600 rounded-md p-4"
-                          >
-                            <h4 className="text-blue-500 dark:text-blue-400 font-medium mb-2">
-                              {action.name}
-                            </h4>
-                            <pre className="bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto">
-                              {JSON.stringify(action.params, null, 2)}
-                            </pre>
-                          </div>
-                        ))}
-                      </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex gap-4">
+                <button
+                  onClick={handleRenderPrompt}
+                  disabled={loading}
+                  className={`flex-1 px-4 py-2 rounded-md text-white ${
+                    loading
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-500 hover:bg-blue-600'
+                  }`}
+                >
+                  {loading ? 'Loading...' : 'Render Prompt'}
+                </button>
+                <button
+                  onClick={handleTestWithOpenAI}
+                  disabled={!renderedPrompt || !apiKey || loading}
+                  className={`flex-1 px-4 py-2 rounded-md text-white ${
+                    !renderedPrompt || !apiKey || loading
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-green-500 hover:bg-green-600'
+                  }`}
+                >
+                  {loading ? 'Loading...' : 'Test with OpenAI'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel - Chat */}
+          <div className="w-1/2 flex flex-col">
+            {/* Chat Messages */}
+            <div className="flex-1 p-6 overflow-y-auto">
+              <div className="space-y-6">
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${
+                      message.role === 'assistant' ? 'justify-start' : 'justify-end'
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg p-4 ${
+                        message.role === 'assistant'
+                          ? 'bg-gray-100 dark:bg-gray-700'
+                          : 'bg-blue-500 text-white'
+                      }`}
+                    >
+                      <pre className="whitespace-pre-wrap font-mono text-sm">
+                        {message.content}
+                      </pre>
+                      {message.role === 'assistant' && (
+                        <div className="mt-4 space-y-4">
+                          {parseActions(message.content).map((action, actionIndex) => (
+                            <div
+                              key={actionIndex}
+                              className="border border-gray-300 dark:border-gray-600 rounded-md p-4 bg-white dark:bg-gray-800"
+                            >
+                              <h4 className="text-blue-500 dark:text-blue-400 font-medium mb-2">
+                                {action.name}
+                              </h4>
+                              <pre className="bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto text-xs">
+                                {JSON.stringify(action.params, null, 2)}
+                              </pre>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Chat Input */}
+            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex gap-4">
+                <textarea
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleTestWithOpenAI();
+                    }
+                  }}
+                  placeholder="Enter message..."
+                  className="flex-1 min-h-[80px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white resize-none"
+                />
+                <button
+                  onClick={handleTestWithOpenAI}
+                  disabled={!userInput.trim() || !apiKey || loading}
+                  className={`px-6 self-end h-10 rounded-md text-white ${
+                    !userInput.trim() || !apiKey || loading
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-500 hover:bg-blue-600'
+                  }`}
+                >
+                  {loading ? 'Sending...' : 'Send'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
