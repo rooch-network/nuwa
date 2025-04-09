@@ -74,6 +74,11 @@ export function AgentDebugger() {
       return;
     }
 
+    if (messages.length === 0) {
+      setError('Please add at least one message');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -98,16 +103,24 @@ export function AgentDebugger() {
         target: `${packageId}::agent_debugger::make_debug_ai_request`,
         args: [Args.objectId(agent?.id || ''), Args.string(JSON.stringify(debugInput))],
       });
+      console.log(response);
 
-      const renderedPromptJson = response.return_values?.[0]?.decoded_value as string;
+      if (!response.return_values?.[0]?.decoded_value) {
+        throw new Error('Failed to get response from contract: ' + JSON.stringify(response));
+      }
+
+      const renderedPromptJson = response.return_values[0].decoded_value as string;
       const chatRequest = JSON.parse(renderedPromptJson);
       
       // Extract the system prompt from the chat request
       const systemMessage = (chatRequest.messages as ChatMessage[]).find(msg => msg.role === 'system');
-      setRenderedPrompt(systemMessage?.content || '');
+      if (!systemMessage?.content) {
+        throw new Error('Invalid response format: missing system message');
+      }
+      setRenderedPrompt(systemMessage.content);
     } catch (error) {
-      setError('Failed to render prompt');
-      console.error(error);
+      console.error('Render prompt error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to render prompt');
     } finally {
       setLoading(false);
     }
@@ -231,7 +244,7 @@ export function AgentDebugger() {
 
               <div className="flex items-center space-x-4 mb-4">
                 <input
-                  type="password"
+                  type="text"
                   value={apiKey}
                   onChange={(e) => {
                     setApiKey(e.target.value);
@@ -296,9 +309,9 @@ export function AgentDebugger() {
               <div className="flex gap-4">
                 <button
                   onClick={handleRenderPrompt}
-                  disabled={loading}
+                  disabled={loading || messages.length === 0}
                   className={`flex-1 px-4 py-2 rounded-md text-white ${
-                    loading
+                    loading || messages.length === 0
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-blue-500 hover:bg-blue-600'
                   }`}
