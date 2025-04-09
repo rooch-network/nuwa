@@ -43,12 +43,12 @@ function AgentDebuggerContent() {
     prompt?: string;
   }>({});
 
-  // Update prompt when agent is loaded
+  // Initialize prompt when agent is loaded
   useEffect(() => {
-    if (agent?.instructions) {
+    if (agent?.instructions && !agentPrompt) {
       setAgentPrompt(agent.instructions);
     }
-  }, [agent]);
+  }, [agent, agentPrompt]);
 
   // Parse Actions from AI response
   const parseActions = (response: string): Array<{name: string; params: any}> => {
@@ -159,8 +159,8 @@ function AgentDebuggerContent() {
       return;
     }
 
-    if (!agent) {
-      setError('Agent not found');
+    if (!agent?.address) {
+      setError('Agent address not found');
       return;
     }
 
