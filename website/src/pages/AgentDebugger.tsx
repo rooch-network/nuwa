@@ -43,12 +43,12 @@ function AgentDebuggerContent() {
     prompt?: string;
   }>({});
 
-  // Initialize prompt when agent is loaded
+  // Initialize prompt only once when agent is loaded
   useEffect(() => {
-    if (agent?.instructions && !agentPrompt) {
+    if (agent?.instructions && agentPrompt === '') {
       setAgentPrompt(agent.instructions);
     }
-  }, [agent, agentPrompt]);
+  }, [agent]); // Remove agentPrompt from dependencies
 
   // Parse Actions from AI response
   const parseActions = (response: string): Array<{name: string; params: any}> => {
