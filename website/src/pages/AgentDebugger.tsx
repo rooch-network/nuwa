@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
-import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
-import { RoochAddress, Serializer, Args } from "@roochnetwork/rooch-sdk";
+import { useRoochClient, useCurrentAddress } from "@roochnetwork/rooch-sdk-kit";
+import { RoochClient, RoochAddress, Serializer, Args } from "@roochnetwork/rooch-sdk";
 import { useNetworkVariable } from "../hooks/use-networks";
 import useAgent from "../hooks/use-agent";
 import { SEO } from "../components/layout/SEO";
@@ -20,10 +20,16 @@ interface Message {
   content: string;
 }
 
+interface ChatMessage {
+  role: string;
+  content: string;
+}
+
 export function AgentDebugger() {
   const { identifier } = useParams<{ identifier: string }>();
   const navigate = useNavigate();
   const client = useRoochClient();
+  const currentAddress = useCurrentAddress();
   const packageId = useNetworkVariable("packageId");
 
   const [loading, setLoading] = useState(false);
@@ -33,6 +39,8 @@ export function AgentDebugger() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [temperature, setTemperature] = useState<number>(0.7);
+  const [mockRgasAmount, setMockRgasAmount] = useState<string>("1000000");
 
   // Check if the identifier is a valid address
   const isAddress = (() => {
@@ -61,14 +69,42 @@ export function AgentDebugger() {
 
   // Render Prompt
   const handleRenderPrompt = async () => {
+    if (!currentAddress) {
+      setError('Please connect your wallet');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+
+      // Get current account address in bech32 format
+      const userAddress = currentAddress.genRoochAddress().toBech32Address();
+
+      // Assemble DebugInput
+      const debugInput = {
+        messages: messages.map((msg, index) => ({
+          index: index,
+          sender: userAddress,
+          content: msg.content,
+          timestamp: Date.now(),
+          attachments: [],
+        })),
+        temperature: temperature,
+        mock_rgas_amount: mockRgasAmount,
+      };
+
       const response = await client.executeViewFunction({
         target: `${packageId}::agent_debugger::make_debug_ai_request`,
-        args: [Args.objectId(agent?.id), Args.string(agentPrompt)],
+        args: [Args.objectId(agent?.id || ''), Args.string(JSON.stringify(debugInput))],
       });
-      setRenderedPrompt(response.return_values?.[0]?.decoded_value as string);
+
+      const renderedPromptJson = response.return_values?.[0]?.decoded_value as string;
+      const chatRequest = JSON.parse(renderedPromptJson);
+      
+      // Extract the system prompt from the chat request
+      const systemMessage = (chatRequest.messages as ChatMessage[]).find(msg => msg.role === 'system');
+      setRenderedPrompt(systemMessage?.content || '');
     } catch (error) {
       setError('Failed to render prompt');
       console.error(error);
@@ -193,18 +229,42 @@ export function AgentDebugger() {
                 </div>
               )}
 
-            <div className="flex items-center">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  localStorage.setItem('openai_api_key', e.target.value);
-                }}
-                placeholder="Enter your OpenAI API Key"
-                className="w-80 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white mr-4"
-              />
-            </div>
+              <div className="flex items-center space-x-4 mb-4">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => {
+                    setApiKey(e.target.value);
+                    localStorage.setItem('openai_api_key', e.target.value);
+                  }}
+                  placeholder="Enter your OpenAI API Key"
+                  className="w-80 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm text-gray-600 dark:text-gray-300">Temperature:</label>
+                  <input
+                    type="number"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm text-gray-600 dark:text-gray-300">Mock RGas:</label>
+                  <input
+                    type="text"
+                    value={mockRgasAmount}
+                    onChange={(e) => setMockRgasAmount(e.target.value)}
+                    placeholder="Mock RGas amount"
+                    className="w-32 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              </div>
 
               {/* Prompt Editor */}
               <div className="mb-6">
