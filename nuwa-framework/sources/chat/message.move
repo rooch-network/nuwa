@@ -6,6 +6,7 @@ module nuwa_framework::message {
     use nuwa_framework::attachment::{Attachment};
 
     friend nuwa_framework::channel;
+    friend nuwa_framework::agent_debugger;
 
     /// Message types
     const MESSAGE_TYPE_NORMAL: u8 = 0;
@@ -71,7 +72,7 @@ module nuwa_framework::message {
         msg_id
     }
 
-    fun new_message(
+    public(friend) fun new_message(
         index: u64, 
         channel_id: ObjectID,  // Added channel_id parameter
         sender: address, 
