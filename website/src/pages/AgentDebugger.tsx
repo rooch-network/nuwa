@@ -35,7 +35,7 @@ export function AgentDebugger() {
   const [userInput, setUserInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [temperature, setTemperature] = useState<number>(0.7);
-  const [mockRgasAmount, setMockRgasAmount] = useState<string>("1000000");
+  const [mockRgasAmount, setMockRgasAmount] = useState<string>("10"); // Default to 10 RGAS
 
   // Check if the identifier is a valid address
   const isAddress = (() => {
@@ -88,6 +88,31 @@ export function AgentDebugger() {
   const extractResponseContent = (actions: Array<{name: string; params: any}>): string => {
     const sayAction = actions.find(action => action.name === 'response::say');
     return sayAction?.params?.content || '';
+  };
+
+  // Convert RGAS float value to raw value (8 decimal places)
+  const convertRgasToRaw = (amount: string): string => {
+    try {
+      // Parse the float value
+      const floatValue = parseFloat(amount);
+      if (isNaN(floatValue)) {
+        throw new Error('Invalid number');
+      }
+      // Convert to raw value (multiply by 10^8)
+      const rawValue = Math.floor(floatValue * 100000000).toString();
+      return rawValue;
+    } catch (e) {
+      return "0";
+    }
+  };
+
+  // Handle RGAS input change with validation
+  const handleRgasInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow empty string, numbers, and one decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setMockRgasAmount(value);
+    }
   };
 
   // Call OpenAI API
@@ -168,7 +193,7 @@ export function AgentDebugger() {
           attachments: [],
         })),
         temperature: temperature,
-        mock_rgas_amount: mockRgasAmount,
+        mock_rgas_amount: convertRgasToRaw(mockRgasAmount),
       };
 
       // Call contract to get chat request
@@ -273,10 +298,11 @@ export function AgentDebugger() {
                   <input
                     type="text"
                     value={mockRgasAmount}
-                    onChange={(e) => setMockRgasAmount(e.target.value)}
-                    placeholder="Mock RGas amount"
+                    onChange={handleRgasInputChange}
+                    placeholder="RGAS amount"
                     className="w-32 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
+                  <span className="text-sm text-gray-500 dark:text-gray-400">RGAS</span>
                 </div>
               </div>
 
