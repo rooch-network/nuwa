@@ -28,6 +28,7 @@ module nuwa_framework::agent_runner {
     use nuwa_framework::memory;
     use nuwa_framework::memory_info;
     use nuwa_framework::user_profile_for_agent;
+    use nuwa_framework::agent_info::{AgentInfo};
 
     friend nuwa_framework::channel_entry;
     friend nuwa_framework::ai_callback;
@@ -39,9 +40,17 @@ module nuwa_framework::agent_runner {
         agent: &Object<Agent>,
         agent_input_info: AgentInputInfo,
     ): PromptInput {
+        let agent_info = agent::get_agent_info(agent);
+        generate_system_prompt_with_agent_info(agent, agent_info, agent_input_info)
+    }
+
+    public fun generate_system_prompt_with_agent_info(
+        agent: &Object<Agent>,
+        agent_info: AgentInfo,
+        agent_input_info: AgentInputInfo,
+    ): PromptInput {
         let states = state_providers::get_agent_state(agent);
         let available_actions = get_available_actions();
-        let agent_info = agent::get_agent_info(agent);
         
         let memory_store = agent::borrow_memory_store(agent);
         let agent_addr = agent::get_agent_address(agent);

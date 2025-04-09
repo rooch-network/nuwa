@@ -35,7 +35,8 @@ module nuwa_framework::agent_debugger_tests {
         let messages = vector::singleton(debug_msg);
         let temperature = decimal_value::new(7, 1); // 0.7
         let mock_rgas_amount = 1000000000u256;
-        let debug_input = agent_debugger::new_debug_input(
+        let debug_input = agent_debugger::new_debug_input_v2(
+            string::utf8(b"Test instructions"),
             messages,
             temperature,
             mock_rgas_amount

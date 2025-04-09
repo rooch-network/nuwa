@@ -86,6 +86,10 @@ module nuwa_framework::agent_info {
         agent_info.temperature
     }
 
+    public fun set_instructions(agent_info: &mut AgentInfo, instructions: String) {
+        agent_info.instructions = instructions;
+    }
+
     /// The PromptAgentInfo struct is used to display agent information in a prompt
     struct PromptAgentInfo has copy, drop, store {
         name: String,            

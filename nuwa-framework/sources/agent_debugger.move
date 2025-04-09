@@ -16,8 +16,10 @@ module nuwa_framework::agent_debugger {
     use nuwa_framework::user_profile_for_agent;
     use nuwa_framework::ai_request;
     use nuwa_framework::prompt_input;
+    use nuwa_framework::agent_info;
 
     const ErrorEmptyMessage: u64 = 1;
+    const ErrorDeprecatedFunction: u64 = 2;
 
     #[data_struct]
     struct DebugMessage has copy, drop, store {
@@ -35,14 +37,26 @@ module nuwa_framework::agent_debugger {
         mock_rgas_amount: u256,
     }
 
-    public fun new_debug_input(messages: vector<DebugMessage>, temperature: DecimalValue, mock_rgas_amount: u256): DebugInput {
-        DebugInput {
+    #[data_struct]
+    struct DebugInputV2 has copy, drop, store {
+        instructions: String,
+        messages: vector<DebugMessage>,
+        temperature: DecimalValue,
+        mock_rgas_amount: u256,
+    }
+
+    public fun new_debug_input(_messages: vector<DebugMessage>, _temperature: DecimalValue, _mock_rgas_amount: u256): DebugInput {
+        abort ErrorDeprecatedFunction
+    }
+
+    public fun new_debug_input_v2(instructions: String, messages: vector<DebugMessage>, temperature: DecimalValue, mock_rgas_amount: u256): DebugInputV2 {
+        DebugInputV2 {
+            instructions,
             messages,
             temperature,
             mock_rgas_amount,
         }
     }
-
     public fun new_debug_message(index: u64, sender: address, content: String, timestamp: u64, attachments: vector<Attachment>): DebugMessage {
         DebugMessage {
             index,
@@ -54,7 +68,7 @@ module nuwa_framework::agent_debugger {
     }
 
     public fun make_debug_ai_request(agent: &Object<Agent>, message_json: String): String {
-        let debug_input = json::from_json<DebugInput>(string::into_bytes(message_json));
+        let debug_input = json::from_json<DebugInputV2>(string::into_bytes(message_json));
         assert!(vector::length(&debug_input.messages) > 0, ErrorEmptyMessage);
         let messages = vector::empty();
         let channel_id = channel::get_agent_home_channel_id(agent);
@@ -81,7 +95,9 @@ module nuwa_framework::agent_debugger {
         let sender_profile = user_profile_for_agent::get_user_profile(sender);
         let input_info = agent_input::into_agent_input_info(agent_input, sender_profile, coin_input_info);
 
-        let prompt = agent_runner::generate_system_prompt(agent, input_info);
+        let agent_info = agent::get_agent_info(agent);
+        agent_info::set_instructions(&mut agent_info, debug_input.instructions);
+        let prompt = agent_runner::generate_system_prompt_with_agent_info(agent, agent_info, input_info);
         let system_prompt = prompt_input::format_prompt(&prompt);
         // Create chat messages
         let messages = vector::empty();
