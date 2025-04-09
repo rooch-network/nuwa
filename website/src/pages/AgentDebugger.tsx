@@ -127,13 +127,49 @@ export function AgentDebugger() {
   };
 
   // Call OpenAI API
-  const handleTestWithOpenAI = async () => {
+  const handleTestWithOpenAI = async (chatRequest: any) => {
     if (!apiKey) {
       setError('Please enter OpenAI API Key');
       return;
     }
 
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Call OpenAI API directly with the chat request from contract
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(chatRequest)
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const assistantMessage = { role: 'assistant' as const, content: data.choices[0].message.content };
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      setError('Failed to call OpenAI API: ' + (error instanceof Error ? error.message : String(error)));
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle sending a new message
+  const handleSendMessage = async () => {
     if (!userInput.trim()) {
+      return;
+    }
+
+    if (!currentAddress) {
+      setError('Please connect your wallet');
       return;
     }
 
@@ -146,34 +182,43 @@ export function AgentDebugger() {
       setMessages(prev => [...prev, userMessage]);
       setUserInput(''); // Clear input after sending
 
-      // Call OpenAI API directly
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: [
-            { role: 'system', content: renderedPrompt }, // Use rendered prompt as system message
-            ...messages,
-            userMessage
-          ],
-          temperature: 0.7
-        })
-      });
+      // Get current account address in bech32 format
+      const userAddress = currentAddress.genRoochAddress().toBech32Address();
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.statusText}`);
+      // Assemble DebugInput with the updated messages
+      const debugInput = {
+        messages: [...messages, userMessage].map((msg, index) => ({
+          index: index,
+          sender: userAddress,
+          content: msg.content,
+          timestamp: Date.now(),
+          attachments: [],
+        })),
+        temperature: temperature,
+        mock_rgas_amount: mockRgasAmount,
+      };
+
+      // Call contract to get chat request
+      const response = await client.executeViewFunction({
+        target: `${packageId}::agent_debugger::make_debug_ai_request`,
+        args: [Args.objectId(agent?.id || ''), Args.string(JSON.stringify(debugInput))],
+      });
+      console.log(response);
+
+      if (!response.return_values?.[0]?.decoded_value) {
+        throw new Error('Failed to get response from contract: ' + JSON.stringify(response));
       }
 
-      const data = await response.json();
-      const assistantMessage = { role: 'assistant' as const, content: data.choices[0].message.content };
-      setMessages(prev => [...prev, assistantMessage]);
+      const renderedPromptJson = response.return_values[0].decoded_value as string;
+      const chatRequest = JSON.parse(renderedPromptJson);
+      
+      // Call OpenAI API with the chat request
+      await handleTestWithOpenAI(chatRequest);
     } catch (error) {
-      setError('Failed to call OpenAI API');
-      console.error(error);
+      console.error('Send message error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to send message');
+      // Remove the user message if the request failed
+      setMessages(prev => prev.slice(0, -1));
     } finally {
       setLoading(false);
     }
@@ -319,15 +364,15 @@ export function AgentDebugger() {
                   {loading ? 'Loading...' : 'Render Prompt'}
                 </button>
                 <button
-                  onClick={handleTestWithOpenAI}
-                  disabled={!renderedPrompt || !apiKey || loading}
+                  onClick={handleSendMessage}
+                  disabled={!userInput.trim() || !apiKey || loading}
                   className={`flex-1 px-4 py-2 rounded-md text-white ${
-                    !renderedPrompt || !apiKey || loading
+                    !userInput.trim() || !apiKey || loading
                       ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-green-500 hover:bg-green-600'
+                      : 'bg-blue-500 hover:bg-blue-600'
                   }`}
                 >
-                  {loading ? 'Loading...' : 'Test with OpenAI'}
+                  {loading ? 'Sending...' : 'Send'}
                 </button>
               </div>
             </div>
@@ -387,14 +432,14 @@ export function AgentDebugger() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleTestWithOpenAI();
+                      handleSendMessage();
                     }
                   }}
                   placeholder="Enter message..."
                   className="flex-1 min-h-[80px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white resize-none"
                 />
                 <button
-                  onClick={handleTestWithOpenAI}
+                  onClick={handleSendMessage}
                   disabled={!userInput.trim() || !apiKey || loading}
                   className={`px-6 self-end h-10 rounded-md text-white ${
                     !userInput.trim() || !apiKey || loading
