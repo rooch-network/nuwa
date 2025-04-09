@@ -191,6 +191,7 @@ export function AgentDebugger() {
 
       // Assemble DebugInput with the updated messages
       const debugInput = {
+        instructions: agentPrompt,
         messages: [...messages, userMessage].map((msg, index) => ({
           index: index,
           // Use agent address for assistant messages, user address for user messages
