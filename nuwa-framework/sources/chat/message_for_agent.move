@@ -11,6 +11,7 @@ module nuwa_framework::message_for_agent {
     use nuwa_framework::attachment::{Attachment};
 
     const ErrorDeprecatedFunction: u64 = 1;
+    const ErrorEmptyMessage: u64 = 2;
 
     #[data_struct]
     struct MessageForAgent has copy, drop, store {
@@ -38,6 +39,7 @@ module nuwa_framework::message_for_agent {
     } 
 
     public fun new_agent_input_with_agent_address(agent_address: address, messages: vector<Message>) : AgentInput<MessageInput> {
+        assert!(vector::length(&messages) > 0, ErrorEmptyMessage);
         let channel_id = message::get_channel_id(vector::borrow(&messages,0));
         let messages_for_agent = vector::empty();
         vector::for_each(messages, |msg| {

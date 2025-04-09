@@ -17,6 +17,8 @@ module nuwa_framework::agent_debugger {
     use nuwa_framework::ai_request;
     use nuwa_framework::prompt_input;
 
+    const ErrorEmptyMessage: u64 = 1;
+
     #[data_struct]
     struct DebugMessage has copy, drop, store {
         index: u64,
@@ -53,6 +55,7 @@ module nuwa_framework::agent_debugger {
 
     public fun make_debug_ai_request(agent: &Object<Agent>, message_json: String): String {
         let debug_input = json::from_json<DebugInput>(string::into_bytes(message_json));
+        assert!(vector::length(&debug_input.messages) > 0, ErrorEmptyMessage);
         let messages = vector::empty();
         let channel_id = channel::get_agent_home_channel_id(agent);
         vector::for_each(debug_input.messages, |debug_msg| {
