@@ -245,9 +245,9 @@ export function AgentDebugger() {
 
   return (
     <> 
-      <div className="h-screen flex flex-col">
+      <div className="h-screen flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex-shrink-0">
           <div className="max-w-[1800px] mx-auto flex items-center justify-between">
             <div className="flex items-center">
               <button
@@ -267,7 +267,7 @@ export function AgentDebugger() {
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Panel - Prompt Editor */}
-          <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-gray-700">
+          <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="flex-1 p-6 overflow-y-auto">
               {error && (
                 <div className="mb-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 rounded-lg">
@@ -340,7 +340,7 @@ export function AgentDebugger() {
           </div>
 
           {/* Right Panel - Chat */}
-          <div className="w-1/2 flex flex-col">
+          <div className="w-1/2 flex flex-col overflow-hidden">
             {/* Chat Messages */}
             <div className="flex-1 p-6 overflow-y-auto">
               <div className="space-y-6">
@@ -385,7 +385,7 @@ export function AgentDebugger() {
             </div>
 
             {/* Chat Input */}
-            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800 flex-shrink-0">
               <div className="flex gap-4">
                 <textarea
                   value={userInput}
