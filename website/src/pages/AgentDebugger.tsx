@@ -4,20 +4,15 @@ import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useRoochClient, useCurrentAddress } from "@roochnetwork/rooch-sdk-kit";
 import { RoochClient, RoochAddress, Serializer, Args } from "@roochnetwork/rooch-sdk";
 import { useNetworkVariable } from "../hooks/use-networks";
-import useAgent from "../hooks/use-agent";
-import { SEO } from "../components/layout/SEO";
 import { LoadingScreen } from "../components/layout/LoadingScreen";
 import { NotFound } from "./NotFound";
 import useAgentWithAddress from '../hooks/use-agent-with-address'
 import useAddressByUsername from '../hooks/use-address-by-username'
 
-interface InputEvent extends React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> {
-  target: HTMLInputElement | HTMLTextAreaElement;
-}
-
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  actions?: Array<{name: string; params: any}>;
 }
 
 interface ChatMessage {
@@ -67,63 +62,32 @@ export function AgentDebugger() {
     }
   }, [agent]);
 
-  // Render Prompt
-  const handleRenderPrompt = async () => {
-    if (!currentAddress) {
-      setError('Please connect your wallet');
-      return;
-    }
+  // Parse Actions from AI response
+  const parseActions = (response: string): Array<{name: string; params: any}> => {
+    const actions: Array<{name: string; params: any}> = [];
+    const lines = response.split('\n');
 
-    if (messages.length === 0) {
-      setError('Please add at least one message');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Get current account address in bech32 format
-      const userAddress = currentAddress.genRoochAddress().toBech32Address();
-
-      // Assemble DebugInput
-      const debugInput = {
-        messages: messages.map((msg, index) => ({
-          index: index,
-          sender: userAddress,
-          content: msg.content,
-          timestamp: Date.now(),
-          attachments: [],
-        })),
-        temperature: temperature,
-        mock_rgas_amount: mockRgasAmount,
-      };
-
-      const response = await client.executeViewFunction({
-        target: `${packageId}::agent_debugger::make_debug_ai_request`,
-        args: [Args.objectId(agent?.id || ''), Args.string(JSON.stringify(debugInput))],
-      });
-      console.log(response);
-
-      if (!response.return_values?.[0]?.decoded_value) {
-        throw new Error('Failed to get response from contract: ' + JSON.stringify(response));
+    for (const line of lines) {
+      const match = line.match(/^(\w+::\w+)\s+(.+)$/);
+      if (match) {
+        try {
+          actions.push({
+            name: match[1],
+            params: JSON.parse(match[2])
+          });
+        } catch (e) {
+          console.warn('Failed to parse action:', line);
+        }
       }
-
-      const renderedPromptJson = response.return_values[0].decoded_value as string;
-      const chatRequest = JSON.parse(renderedPromptJson);
-      
-      // Extract the system prompt from the chat request
-      const systemMessage = (chatRequest.messages as ChatMessage[]).find(msg => msg.role === 'system');
-      if (!systemMessage?.content) {
-        throw new Error('Invalid response format: missing system message');
-      }
-      setRenderedPrompt(systemMessage.content);
-    } catch (error) {
-      console.error('Render prompt error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to render prompt');
-    } finally {
-      setLoading(false);
     }
+
+    return actions;
+  };
+
+  // Extract response::say content from actions
+  const extractResponseContent = (actions: Array<{name: string; params: any}>): string => {
+    const sayAction = actions.find(action => action.name === 'response::say');
+    return sayAction?.params?.content || '';
   };
 
   // Call OpenAI API
@@ -152,7 +116,16 @@ export function AgentDebugger() {
       }
 
       const data = await response.json();
-      const assistantMessage = { role: 'assistant' as const, content: data.choices[0].message.content };
+      const aiResponse = data.choices[0].message.content;
+      const actions = parseActions(aiResponse);
+      const responseContent = extractResponseContent(actions);
+
+      // Add assistant message with actions
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: responseContent,
+        actions: actions.filter(action => action.name !== 'response::say') // Store other actions
+      };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       setError('Failed to call OpenAI API: ' + (error instanceof Error ? error.message : String(error)));
@@ -209,9 +182,14 @@ export function AgentDebugger() {
         throw new Error('Failed to get response from contract: ' + JSON.stringify(response));
       }
 
-      const renderedPromptJson = response.return_values[0].decoded_value as string;
-      const chatRequest = JSON.parse(renderedPromptJson);
-      
+      const chatRequestJson = response.return_values[0].decoded_value as string;
+      const chatRequest = JSON.parse(chatRequestJson);
+      // Extract the system prompt from the chat request
+      const systemMessage = (chatRequest.messages as ChatMessage[]).find(msg => msg.role === 'system');
+      if (!systemMessage?.content) {
+        throw new Error('Invalid response format: missing system message');
+      }
+      setRenderedPrompt(systemMessage.content); 
       // Call OpenAI API with the chat request
       await handleTestWithOpenAI(chatRequest);
     } catch (error) {
@@ -222,28 +200,6 @@ export function AgentDebugger() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Parse Actions from AI response
-  const parseActions = (response: string) => {
-    const actions: Array<{ name: string; params: any }> = [];
-    const lines = response.split('\n');
-
-    for (const line of lines) {
-      const match = line.match(/^(\w+::\w+)\s+(.+)$/);
-      if (match) {
-        try {
-          actions.push({
-            name: match[1],
-            params: JSON.parse(match[2])
-          });
-        } catch (e) {
-          console.warn('Failed to parse action:', line);
-        }
-      }
-    }
-
-    return actions;
   };
 
   // Handle loading and error states
@@ -348,34 +304,6 @@ export function AgentDebugger() {
                 </pre>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-              <div className="flex gap-4">
-                <button
-                  onClick={handleRenderPrompt}
-                  disabled={loading || messages.length === 0}
-                  className={`flex-1 px-4 py-2 rounded-md text-white ${
-                    loading || messages.length === 0
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-500 hover:bg-blue-600'
-                  }`}
-                >
-                  {loading ? 'Loading...' : 'Render Prompt'}
-                </button>
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!userInput.trim() || !apiKey || loading}
-                  className={`flex-1 px-4 py-2 rounded-md text-white ${
-                    !userInput.trim() || !apiKey || loading
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-500 hover:bg-blue-600'
-                  }`}
-                >
-                  {loading ? 'Sending...' : 'Send'}
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Right Panel - Chat */}
@@ -400,9 +328,9 @@ export function AgentDebugger() {
                       <pre className="whitespace-pre-wrap font-mono text-sm">
                         {message.content}
                       </pre>
-                      {message.role === 'assistant' && (
+                      {message.role === 'assistant' && message.actions && message.actions.length > 0 && (
                         <div className="mt-4 space-y-4">
-                          {parseActions(message.content).map((action, actionIndex) => (
+                          {message.actions.map((action, actionIndex) => (
                             <div
                               key={actionIndex}
                               className="border border-gray-300 dark:border-gray-600 rounded-md p-4 bg-white dark:bg-gray-800"
