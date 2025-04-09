@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
-import { useRoochClient, useCurrentAddress } from "@roochnetwork/rooch-sdk-kit";
+import { ArrowLeftIcon, PencilIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import { useRoochClient, useCurrentAddress, SessionKeyGuard } from "@roochnetwork/rooch-sdk-kit";
 import { RoochClient, RoochAddress, Serializer, Args } from "@roochnetwork/rooch-sdk";
 import { useNetworkVariable } from "../hooks/use-networks";
 import { LoadingScreen } from "../components/layout/LoadingScreen";
 import { NotFound } from "./NotFound";
-import useAgentWithAddress from '../hooks/use-agent-with-address'
 import useAddressByUsername from '../hooks/use-address-by-username'
+import { toast } from 'react-toastify';
+import { AgentProfileProvider, useAgentProfile } from '../components/profile/AgentProfileContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -20,12 +21,13 @@ interface ChatMessage {
   content: string;
 }
 
-export function AgentDebugger() {
+function AgentDebuggerContent() {
   const { identifier } = useParams<{ identifier: string }>();
   const navigate = useNavigate();
   const client = useRoochClient();
   const currentAddress = useCurrentAddress();
   const packageId = useNetworkVariable("packageId");
+  const { agent, isOwner, caps, updateAgent } = useAgentProfile();
 
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
@@ -36,27 +38,13 @@ export function AgentDebugger() {
   const [error, setError] = useState<string | null>(null);
   const [temperature, setTemperature] = useState<number>(0.7);
   const [mockRgasAmount, setMockRgasAmount] = useState<string>("10"); // Default to 10 RGAS
-
-  // Check if the identifier is a valid address
-  const isAddress = (() => {
-      try {
-          if (!identifier) return false
-          new RoochAddress(identifier)
-          return true
-      } catch {
-          return false
-      }
-  })()
-
-  const { address, isPending: isAddressPending, isError: isAddressError } = useAddressByUsername(!isAddress ? identifier : undefined)
-
-  // Add agent and userInfo queries for username type
-  const { agent, isPending: isAgentPending } = useAgentWithAddress(address || undefined)
-
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+  const [formErrors, setFormErrors] = useState<{
+    prompt?: string;
+  }>({});
 
   // Update prompt when agent is loaded
   useEffect(() => {
-    console.log(agent)
     if (agent?.instructions) {
       setAgentPrompt(agent.instructions);
     }
@@ -171,8 +159,8 @@ export function AgentDebugger() {
       return;
     }
 
-    if (!agent?.address) {
-      setError('Agent address not found');
+    if (!agent) {
+      setError('Agent not found');
       return;
     }
 
@@ -207,7 +195,7 @@ export function AgentDebugger() {
       // Call contract to get chat request
       const response = await client.executeViewFunction({
         target: `${packageId}::agent_debugger::make_debug_ai_request`,
-        args: [Args.objectId(agent?.id || ''), Args.string(JSON.stringify(debugInput))],
+        args: [Args.objectId(agent.id || ''), Args.string(JSON.stringify(debugInput))],
       });
       console.log(response);
 
@@ -235,13 +223,64 @@ export function AgentDebugger() {
     }
   };
 
-  // Handle loading and error states
-  if (isAgentPending) {
-    return <LoadingScreen agentName={identifier} />;
+  const validatePrompt = (prompt: string): string | null => {
+    if (prompt.length > 4096) {
+      return 'Prompt cannot be longer than 4096 characters'
+    }
+    if (prompt.trim() && /^\s+$/.test(prompt)) {
+      return 'Prompt cannot only contain spaces'
+    }
+    return null
   }
 
-  if (isAddressError || !agent) {
-    return <NotFound />;
+  const handleSavePrompt = async () => {
+    if (!agent) return;
+
+    const promptError = validatePrompt(agentPrompt);
+    if (promptError) {
+      setFormErrors(prev => ({
+        ...prev,
+        prompt: promptError
+      }));
+      return;
+    }
+
+    setIsSavingPrompt(true);
+    try {
+      await updateAgent({
+        cap: caps.get(agent.id)!.id,
+        instructions: agentPrompt,
+      });
+
+      toast.success('Agent prompt updated successfully!', {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      });
+    } catch (error) {
+      toast.error('Failed to update agent prompt', {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      });
+    } finally {
+      setIsSavingPrompt(false);
+    }
+  };
+
+  // Handle loading and error states
+  if (!agent) {
+    return <LoadingScreen agentName={identifier} />;
   }
 
   return (
@@ -262,6 +301,47 @@ export function AgentDebugger() {
                 Debug {agent.name}'s Prompt
               </h1>
             </div>
+            {isOwner ? (
+              <SessionKeyGuard onClick={handleSavePrompt}>
+                <button 
+                  disabled={isSavingPrompt}
+                  className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                >
+                  {isSavingPrompt ? (
+                    <svg
+                      className="w-5 h-5 animate-spin mx-auto text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8H4z"
+                      ></path>
+                    </svg>
+                  ) : (
+                    <>
+                      <PencilIcon className="w-4 h-4 mr-2" />
+                      Save Prompt
+                    </>
+                  )}
+                </button>
+              </SessionKeyGuard>
+            ) : (
+              <div className="flex items-center text-gray-500 dark:text-gray-400">
+                <LockClosedIcon className="w-4 h-4 mr-2" />
+                <span className="text-sm">Only the owner can edit</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -417,6 +497,35 @@ export function AgentDebugger() {
         </div>
       </div>
     </>
+  );
+}
+
+export function AgentDebugger() {
+  const { identifier } = useParams<{ identifier: string }>();
+  const isAddress = (() => {
+    try {
+      if (!identifier) return false
+      new RoochAddress(identifier)
+      return true
+    } catch {
+      return false
+    }
+  })()
+
+  const { address, isPending: isAddressPending, isError: isAddressError } = useAddressByUsername(!isAddress ? identifier : undefined)
+
+  if (isAddressPending) {
+    return <LoadingScreen agentName={identifier} />;
+  }
+
+  if (isAddressError || !address) {
+    return <NotFound />;
+  }
+
+  return (
+    <AgentProfileProvider address={address}>
+      <AgentDebuggerContent />
+    </AgentProfileProvider>
   );
 }
 
