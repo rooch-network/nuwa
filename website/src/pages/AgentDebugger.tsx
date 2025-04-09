@@ -171,6 +171,11 @@ export function AgentDebugger() {
       return;
     }
 
+    if (!agent?.address) {
+      setError('Agent address not found');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -182,12 +187,14 @@ export function AgentDebugger() {
 
       // Get current account address in bech32 format
       const userAddress = currentAddress.genRoochAddress().toBech32Address();
+      const agentAddress = new RoochAddress(agent.address).toBech32Address();
 
       // Assemble DebugInput with the updated messages
       const debugInput = {
         messages: [...messages, userMessage].map((msg, index) => ({
           index: index,
-          sender: userAddress,
+          // Use agent address for assistant messages, user address for user messages
+          sender: msg.role === 'assistant' ? agentAddress : userAddress,
           content: msg.content,
           timestamp: Date.now(),
           attachments: [],
