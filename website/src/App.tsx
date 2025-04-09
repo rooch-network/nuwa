@@ -83,7 +83,7 @@ function AppContent() {
               <Route path="/docs/:docId" element={<DocPage />} />
               <Route path="/getrgas" element={<GetRGAS />} />
               <Route path="/getrgas-testnet" element={<GetRGASTestnet />} />
-              <Route path="/agent/:identifier/debug" element={<AgentDebugger />} />
+              <Route path="/profile/:identifier/debug" element={<AgentDebugger />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
