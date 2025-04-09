@@ -37,7 +37,7 @@ function AgentDebuggerContent() {
   const [userInput, setUserInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [temperature, setTemperature] = useState<number>(0.7);
-  const [mockRgasAmount, setMockRgasAmount] = useState<string>("10"); // Default to 10 RGAS
+  const [mockRgasAmount, setMockRgasAmount] = useState<string>("0");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const [formErrors, setFormErrors] = useState<{
     prompt?: string;
