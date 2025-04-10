@@ -9,15 +9,15 @@ DEFAULT_NUWA_SYNTAX_SPECIFICATION = """
 
 1. Variables:
    LET var_name = <expression>
-   Example: LET PRICE = 65000
+   Example: LET price = 65000
 
 2. Tool Calls (Statement):
    CALL tool_name { arg1: <expr1>, arg2: <expr2>, ... }
-   Example: CALL SWAP { from_token: "USDT", to_token: "BTC", amount: 100 }
+   Example: CALL swap { from_token: "USDT", to_token: "BTC", amount: 100 }
 
 3. Tool Calls (Expression, used in LET):
    LET result = CALL tool_name { ... }
-   Example: LET PRICE = CALL GET_PRICE { token: "BTC" }
+   Example: LET price = CALL get_price { token: "BTC" }
 
 4. Conditionals:
    IF <condition_expr> THEN
@@ -26,13 +26,13 @@ DEFAULT_NUWA_SYNTAX_SPECIFICATION = """
      <statements>]
    END
    Operators: ==, !=, >, <, >=, <=, AND, OR, NOT
-   Example: IF PRICE < 70000 THEN CALL BUY { amount: 1 } END
+   Example: IF price < 70000 THEN CALL buy { amount: 1 } END
 
 5. Loops:
    FOR item_var IN list_var DO
      <statements>
    END
-   Example: FOR NFT IN MY_NFTS DO CALL LIST_NFT { id: NFT.id } END
+   Example: FOR NFT IN MY_NFTS DO CALL list_nft { id: NFT.id } END
 
 6. Calculations:
    CALC { formula: "string_formula", vars: { name1: <expr1>, ... } }
@@ -46,7 +46,7 @@ DEFAULT_NUWA_SYNTAX_SPECIFICATION = """
 
 8. Booleans:
    Must be uppercase: TRUE, FALSE
-   Example: LET IS_ACTIVE = TRUE
+   Example: LET is_active = TRUE
 """
 
 def _format_tool_parameter(param: ToolParameter) -> str:

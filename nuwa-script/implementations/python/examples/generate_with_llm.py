@@ -74,14 +74,9 @@ registry.register(swap_schema)
 TASK_DESCRIPTION = """
 Based on the user's request below, generate a NuwaScript script that fulfills the request using the syntax and available tools defined above.
 Constraints:
-- Keywords (LET, CALL, IF, THEN, ELSE, END, FOR, IN, DO, CALC, PRINT, NOW, AND, OR, NOT) MUST be uppercase.
-- Booleans MUST be uppercase (TRUE, FALSE).
 - Use ONLY the available tools listed. Do not make up tools.
-- Ensure the syntax is correct according to the NuwaScript specification. Pay attention to curly braces `{}` for arguments.
-- Use the `PRINT(value)` function to output information or results to the user.
-- Use `CALC` ONLY for necessary mathematical calculations.
 - Generate ONLY the NuwaScript code. Do not include explanations, apologies, or any text other than the script itself.
-- If the request cannot be fulfilled, respond ONLY with "// Cannot fulfill request."
+- If the request cannot be fulfilled, PRINT the reason.
 """
 
 # Build the full system prompt using the default syntax from prompts.py
