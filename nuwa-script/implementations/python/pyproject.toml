@@ -15,6 +15,7 @@ classifiers = [
 ]
 dependencies = [
     "ply>=3.11", # Add ply dependency
+    "simpleeval>=0.9.13", # Add simpleeval dependency
 ]
 
 [project.urls]

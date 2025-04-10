@@ -2,6 +2,15 @@ import time
 import operator
 from typing import Any, Dict, List, Optional
 
+# Import simpleeval
+try:
+    import simpleeval
+except ImportError:
+    # Provide a fallback or raise a more informative error if simpleeval is critical
+    print("Warning: simpleeval library not found. CALC functionality will be limited.")
+    print("Please install it: pip install simpleeval")
+    simpleeval = None # Set to None to handle gracefully later
+
 # Import AST nodes
 from .ast import (
     Node, Script, Statement, LetStatement, CallStatement, IfStatement, ForStatement,
@@ -171,23 +180,41 @@ class Interpreter:
         return self._execute_tool_call(node.tool_name, node.arguments)
 
     def _evaluate_CalcExpression(self, node: CalcExpression) -> Any:
-        """Evaluates a CALC expression."""
+        """Evaluates a CALC expression using the 'simpleeval' library."""
+        if simpleeval is None:
+            raise InterpreterError("CALC expressions require the 'simpleeval' library, which is not installed.")
+
         # Evaluate variables used in the formula
         local_vars = {}
         for name, expr in node.variables.items():
             local_vars[name] = self._evaluate_expression(expr)
 
-        # VERY basic and UNSAFE formula evaluation using eval().
-        # Replace with a safe math expression evaluator library (e.g., numexpr, simpleeval)
-        # for any real-world use.
         try:
-            # WARNING: eval() is dangerous with untrusted input!
-            # We only pass evaluated local_vars, not the global scope.
-            result = eval(node.formula, {"__builtins__": {}}, local_vars)
+            # Create a SimpleEval instance.
+            # Pass evaluated variables to the 'names' parameter during initialization.
+            s = simpleeval.SimpleEval(
+                operators=simpleeval.DEFAULT_OPERATORS,
+                functions={}, # Still no functions allowed
+                names=local_vars # Pass variables HERE
+            )
+            # Evaluate the formula (without passing names again)
+            result = s.eval(node.formula) # Call eval only with the formula
             return result
+        # Catch specific simpleeval errors and general exceptions
+        except simpleeval.InvalidExpression as e:
+             raise InterpreterError(f"Invalid CALC formula '{node.formula}': {e}")
+        except simpleeval.FunctionNotDefined as e:
+             # This will catch attempts to use 'str()' or other disallowed functions
+             raise InterpreterError(f"Function '{e.func_name}' not allowed in CALC formula '{node.formula}'")
+        except simpleeval.NameNotDefined as e:
+             # This means a variable used in the formula wasn't provided in 'vars'
+             raise InterpreterError(f"Variable '{e.name}' not defined for CALC formula '{node.formula}' (available: {list(local_vars.keys())})")
+        except ZeroDivisionError:
+            # simpleeval might raise this directly depending on configuration/version
+            raise InterpreterError(f"Division by zero in CALC formula '{node.formula}'")
         except Exception as e:
-            raise InterpreterError(f"Error evaluating CALC formula '{node.formula}' with vars {local_vars}: {e}")
-
+            # Catch other potential evaluation errors
+            raise InterpreterError(f"Error evaluating CALC formula '{node.formula}' with vars {local_vars}: {type(e).__name__} - {e}")
 
     # --- Tool Execution Helper ---
 

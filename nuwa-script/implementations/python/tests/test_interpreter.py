@@ -331,10 +331,10 @@ def test_interpreter_tool_execution_error(interpreter_with_mock_tools):
     # assert isinstance(exc_info.value.__cause__, ValueError)
 
 def test_interpreter_calc_error(interpreter_with_mock_tools):
-    """Test CALC expression with an evaluation error."""
+    """Test CALC expression with a evaluation error (division by zero)."""
     script = """
     LET x = 1
     LET result = CALC { formula: "x / 0", vars: { x: x } } // Division by zero
     """
-    with pytest.raises(InterpreterError, match="Error evaluating CALC formula"):
+    with pytest.raises(InterpreterError, match="Division by zero"):
         run_test_script(interpreter_with_mock_tools, script) 

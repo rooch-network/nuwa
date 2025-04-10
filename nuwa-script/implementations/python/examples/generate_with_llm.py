@@ -152,33 +152,58 @@ def generate_nuwa_script_with_openai(user_request: str, sys_prompt: str) -> str:
         return f"// Error generating script via LLM: {e}"
 
 
-# --- 4. Main Execution Logic ---
+# --- 4. Main Interactive Execution Logic ---
 
 if __name__ == "__main__":
-    user_request = "Check the price of Bitcoin. If it's below $70,000, swap 500 USDT for BTC and tell me the transaction ID. Otherwise, just tell me the current price."
+    print("NuwaScript LLM Generator (Interactive Mode)")
+    print("Enter your request, or type 'quit' or 'exit' to leave.")
 
-    # Generate the script
-    generated_nuwa_code = generate_nuwa_script_with_openai(user_request, system_prompt)
+    while True:
+        try:
+            user_request = input("\nYour Request: ")
+        except EOFError:
+            # Handle Ctrl+D or end of input stream gracefully
+            print("\nExiting.")
+            break
 
-    print("\n--- Generated NuwaScript ---")
-    print(generated_nuwa_code)
+        if not user_request:
+            continue # Ignore empty input
 
-    # Optional: Validate and Execute
-    if generated_nuwa_code and not generated_nuwa_code.startswith("//"):
-        print("\n--- Validating Script Syntax ---")
-        ast = parse_script(generated_nuwa_code)
+        request_lower = user_request.lower()
+        if request_lower == 'quit' or request_lower == 'exit':
+            print("Exiting.")
+            break
 
-        if ast:
-            print("Syntax validation successful.")
-            print("\n--- Executing Script ---")
-            interpreter = Interpreter(tool_registry=registry)
-            try:
-                interpreter.execute(ast)
-                print("\n--- Execution Finished ---")
-                print("Final Variables:", interpreter.variables)
-            except (InterpreterError, ToolNotFoundException, ToolExecutionError) as e:
-                print(f"Execution Error: {e}")
+        # Generate the script for the current request
+        generated_nuwa_code = generate_nuwa_script_with_openai(user_request, system_prompt)
+
+        print("\n--- Generated NuwaScript ---")
+        print(generated_nuwa_code)
+
+        # Optional: Validate and Execute
+        if generated_nuwa_code and not generated_nuwa_code.startswith("//"):
+            print("\n--- Validating Script Syntax ---")
+            ast = parse_script(generated_nuwa_code)
+
+            if ast:
+                print("Syntax validation successful.")
+                print("\n--- Executing Script ---")
+                # Create a new interpreter instance for each execution
+                # to reset variables state between requests.
+                interpreter = Interpreter(tool_registry=registry)
+                try:
+                    interpreter.execute(ast)
+                    print("\n--- Execution Finished ---")
+                    print("Final Variables:", interpreter.variables)
+                except (InterpreterError, ToolNotFoundException, ToolExecutionError) as e:
+                    print(f"Execution Error: {e}")
+                except Exception as e: # Catch potential unexpected errors during execution
+                    print(f"An unexpected error occurred during execution: {e}")
+            else:
+                print("Syntax validation failed (check parser output in logs if any).")
+        elif generated_nuwa_code.startswith("//"):
+             print(f"\n(LLM indicated inability or error: {generated_nuwa_code})")
         else:
-            print("Syntax validation failed (check parser output for details).")
-    elif generated_nuwa_code.startswith("//"):
-         print(f"(LLM indicated inability or error: {generated_nuwa_code})") 
+             print("\n(LLM returned an empty response)")
+
+        print("-" * 40) # Separator for the next interaction 
