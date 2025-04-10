@@ -70,7 +70,10 @@ Here's how to use the interpreter:
 ```python
 from nuwa.parser import parse_script
 from nuwa.interpreter import Interpreter, InterpreterError
-from nuwa.tools import ToolRegistry, ToolExecutionError, ToolNotFoundException
+# Import schema classes
+from nuwa.tools import ToolRegistry, ToolExecutionError, ToolNotFoundException, ToolSchema, ToolParameter
+# Optionally import prompt builder
+from nuwa.prompts import generate_tools_prompt_section, build_system_prompt
 
 # 1. Define your NuwaScript
 script_content = """
@@ -82,44 +85,74 @@ IF user_info.is_active == true THEN
 ELSE
     CALL log_event { event: "inactive_user_login", user: user_id }
 END
-
-LET current_timestamp = NOW()
 """
 
-# 2. (Optional) Define and register tools
-class MyToolRegistry(ToolRegistry):
-    def get_user_details(self, id: str) -> dict:
-        print(f"[Tool] Getting details for {id}")
-        # Replace with actual logic (e.g., API call)
-        if id == "user-123":
-            return {"name": "Alice", "is_active": True}
-        return {"name": "Unknown", "is_active": False}
+# 2. Define tool functions and their schemas
+def get_user_details_impl(id: str) -> dict:
+    print(f"[Tool] Getting details for {id}")
+    if id == "user-123": return {"name": "Alice", "is_active": True}
+    return {"name": "Unknown", "is_active": False}
 
-    def send_notification(self, user: str, message: str) -> bool:
-        print(f"[Tool] Sending to {user}: {message}")
-        return True # Simulate success
+def send_notification_impl(user: str, message: str) -> bool:
+    print(f"[Tool] Sending to {user}: {message}")
+    return True
 
-    def log_event(self, event: str, user: str):
-        print(f"[Tool] Logging event '{event}' for user {user}")
-        # No return value needed
+def log_event_impl(event: str, user: str):
+    print(f"[Tool] Logging event '{event}' for user {user}")
 
-# Create and populate the registry
-registry = MyToolRegistry()
-registry.register("get_user_details", registry.get_user_details)
-registry.register("send_notification", registry.send_notification)
-registry.register("log_event", registry.log_event)
+# Define schemas
+get_user_details_schema = ToolSchema(
+    name="get_user_details",
+    description="Retrieves details for a given user ID.",
+    parameters=[ToolParameter(name="id", type="String", description="The user's unique identifier.")],
+    returns="Object (user details)",
+    callable=get_user_details_impl
+)
 
+send_notification_schema = ToolSchema(
+    name="send_notification",
+    description="Sends a notification message to a user.",
+    parameters=[
+        ToolParameter(name="user", type="String", description="The recipient user ID."),
+        ToolParameter(name="message", type="String", description="The message content.")
+    ],
+    returns="Boolean (success status)",
+    callable=send_notification_impl
+)
 
-# 3. Parse the script
-print("Parsing script...")
+log_event_schema = ToolSchema(
+    name="log_event",
+    description="Logs an event related to a user.",
+    parameters=[
+        ToolParameter(name="event", type="String", description="The event name/type."),
+        ToolParameter(name="user", type="String", description="The user ID associated with the event.")
+    ],
+    returns="None", # Or specify if it returns something
+    callable=log_event_impl
+)
+
+# 3. Create registry and register tools via schemas
+registry = ToolRegistry()
+registry.register(get_user_details_schema)
+registry.register(send_notification_schema)
+registry.register(log_event_schema)
+
+# 4. (Optional) Generate prompt section for LLM
+print("\n--- Tools Prompt Section ---")
+tools_prompt = generate_tools_prompt_section(registry)
+print(tools_prompt)
+# You can combine this with other parts using build_system_prompt(...)
+
+# 5. Parse the script
+print("\nParsing script...")
 ast = parse_script(script_content)
 
 if ast:
     print("Script parsed successfully.")
-    # 4. Create an interpreter instance (with tools)
+    # 6. Create an interpreter instance (with tools)
     interpreter = Interpreter(tool_registry=registry)
 
-    # 5. Execute the script
+    # 7. Execute the script
     try:
         print("Executing script...")
         interpreter.execute(ast)

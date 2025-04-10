@@ -1,3 +1,4 @@
+import dataclasses
 from typing import Any, Dict, Callable, List
 
 class ToolNotFoundException(Exception):
@@ -14,27 +15,59 @@ class ToolExecutionError(Exception):
         super().__init__(f"Error executing tool '{tool_name}': {original_exception}")
 
 
+@dataclasses.dataclass
+class ToolParameter:
+    """Describes a parameter for a tool."""
+    name: str
+    type: str # e.g., "String", "Number", "Boolean", "List[String]", "Object"
+    description: str = ""
+    required: bool = True # Assume required unless specified
+
+@dataclasses.dataclass
+class ToolSchema:
+    """Describes the schema (metadata and callable) for a tool."""
+    name: str
+    description: str
+    parameters: List[ToolParameter]
+    returns: str # e.g., "Number", "String", "Boolean", "Object", "List[Object]"
+    callable: Callable[..., Any]
+
+
 class ToolRegistry:
     """
-    Manages the registration and calling of external tools for the interpreter.
+    Manages the registration and calling of external tools for the interpreter,
+    using ToolSchema for metadata.
     """
     def __init__(self):
-        self._tools: Dict[str, Callable[..., Any]] = {}
+        # Store ToolSchema objects mapped by tool name
+        self._tools: Dict[str, ToolSchema] = {}
 
-    def register(self, name: str, func: Callable[..., Any]):
+    def register(self, schema: ToolSchema):
         """
-        Registers a Python callable as a tool.
+        Registers a tool using its schema.
 
         Args:
-            name: The name the tool will be called by in NuwaScript.
-            func: The Python function or method to execute for this tool.
-                  It should accept keyword arguments corresponding to the
-                  arguments defined in the NuwaScript CALL.
+            schema: A ToolSchema object containing the tool's metadata
+                    and callable implementation.
+
+        Raises:
+            TypeError: If the provided schema is not a ToolSchema or
+                       if the callable is invalid.
         """
-        if not callable(func):
-            raise TypeError(f"Tool implementation for '{name}' must be callable.")
-        self._tools[name] = func
-        # print(f"Tool registered: {name}") # Debug print - commented out
+        if not isinstance(schema, ToolSchema):
+            raise TypeError("Registry expects a ToolSchema object.")
+        if not callable(schema.callable):
+            raise TypeError(f"Callable implementation missing or invalid for tool '{schema.name}'.")
+        if schema.name in self._tools:
+            # Optionally raise an error or log a warning on re-registration
+            print(f"Warning: Re-registering tool '{schema.name}'")
+        self._tools[schema.name] = schema
+
+    def get_schema(self, tool_name: str) -> ToolSchema:
+        """Retrieves the schema for a registered tool."""
+        if tool_name not in self._tools:
+            raise ToolNotFoundException(tool_name)
+        return self._tools[tool_name]
 
     def call_tool(self, tool_name: str, args: Dict[str, Any]) -> Any:
         """
@@ -49,12 +82,15 @@ class ToolRegistry:
 
         Raises:
             ToolNotFoundException: If the tool is not registered.
-            ToolExecutionError: If the tool function raises an exception during execution.
+            ToolExecutionError: If the tool function raises an exception.
+            # Optional: Could add validation errors if args don't match schema
         """
-        if tool_name not in self._tools:
-            raise ToolNotFoundException(tool_name)
+        schema = self.get_schema(tool_name) # Raises ToolNotFoundException if not found
+        tool_func = schema.callable
 
-        tool_func = self._tools[tool_name]
+        # Optional: Validate args against schema.parameters here before calling
+        # (Check required args are present, types match, etc.)
+
         try:
             # Call the tool function with keyword arguments
             return tool_func(**args)
@@ -66,31 +102,54 @@ class ToolRegistry:
         """Returns a list of names of registered tools."""
         return list(self._tools.keys())
 
-# Example Usage (can be removed or kept for demonstration)
+    @property
+    def schemas(self) -> Dict[str, ToolSchema]:
+        """Returns the dictionary of registered tool schemas."""
+        return self._tools
+
+
+# Example Usage (Updated)
 if __name__ == '__main__':
-    # Define some example Python functions to act as tools
+    # Define example Python functions
     def get_weather(location: str) -> str:
-        # In a real scenario, this would call an API
-        if location == "London":
-            return "Cloudy"
-        elif location == "Paris":
-            return "Sunny"
-        else:
-            return f"Weather data not available for {location}"
+        if location == "London": return "Cloudy"
+        elif location == "Paris": return "Sunny"
+        else: return f"Weather data not available for {location}"
 
     def send_message(channel: str, message: str) -> bool:
         print(f"Sending message to {channel}: '{message}'")
-        # Simulate success
         return True
 
-    # Create a registry and register the tools
+    # Define schemas for the tools
+    weather_schema = ToolSchema(
+        name="get_weather",
+        description="Retrieves the current weather forecast for a given location.",
+        parameters=[
+            ToolParameter(name="location", type="String", description="The city or area name.")
+        ],
+        returns="String (e.g., 'Cloudy', 'Sunny')",
+        callable=get_weather
+    )
+
+    message_schema = ToolSchema(
+        name="send_message",
+        description="Sends a message to a specified channel.",
+        parameters=[
+            ToolParameter(name="channel", type="String", description="The target channel name."),
+            ToolParameter(name="message", type="String", description="The message content.")
+        ],
+        returns="Boolean (true if successful)",
+        callable=send_message
+    )
+
+    # Create registry and register using schemas
     registry = ToolRegistry()
-    registry.register("get_weather", get_weather)
-    registry.register("send_message", send_message)
+    registry.register(weather_schema)
+    registry.register(message_schema)
 
     print("\nRegistered tools:", registry.list_tools())
 
-    # Simulate calling tools
+    # Simulate calling tools (call_tool usage remains the same)
     try:
         print("\nCalling get_weather(location='London')")
         weather = registry.call_tool("get_weather", {"location": "London"})
@@ -99,9 +158,6 @@ if __name__ == '__main__':
         print("\nCalling send_message(channel='alerts', message='System online')")
         success = registry.call_tool("send_message", {"channel": "alerts", "message": "System online"})
         print(f"Result: {success}")
-
-        print("\nCalling unknown tool")
-        registry.call_tool("get_stock_price", {"ticker": "ACME"})
 
     except (ToolNotFoundException, ToolExecutionError) as e:
         print(f"Error: {e}")

@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from nuwa.parser import parse_script
 from nuwa.interpreter import Interpreter, InterpreterError
-from nuwa.tools import ToolRegistry, ToolNotFoundException, ToolExecutionError
+from nuwa.tools import ToolRegistry, ToolNotFoundException, ToolExecutionError, ToolParameter, ToolSchema
 from nuwa.ast import Script
 
 # --- Mock Tools ---
@@ -17,13 +17,38 @@ class MockToolRegistry(ToolRegistry):
         self.call_log = [] # Record tool calls for assertions
 
     def register_defaults(self):
-        """Register some default mock tools."""
-        self.register("get_data", self._get_data)
-        self.register("process", self._process)
-        self.register("get_list", self._get_list)
-        self.register("check_item", self._check_item)
-        self.register("tool_that_errors", self._tool_that_errors)
-        self.register("identity", self._identity) # Returns its input arg
+        """Register mock tools using ToolSchema."""
+        self.register(ToolSchema(
+            name="get_data", description="Get some data.",
+            parameters=[ToolParameter(name="key", type="String")],
+            returns="Any", callable=self._get_data
+        ))
+        self.register(ToolSchema(
+            name="process", description="Process a value.",
+            parameters=[
+                ToolParameter(name="value", type="Any"),
+                ToolParameter(name="mode", type="String", required=False, description="Processing mode.")
+            ],
+            returns="Boolean", callable=self._process
+        ))
+        self.register(ToolSchema(
+            name="get_list", description="Get a list of items.",
+            parameters=[], returns="List[Object]", callable=self._get_list
+        ))
+        self.register(ToolSchema(
+            name="check_item", description="Check an item.",
+            parameters=[ToolParameter(name="item_id", type="Number")],
+            returns="Boolean", callable=self._check_item
+        ))
+        self.register(ToolSchema(
+            name="tool_that_errors", description="A tool that fails.",
+            parameters=[], returns="Never", callable=self._tool_that_errors
+        ))
+        self.register(ToolSchema(
+            name="identity", description="Returns its input.",
+            parameters=[ToolParameter(name="arg", type="Any")],
+            returns="Any", callable=self._identity
+        ))
 
     def _get_data(self, key: str) -> Any:
         self.call_log.append(("get_data", {"key": key}))
