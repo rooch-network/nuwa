@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nuwa-script"
+version = "0.1.0"
+description = "Python implementation of NuwaScript interpreter"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License", # Or your chosen license
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "ply>=3.11", # Add ply dependency
+]
+
+[project.urls]
+Homepage = "https://github.com/rooch-network/nuwa" # Replace with your actual repo URL if different
+Issues = "https://github.com/rooch-network/nuwa/issues" # Replace if needed
+
+# Add pytest as an optional/development dependency
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
