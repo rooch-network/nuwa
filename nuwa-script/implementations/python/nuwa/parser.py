@@ -38,7 +38,8 @@ def p_statement(p):
     '''statement : let_statement
                  | call_statement
                  | if_statement
-                 | for_statement'''
+                 | for_statement
+                 | function_call'''
     p[0] = p[1]
 
 # LET statement: LET ID = expression
@@ -103,8 +104,8 @@ def p_expression(p):
                   | variable
                   | LPAREN expression RPAREN'''
     if len(p) == 2:
-        p[0] = p[1] # Simple expression
-    else: # Parenthesized expression
+        p[0] = p[1]
+    else:
         p[0] = p[2]
 
 # Binary operations: expression OP expression
@@ -143,11 +144,24 @@ def p_unary_op(p):
     '''unary_op : NOT expression'''
     p[0] = UnaryOp(operator='NOT', operand=p[2])
 
-# Built-in function call: NOW()
+# Built-in function call: NOW() or PRINT(...)
 def p_function_call(p):
-    '''function_call : NOW LPAREN RPAREN'''
-    p[0] = FunctionCall(function_name='NOW')
-    # Add rules for functions with arguments if needed later
+    '''function_call : NOW LPAREN RPAREN
+                     | PRINT LPAREN expression RPAREN'''
+    # p[1] holds the token value ('NOW' or 'PRINT')
+    function_name = p[1] # Use the token value directly
+    if function_name == 'NOW':
+        if len(p) != 4: # Should only be NOW ( ) three tokens
+            raise SyntaxError(f"NOW() function does not accept arguments, found extra token near {p.slice[1]}")
+        p[0] = FunctionCall(function_name='NOW', arguments=[])
+    elif function_name == 'PRINT':
+        if len(p) != 5: # Should be PRINT ( expr ) five tokens
+             raise SyntaxError(f"PRINT() function expects one argument, check syntax near {p.slice[1]}")
+        # Store the single argument expression in the list
+        p[0] = FunctionCall(function_name='PRINT', arguments=[p[3]])
+    else:
+        # This case should not be reachable if grammar matches lexer tokens
+        raise SyntaxError(f"Unexpected token in function call rule: {function_name}")
 
 # CALL used as expression: CALL ID { arguments }
 def p_call_expression(p):
@@ -244,8 +258,26 @@ if __name__ == '__main__':
         # Safer: just print the structure
         print(ast)
 
-
     # Test error case
     error_script = "LET x = 5 IF x > THEN CALL foo END"
     print("\nTesting error case:")
     parse_script(error_script)
+
+    # Test Print Parsing (should now succeed)
+    test_script_print = """
+    LET msg = "Hello World"
+    PRINT(msg)
+    LET value = 123
+    PRINT(value * 2)
+    PRINT(NOW())
+    """
+    print("\n--- Testing Print Parsing ---")
+    ast_print = parse_script(test_script_print)
+    if ast_print:
+        # Add an assertion to be more explicit
+        print("Print parsing successful.")
+        print(ast_print)
+        assert len(ast_print.statements) == 5 # 2 LET, 3 PRINT (FunctionCall nodes)
+    else:
+        # This path should ideally not be taken now for this script
+        print("Print parsing FAILED.")

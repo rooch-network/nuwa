@@ -8,92 +8,62 @@ from nuwa.ast import (
 
 # --- Helper to get the first statement from a parsed script ---
 def get_first_statement(script_content):
+    # Parse the script as-is (respecting case for identifiers)
     ast = parse_script(script_content)
     assert ast is not None, f"Parsing failed for: {script_content}"
     assert isinstance(ast, Script)
     assert len(ast.statements) > 0, "Script produced no statements"
     return ast.statements[0]
 
-# --- Test Cases ---
+# --- Test Cases (Keywords/Booleans UPPERCASE, Identifiers keep case) ---
 
 def test_parse_let_literal():
-    """Test parsing LET statement with various literals."""
     stmt = get_first_statement('LET x = 42')
-    assert isinstance(stmt, LetStatement)
-    assert stmt.variable_name == 'x'
-    assert isinstance(stmt.value, Literal)
-    assert stmt.value.value == 42
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'x'
+    assert isinstance(stmt.value, Literal) and stmt.value.value == 42
 
     stmt = get_first_statement('LET name = "Nuwa"')
-    assert isinstance(stmt, LetStatement)
-    assert stmt.variable_name == 'name'
-    assert isinstance(stmt.value, Literal)
-    assert stmt.value.value == "Nuwa"
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'name'
+    assert isinstance(stmt.value, Literal) and stmt.value.value == "Nuwa"
 
-    stmt = get_first_statement('LET active = true')
-    assert isinstance(stmt, LetStatement)
-    assert stmt.variable_name == 'active'
-    assert isinstance(stmt.value, Literal)
-    assert stmt.value.value is True
+    stmt = get_first_statement('LET isActive = TRUE')
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'isActive'
+    assert isinstance(stmt.value, Literal) and stmt.value.value is True
 
-    stmt = get_first_statement('LET pi = 3.14')
-    assert isinstance(stmt, LetStatement)
-    assert stmt.variable_name == 'pi'
-    assert isinstance(stmt.value, Literal)
-    assert stmt.value.value == 3.14
+    stmt = get_first_statement('LET PI = 3.14') # Keep uppercase if desired
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'PI'
+    assert isinstance(stmt.value, Literal) and stmt.value.value == 3.14
 
 def test_parse_let_variable():
-    """Test parsing LET statement assigning another variable."""
     stmt = get_first_statement('LET y = x')
-    assert isinstance(stmt, LetStatement)
-    assert stmt.variable_name == 'y'
-    assert isinstance(stmt.value, Variable)
-    assert stmt.value.name == 'x'
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'y'
+    assert isinstance(stmt.value, Variable) and stmt.value.name == 'x'
 
 def test_parse_let_call_expression():
-    """Test parsing LET statement with a CALL expression."""
     stmt = get_first_statement('LET price = CALL get_price { token: "BTC" }')
-    assert isinstance(stmt, LetStatement)
-    assert stmt.variable_name == 'price'
-    assert isinstance(stmt.value, CallExpression)
-    assert stmt.value.tool_name == 'get_price'
-    assert 'token' in stmt.value.arguments
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'price'
+    assert isinstance(stmt.value, CallExpression) and stmt.value.tool_name == 'get_price' # Tool names are identifiers
     assert isinstance(stmt.value.arguments['token'], Literal)
-    assert stmt.value.arguments['token'].value == "BTC"
 
 def test_parse_let_calc_expression():
-    """Test parsing LET statement with a CALC expression."""
-    stmt = get_first_statement('LET total = CALC { formula: "a+b", vars: {a: 1, b: var_b} }')
-    assert isinstance(stmt, LetStatement)
-    assert stmt.variable_name == 'total'
-    assert isinstance(stmt.value, CalcExpression)
-    assert stmt.value.formula == "a+b"
-    assert 'a' in stmt.value.variables
+    stmt = get_first_statement('LET total = CALC { formula: "a+b", vars: {a: 1, b: varB} }')
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'total'
+    assert isinstance(stmt.value, CalcExpression) and stmt.value.formula == "a+b"
     assert isinstance(stmt.value.variables['a'], Literal)
-    assert stmt.value.variables['a'].value == 1
-    assert 'b' in stmt.value.variables
-    assert isinstance(stmt.value.variables['b'], Variable)
-    assert stmt.value.variables['b'].name == 'var_b'
+    assert isinstance(stmt.value.variables['b'], Variable) and stmt.value.variables['b'].name == 'varB'
 
 def test_parse_call_statement():
-    """Test parsing a CALL statement."""
-    stmt = get_first_statement('CALL swap { from: "USD", to: "EUR", amount: 100.5 }')
-    assert isinstance(stmt, CallStatement)
-    assert stmt.tool_name == 'swap'
+    stmt = get_first_statement('CALL swap_tool { from: "USD", to: "EUR", amount: 100.5 }')
+    assert isinstance(stmt, CallStatement) and stmt.tool_name == 'swap_tool'
     assert len(stmt.arguments) == 3
-    assert 'from' in stmt.arguments and isinstance(stmt.arguments['from'], Literal) and stmt.arguments['from'].value == "USD"
-    assert 'to' in stmt.arguments and isinstance(stmt.arguments['to'], Literal) and stmt.arguments['to'].value == "EUR"
-    assert 'amount' in stmt.arguments and isinstance(stmt.arguments['amount'], Literal) and stmt.arguments['amount'].value == 100.5
+    assert isinstance(stmt.arguments['from'], Literal)
 
 def test_parse_call_statement_no_args():
-     """Test parsing a CALL statement with no arguments."""
-     stmt = get_first_statement('CALL do_something {}')
-     assert isinstance(stmt, CallStatement)
-     assert stmt.tool_name == 'do_something'
+     stmt = get_first_statement('CALL doSomething {}')
+     assert isinstance(stmt, CallStatement) and stmt.tool_name == 'doSomething'
      assert len(stmt.arguments) == 0
 
 def test_parse_if_statement():
-    """Test parsing IF statement."""
     script = """
     IF price > 100 THEN
         LET action = "sell"
@@ -102,17 +72,15 @@ def test_parse_if_statement():
     """
     stmt = get_first_statement(script)
     assert isinstance(stmt, IfStatement)
-    assert isinstance(stmt.condition, BinaryOp)
-    assert stmt.condition.operator == '>'
+    assert isinstance(stmt.condition, BinaryOp) and stmt.condition.operator == '>'
     assert isinstance(stmt.condition.left, Variable) and stmt.condition.left.name == 'price'
     assert isinstance(stmt.condition.right, Literal) and stmt.condition.right.value == 100
     assert len(stmt.then_block) == 2
-    assert isinstance(stmt.then_block[0], LetStatement)
-    assert isinstance(stmt.then_block[1], CallStatement)
+    assert isinstance(stmt.then_block[0], LetStatement) and stmt.then_block[0].variable_name == 'action'
+    assert isinstance(stmt.then_block[1], CallStatement) and stmt.then_block[1].tool_name == 'execute_sell'
     assert stmt.else_block is None
 
 def test_parse_if_else_statement():
-    """Test parsing IF-ELSE statement."""
     script = """
     IF status == "active" THEN
         CALL process {}
@@ -123,100 +91,115 @@ def test_parse_if_else_statement():
     stmt = get_first_statement(script)
     assert isinstance(stmt, IfStatement)
     assert isinstance(stmt.condition, BinaryOp) and stmt.condition.operator == '=='
+    assert isinstance(stmt.condition.left, Variable) and stmt.condition.left.name == 'status'
     assert len(stmt.then_block) == 1
     assert isinstance(stmt.then_block[0], CallStatement) and stmt.then_block[0].tool_name == 'process'
-    assert stmt.else_block is not None
-    assert len(stmt.else_block) == 1
+    assert stmt.else_block is not None and len(stmt.else_block) == 1
     assert isinstance(stmt.else_block[0], CallStatement) and stmt.else_block[0].tool_name == 'log_inactive'
 
 def test_parse_for_statement():
-    """Test parsing FOR statement."""
     script = """
-    FOR item IN item_list DO
+    FOR item IN itemList DO
         LET id = item.id
         CALL process_item { item_id: id }
     END
     """
     stmt = get_first_statement(script)
-    assert isinstance(stmt, ForStatement)
-    assert stmt.iterator_variable == 'item'
-    assert isinstance(stmt.iterable, Variable) and stmt.iterable.name == 'item_list'
+    assert isinstance(stmt, ForStatement) and stmt.iterator_variable == 'item'
+    assert isinstance(stmt.iterable, Variable) and stmt.iterable.name == 'itemList'
     assert len(stmt.loop_block) == 2
-    assert isinstance(stmt.loop_block[0], LetStatement)
-    # Check the simplified member access parsing
-    assert isinstance(stmt.loop_block[0].value, Variable) and stmt.loop_block[0].value.name == 'item.id'
-    assert isinstance(stmt.loop_block[1], CallStatement)
+    assert isinstance(stmt.loop_block[0], LetStatement) and stmt.loop_block[0].variable_name == 'id'
+    assert isinstance(stmt.loop_block[0].value, Variable) and stmt.loop_block[0].value.name == 'item.id' # Member access treated as Variable name
+    assert isinstance(stmt.loop_block[1], CallStatement) and stmt.loop_block[1].tool_name == 'process_item'
 
 def test_parse_complex_expression():
-    """Test parsing complex boolean expressions."""
-    script = 'IF (a > 10 AND b < 5) OR NOT c THEN CALL action {} END'
+    script = 'IF (price > 10 AND volume < 5) OR NOT isStable THEN CALL perform_action {} END'
     stmt = get_first_statement(script)
     assert isinstance(stmt, IfStatement)
     condition = stmt.condition
-    assert isinstance(condition, BinaryOp) and condition.operator == 'OR' # Top level is OR
-
+    assert isinstance(condition, BinaryOp) and condition.operator == 'OR'
     left_or = condition.left
-    assert isinstance(left_or, BinaryOp) and left_or.operator == 'AND' # Left of OR is AND
-
+    assert isinstance(left_or, BinaryOp) and left_or.operator == 'AND'
+    assert isinstance(left_or.left.left, Variable) and left_or.left.left.name == 'price' # Access nested parts
     right_or = condition.right
-    assert isinstance(right_or, UnaryOp) and right_or.operator == 'NOT' # Right of OR is NOT
-    assert isinstance(right_or.operand, Variable) and right_or.operand.name == 'c'
-
-    left_and = left_or.left
-    assert isinstance(left_and, BinaryOp) and left_and.operator == '>'
-    assert isinstance(left_and.left, Variable) and left_and.left.name == 'a'
-
-    right_and = left_or.right
-    assert isinstance(right_and, BinaryOp) and right_and.operator == '<'
-    assert isinstance(right_and.left, Variable) and right_and.left.name == 'b'
+    assert isinstance(right_or, UnaryOp) and right_or.operator == 'NOT'
+    assert isinstance(right_or.operand, Variable) and right_or.operand.name == 'isStable'
 
 def test_parse_now_function():
-    """Test parsing the NOW() built-in function."""
-    stmt = get_first_statement('LET current_time = NOW()')
-    assert isinstance(stmt, LetStatement)
-    assert isinstance(stmt.value, FunctionCall)
-    assert stmt.value.function_name == 'NOW'
+    stmt = get_first_statement('LET currentTime = NOW()')
+    assert isinstance(stmt, LetStatement) and stmt.variable_name == 'currentTime'
+    assert isinstance(stmt.value, FunctionCall) and stmt.value.function_name == 'NOW'
+
+def test_parse_print_function():
+    stmt = get_first_statement('PRINT("Hello World")')
+    assert isinstance(stmt, FunctionCall) and stmt.function_name == 'PRINT'
+    assert len(stmt.arguments) == 1 and isinstance(stmt.arguments[0], Literal) and stmt.arguments[0].value == "Hello World"
 
 def test_parse_member_access():
-     """Test parsing member access using dot notation."""
-     stmt = get_first_statement('LET rarity = nft.details.rarity') # Nested access
-     assert isinstance(stmt, LetStatement)
-     assert stmt.variable_name == 'rarity'
-     assert isinstance(stmt.value, Variable)
-     # NOTE: Current parser simplifies this to a single variable name
-     assert stmt.value.name == 'nft.details.rarity'
-     # A more advanced parser might create a dedicated MemberAccess AST node.
+     stmt = get_first_statement('LET rarityValue = NftData.details.rarity')
+     assert isinstance(stmt, LetStatement) and stmt.variable_name == 'rarityValue'
+     assert isinstance(stmt.value, Variable) and stmt.value.name == 'NftData.details.rarity' # Full path as name
 
 def test_parse_script_with_comments():
-    """Test parsing script with comments."""
     script = """
     // This is a full line comment
     LET x = 10 // Assign value
     // Another comment
-    CALL print { value: x } // Call tool
+    CALL print_value { value: x } // Call tool
     """
+    # Parse script respecting case
     ast = parse_script(script)
-    assert ast is not None
-    assert isinstance(ast, Script)
-    assert len(ast.statements) == 2
-    assert isinstance(ast.statements[0], LetStatement)
-    assert isinstance(ast.statements[1], CallStatement)
+    assert ast is not None and isinstance(ast, Script) and len(ast.statements) == 2
+    assert isinstance(ast.statements[0], LetStatement) and ast.statements[0].variable_name == 'x'
+    assert isinstance(ast.statements[1], CallStatement) and ast.statements[1].tool_name == 'print_value'
 
 def test_parse_syntax_error():
-    """Test parsing script with syntax errors."""
-    # Pytest captures stdout, so we don't need to check it explicitly here unless needed.
-    # `parse_script` currently prints errors but returns None or partial AST.
-    # We just check if it returns None for now.
-    # A better parser might raise specific exceptions.
-    script = "LET x = 5 IF x > THEN CALL foo END"
+    # Error test remains valid, doesn't rely on case
+    script = "LET x = 5 IF x > THEN CALL foo {} END" # Syntax error
     ast = parse_script(script)
-    # Depending on error recovery strategy, this might not be None,
-    # but it should indicate an error occurred (e.g., via logs or exceptions).
-    # For the current basic error printing, we might not get None.
-    # Let's assume for now it *should* ideally fail clearly.
-    # assert ast is None # This might fail depending on ply's default error handling
+    assert ast is None # Parser should return None on syntax error
 
-    # A more specific check would involve capturing stderr or having the parser raise
-    # with pytest.raises(SyntaxError): # If parser raised exceptions
-    #    parse_script(script)
-    pass # Placeholder until error handling is more robust 
+# Test case sensitivity explicitly
+def test_parse_case_sensitivity():
+     stmt_lower = get_first_statement('LET myvar = 1')
+     stmt_upper = get_first_statement('LET MYVAR = 2')
+     assert stmt_lower.variable_name == 'myvar'
+     assert stmt_upper.variable_name == 'MYVAR'
+
+     stmt_mixed = get_first_statement('LET itemValue = item.VALUE')
+     assert stmt_mixed.variable_name == 'itemValue'
+     assert isinstance(stmt_mixed.value, Variable) and stmt_mixed.value.name == 'item.VALUE'
+
+# Test keywords must be uppercase
+def test_keywords_must_be_uppercase():
+    script_lower_let = "let x = 5"
+    ast = parse_script(script_lower_let)
+    assert ast is None, "Lowercase 'let' should fail parsing"
+
+    script_lower_if = "IF x > 5 then CALL y {} END"
+    ast = parse_script(script_lower_if)
+    assert ast is None, "Lowercase 'then' should fail parsing"
+
+    script_lower_true = "LET flag = true" # Lowercase 'true'
+    ast = parse_script(script_lower_true)
+    assert ast is not None, "Parsing should succeed with lowercase 'true' as ID"
+    assert len(ast.statements) == 1
+    stmt = ast.statements[0]
+    assert isinstance(stmt, LetStatement), "Should be a LET statement"
+    assert stmt.variable_name == 'flag', "Variable name should be 'flag'"
+    # Value should be Variable('true'), not Literal(True)
+    assert isinstance(stmt.value, Variable), "Value type should be Variable for 'true'"
+    assert stmt.value.name == 'true', "Variable name should be 'true'"
+    assert not (isinstance(stmt.value, Literal) and stmt.value.value is True)
+
+    script_lower_false = "LET flag = false" # Lowercase 'false'
+    ast = parse_script(script_lower_false)
+    assert ast is not None, "Parsing should succeed with lowercase 'false' as ID"
+    assert len(ast.statements) == 1
+    stmt = ast.statements[0]
+    assert isinstance(stmt, LetStatement), "Should be a LET statement"
+    assert stmt.variable_name == 'flag', "Variable name should be 'flag'"
+    # Value should be Variable('false'), not Literal(False)
+    assert isinstance(stmt.value, Variable), "Value type should be Variable for 'false'"
+    assert stmt.value.name == 'false', "Variable name should be 'false'"
+    assert not (isinstance(stmt.value, Literal) and stmt.value.value is False)

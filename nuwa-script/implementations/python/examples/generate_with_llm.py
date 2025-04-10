@@ -42,11 +42,6 @@ def execute_swap(from_token: str, to_token: str, amount: float) -> str:
     # Simulate returning a transaction ID
     return f"tx_{hash(f'{from_token}{to_token}{amount}') % 100000}"
 
-def send_reply(message: str) -> bool:
-    """Mock function to send a reply."""
-    print(f"[Tool Call] send_reply(message='{message}')")
-    return True
-
 # Define schemas for the tools
 get_price_schema = ToolSchema(
     name="get_price",
@@ -68,19 +63,10 @@ swap_schema = ToolSchema(
     callable=execute_swap
 )
 
-reply_schema = ToolSchema(
-    name="reply",
-    description="Sends a message back to the user.",
-    parameters=[ToolParameter(name="message", type="String", description="The content of the message to send.")],
-    returns="Boolean (true if successful)",
-    callable=send_reply
-)
-
 # Create and populate the registry
 registry = ToolRegistry()
 registry.register(get_price_schema)
 registry.register(swap_schema)
-registry.register(reply_schema)
 
 
 # --- 2. Define Prompt Components ---
@@ -88,11 +74,14 @@ registry.register(reply_schema)
 TASK_DESCRIPTION = """
 Based on the user's request below, generate a NuwaScript script that fulfills the request using the syntax and available tools defined above.
 Constraints:
+- Keywords (LET, CALL, IF, THEN, ELSE, END, FOR, IN, DO, CALC, PRINT, NOW, AND, OR, NOT) MUST be uppercase.
+- Booleans MUST be uppercase (TRUE, FALSE).
 - Use ONLY the available tools listed. Do not make up tools.
 - Ensure the syntax is correct according to the NuwaScript specification. Pay attention to curly braces `{}` for arguments.
-- Use `CALC` for string concatenation or formatting involving variables (e.g., `CALC { formula: "'Value: ' + str(v)", vars: { v: my_var } }`). The `reply` tool expects a single string message.
+- Use the `PRINT(value)` function to output information or results to the user.
+- Use `CALC` ONLY for necessary mathematical calculations.
 - Generate ONLY the NuwaScript code. Do not include explanations, apologies, or any text other than the script itself.
-- If the request cannot be fulfilled with the available tools or syntax, respond ONLY with "// Cannot fulfill request."
+- If the request cannot be fulfilled, respond ONLY with "// Cannot fulfill request."
 """
 
 # Build the full system prompt using the default syntax from prompts.py
@@ -158,6 +147,13 @@ if __name__ == "__main__":
     print("NuwaScript LLM Generator (Interactive Mode)")
     print("Enter your request, or type 'quit' or 'exit' to leave.")
 
+    # Define the output handler for the interpreter
+    script_outputs = [] # Optional: Track outputs if needed outside
+    def interactive_output_handler(value):
+        # Simple handler that prints to console
+        print(f"[Agent Output] {value}")
+        script_outputs.append(value) # Optional tracking
+
     while True:
         try:
             user_request = input("\nYour Request: ")
@@ -188,16 +184,17 @@ if __name__ == "__main__":
             if ast:
                 print("Syntax validation successful.")
                 print("\n--- Executing Script ---")
-                # Create a new interpreter instance for each execution
-                # to reset variables state between requests.
-                interpreter = Interpreter(tool_registry=registry)
+                # Pass the output handler to the interpreter
+                interpreter = Interpreter(registry, output_handler=interactive_output_handler)
+                script_outputs.clear() # Clear previous outputs before execution
                 try:
                     interpreter.execute(ast)
                     print("\n--- Execution Finished ---")
-                    print("Final Variables:", interpreter.variables)
+                    # print("Final Variables:", interpreter.variables) # Still useful for debugging
+                    # print("Captured Outputs:", script_outputs) # Optional
                 except (InterpreterError, ToolNotFoundException, ToolExecutionError) as e:
                     print(f"Execution Error: {e}")
-                except Exception as e: # Catch potential unexpected errors during execution
+                except Exception as e:
                     print(f"An unexpected error occurred during execution: {e}")
             else:
                 print("Syntax validation failed (check parser output in logs if any).")

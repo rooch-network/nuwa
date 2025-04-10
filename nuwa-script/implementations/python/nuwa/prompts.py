@@ -5,18 +5,19 @@ from .tools import ToolRegistry, ToolSchema, ToolParameter
 # Define the default syntax specification as a constant
 DEFAULT_NUWA_SYNTAX_SPECIFICATION = """
 ### NuwaScript Syntax Specification
+(Keywords and built-ins like LET, CALL, IF, THEN, ELSE, END, FOR, IN, DO, CALC, PRINT, NOW, AND, OR, NOT MUST be uppercase. Booleans MUST be TRUE or FALSE.)
 
 1. Variables:
    LET var_name = <expression>
-   Example: LET price = 65000
+   Example: LET PRICE = 65000
 
 2. Tool Calls (Statement):
    CALL tool_name { arg1: <expr1>, arg2: <expr2>, ... }
-   Example: CALL swap { from_token: "USDT", to_token: "BTC", amount: 100 }
+   Example: CALL SWAP { from_token: "USDT", to_token: "BTC", amount: 100 }
 
 3. Tool Calls (Expression, used in LET):
    LET result = CALL tool_name { ... }
-   Example: LET price = CALL get_price { token: "BTC" }
+   Example: LET PRICE = CALL GET_PRICE { token: "BTC" }
 
 4. Conditionals:
    IF <condition_expr> THEN
@@ -25,20 +26,27 @@ DEFAULT_NUWA_SYNTAX_SPECIFICATION = """
      <statements>]
    END
    Operators: ==, !=, >, <, >=, <=, AND, OR, NOT
-   Example: IF price < 70000 THEN CALL buy { amount: 1 } END
+   Example: IF PRICE < 70000 THEN CALL BUY { amount: 1 } END
 
 5. Loops:
    FOR item_var IN list_var DO
      <statements>
    END
-   Example: FOR nft IN my_nfts DO CALL list_nft { id: nft.id } END
+   Example: FOR NFT IN MY_NFTS DO CALL LIST_NFT { id: NFT.id } END
 
 6. Calculations:
    CALC { formula: "string_formula", vars: { name1: <expr1>, ... } }
-   Example: LET total = CALC { formula: "price * 1.1", vars: { price: base_price } }
+   Example: LET TOTAL = CALC { formula: "price * 1.1", vars: { price: base_price } }
 
 7. Built-ins:
-   NOW() // Returns current timestamp
+   NOW()       // Returns current Unix timestamp
+   PRINT(value) // Outputs the evaluated value (e.g., to the user or logs)
+                // Example: PRINT("Processing complete.")
+                // Example: PRINT(RESULT_VARIABLE)
+
+8. Booleans:
+   Must be uppercase: TRUE, FALSE
+   Example: LET IS_ACTIVE = TRUE
 """
 
 def _format_tool_parameter(param: ToolParameter) -> str:
@@ -144,13 +152,13 @@ if __name__ == '__main__':
 
     # Manually define for example:
     weather_schema = ToolSchema(
-        name="get_weather",
+        name="GET_WEATHER", # Convention: Uppercase tool names?
         description="Retrieves the current weather forecast.",
         parameters=[ToolParameter(name="location", type="String", description="The city name.")],
         returns="String", callable=get_weather
     )
     message_schema = ToolSchema(
-        name="send_message", description="Sends a message.",
+        name="SEND_MESSAGE", description="Sends a message.",
         parameters=[
             ToolParameter(name="channel", type="String"),
             ToolParameter(name="message", type="String", required=False, description="Content to send.")
@@ -167,9 +175,8 @@ if __name__ == '__main__':
     tools_prompt = generate_tools_prompt_section(registry)
     print(tools_prompt)
 
-    # Example of building full prompt (using placeholder text)
-    task = "Generate NuwaScript based on user request. Only output code."
-    # Use default syntax_spec
+    # Example of building full prompt using default syntax (now requires uppercase)
+    task = "Generate NuwaScript based on user request. Only output code. Use UPPERCASE for keywords."
     full_prompt = build_system_prompt(registry, task_description=task)
-    print("\n--- Generated Full System Prompt (Using Default Syntax) ---")
+    print("\n--- Generated Full System Prompt (Requires UPPERCASE) ---")
     print(full_prompt) 

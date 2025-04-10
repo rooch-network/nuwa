@@ -1,6 +1,6 @@
 import time
 import operator
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 # Import simpleeval
 try:
@@ -25,15 +25,22 @@ class InterpreterError(Exception):
     pass
 
 class Interpreter:
-    def __init__(self, tool_registry: Optional[ToolRegistry] = None):
+    def __init__(self,
+                 tool_registry: Optional[ToolRegistry] = None,
+                 output_handler: Optional[Callable[[Any], None]] = None):
         """
         Initializes the interpreter.
 
         Args:
             tool_registry: An optional ToolRegistry instance to handle CALLs.
+            output_handler: An optional callable that takes one argument
+                              and handles output from the print() function.
+                              If None, defaults to Python's print().
         """
         self.variables: Dict[str, Any] = {} # Global variable scope for now
         self.tool_registry = tool_registry if tool_registry else ToolRegistry() # Use a default empty registry if none provided
+        # Store the output handler, defaulting to Python's print
+        self.output_handler = output_handler if output_handler is not None else print
 
     def execute(self, script: Script):
         """Executes a full script."""
@@ -100,6 +107,13 @@ class Interpreter:
                  else:
                      del self.variables[node.iterator_variable]
 
+    # Add this method to handle FunctionCall as a statement
+    def _execute_FunctionCall(self, node: FunctionCall):
+        """Executes a function call used as a statement (primarily for print())."""
+        # Evaluate the function call for its side effects.
+        # The return value (e.g., None for print) is ignored for statements.
+        self._evaluate_FunctionCall(node)
+
     # --- Expression Evaluators ---
 
     def _evaluate_expression(self, node: Expression) -> Any:
@@ -117,22 +131,32 @@ class Interpreter:
         return node.value
 
     def _evaluate_Variable(self, node: Variable) -> Any:
-        """Evaluates a variable by looking it up."""
-        # Handle basic member access (e.g., 'nft.rarity') parsed as 'nft.rarity' Variable
+        """Evaluates a variable by looking it up, handling member access."""
         if '.' in node.name:
-            parts = node.name.split('.', 1)
+            parts = node.name.split('.')
             base_var_name = parts[0]
-            member_name = parts[1]
-            if base_var_name in self.variables:
-                base_value = self.variables[base_var_name]
-                # Assuming base_value is a dict-like object for member access
-                if isinstance(base_value, dict) and member_name in base_value:
-                    return base_value[member_name]
+            if base_var_name not in self.variables:
+                raise InterpreterError(f"Variable '{base_var_name}' not found for member access '{node.name}'")
+
+            current_value = self.variables[base_var_name]
+            current_path = base_var_name
+
+            # Iterate through the parts after the base variable
+            for member_name in parts[1:]:
+                # Currently only support dict-like access
+                if isinstance(current_value, dict):
+                    if member_name in current_value:
+                        current_value = current_value[member_name]
+                        current_path += f".{member_name}"
+                    else:
+                        raise InterpreterError(f"Member '{member_name}' not found in '{current_path}' (value: {self.variables[base_var_name]})")
+                # Add support for object attribute access later if needed (getattr)
+                # elif hasattr(current_value, member_name):
+                #    current_value = getattr(current_value, member_name)
+                #    current_path += f".{member_name}"
                 else:
-                    # Add support for object attribute access if needed later
-                    raise InterpreterError(f"Cannot access member '{member_name}' on variable '{base_var_name}' (value: {base_value})")
-            else:
-                raise InterpreterError(f"Variable '{base_var_name}' not found for member access")
+                    raise InterpreterError(f"Cannot access member '{member_name}' on non-dictionary value at '{current_path}' (type: {type(current_value)})")
+            return current_value
         elif node.name in self.variables:
             return self.variables[node.name]
         else:
@@ -168,10 +192,20 @@ class Interpreter:
             raise InterpreterError(f"Unsupported unary operator: {node.operator}")
 
     def _evaluate_FunctionCall(self, node: FunctionCall) -> Any:
-        """Evaluates a built-in function call."""
+        """Evaluates a built-in function call like NOW() or print()."""
         if node.function_name == 'NOW':
-            # For simplicity, return Unix timestamp as float
+            if node.arguments:
+                 raise InterpreterError("NOW() function does not accept arguments.")
             return time.time()
+        elif node.function_name == 'PRINT':
+            if len(node.arguments) != 1:
+                raise InterpreterError("PRINT() function requires exactly one argument.")
+            value_to_print = self._evaluate_expression(node.arguments[0])
+            try:
+                self.output_handler(value_to_print)
+            except Exception as e:
+                raise InterpreterError(f"Error during output handler execution: {e}")
+            return None
         else:
             raise InterpreterError(f"Unknown built-in function: {node.function_name}")
 
@@ -238,116 +272,129 @@ class Interpreter:
             raise InterpreterError(f"Error executing tool '{tool_name}': {e}")
 
 
-# --- Helper function for testing ---
-def run_script(script_content: str, tool_registry: Optional[ToolRegistry] = None):
-    """Parses and executes a NuwaScript string."""
-    from .parser import parse_script # Local import for testing
-    from .tools import ToolRegistry # Ensure ToolRegistry is available for the mock
-    ast = parse_script(script_content)
-    if ast:
-        interpreter = Interpreter(tool_registry)
-        try:
-            interpreter.execute(ast)
-            print("\n--- Final Variables ---")
-            print(interpreter.variables)
-            return interpreter # Return interpreter to inspect state if needed
-        except InterpreterError as e:
-            print(f"\n--- Runtime Error ---")
-            print(e)
-            return None
-    else:
-        print("Parsing failed, cannot execute.")
+# --- Helper function for testing (modified OUTSIDE __main__) ---
+# Make this helper generally available, not just in __main__
+def run_script(script_content: str,
+               tool_registry: Optional[ToolRegistry] = None,
+               output_handler: Optional[Callable[[Any], None]] = None): # Add handler arg
+    """Parses and executes a NuwaScript string.
+       Returns the interpreter instance or None on failure.
+    """
+    # Ensure parser is available if this file is run directly or imported
+    # This might be cleaner if parser/lexer are always imported at top level
+    try:
+        from .parser import parse_script
+    except ImportError:
+        # Handle case where this might be run directly and relative import fails
+        # This indicates a potential structuring issue for direct execution vs import
+        print("Error: Cannot import parser. Ensure nuwa package structure is correct.")
         return None
 
-if __name__ == '__main__':
-    # Example usage for testing
-    # Define a simple mock tool registry for testing
-    from .tools import ToolRegistry, ToolNotFoundException # Need these for the mock
-
-    class MockToolRegistry(ToolRegistry):
-        def call_tool(self, tool_name: str, args: Dict[str, Any]) -> Any:
-            print(f"[Tool Call] {tool_name}({args})")
-            if tool_name == "get_price":
-                if args.get("token") == "BTC": return 65000
-                if args.get("token") == "ETH": return 3500
-                return None # Unknown token
-            elif tool_name == "swap":
-                # Simulate a swap, maybe return a transaction ID
-                return f"swap_tx_{int(time.time())}"
-            elif tool_name == "reply":
-                # Just print the reply message
-                print(f"Reply sent: {args.get('message')}")
-                return True # Indicate success
-            elif tool_name == "get_nfts":
-                # Return a list of dicts for the FOR loop test
-                return [
-                    {'id': 'nft1', 'rarity': 85, 'price': 1.5},
-                    {'id': 'nft2', 'rarity': 95, 'price': 2.5},
-                    {'id': 'nft3', 'rarity': 91, 'price': 2.1},
-                ]
-            elif tool_name == "buy_nft":
-                print(f"Attempting to buy NFT {args.get('id')} for {args.get('price')}")
-                return True # Simulate successful purchase
+    ast = parse_script(script_content)
+    if ast:
+        # Pass handler to Interpreter
+        interpreter = Interpreter(tool_registry, output_handler=output_handler)
+        try:
+            interpreter.execute(ast)
+            # Keep print statements for debugging when run directly
+            if __name__ == "__main__":
+                 print("\n--- Final Variables ---")
+                 print(interpreter.variables)
+            return interpreter
+        except InterpreterError as e:
+            if __name__ == "__main__":
+                 print(f"\n--- Runtime Error ---")
+                 print(e)
             else:
-                raise ToolNotFoundException(tool_name)
+                 raise # Re-raise if used as a library function
+            return None
+        except Exception as e: # Catch unexpected errors
+             if __name__ == "__main__":
+                  print(f"\n--- Unexpected Execution Error ---")
+                  print(e)
+             else:
+                  raise
+             return None
+    else:
+        if __name__ == "__main__":
+             print("Parsing failed, cannot execute.")
+        return None
+
+
+# --- __main__ block: Update MockToolRegistry and example scripts ---
+if __name__ == '__main__':
+    # Needs ToolSchema etc if run directly
+    try:
+        import sys # Import sys for sys.exit
+        from .tools import ToolRegistry, ToolSchema, ToolParameter, ToolExecutionError
+    except ImportError:
+         print("Error: Cannot import tools module. Ensure nuwa package structure is correct.")
+         sys.exit(1)
+
+
+    # Define MockToolRegistry WITHOUT reply
+    class MockToolRegistry(ToolRegistry):
+        def register_defaults(self):
+            def _get_price(token: str): return 65000.0 if token == 'BTC' else 0.0
+            def _swap(from_token: str, to_token: str, amount: float): return f"tx_{int(time.time()*1000)}" # More unique tx id
+
+            self.register(ToolSchema(
+                name="get_price", description="Get price",
+                parameters=[ToolParameter("token", "String")],
+                returns="Number", callable=_get_price
+            ))
+            self.register(ToolSchema(
+                name="swap", description="Swap tokens",
+                parameters=[ToolParameter("from_token", "String"), ToolParameter("to_token", "String"), ToolParameter("amount", "Number")],
+                returns="String", callable=_swap
+            ))
+            # No 'reply' tool registered
 
     mock_registry = MockToolRegistry()
+    mock_registry.register_defaults()
 
-    test_script_1 = """
+    # Example output handler for testing
+    script_outputs = []
+    def simple_output_handler(value):
+        # Convert value to string for consistent printing/logging if needed
+        output_str = str(value)
+        print(f"[Script Output] {output_str}")
+        script_outputs.append(output_str) # Store string representation
+
+    # Example script using PRINT
+    test_script_print = """
     LET btc_price = CALL get_price { token: "BTC" }
-    LET eth_price = CALL get_price { token: "ETH" }
-    LET threshold = 60000
-    LET amount_to_swap = 100
-
-    IF btc_price < threshold OR eth_price < 3000 THEN
-        LET action = "swap_btc"
-        // LET tx_id = CALL swap { ... } // Simplified: CALL directly for now
-        CALL swap {
-            from_token: "USDT",
-            to_token: "BTC",
-            amount: amount_to_swap
-        }
-        // CALL reply { message: "Swapped for BTC, tx: " + tx_id } // Requires CALC/concat
-        CALL reply { message: "Swapped for BTC"}
+    LET threshold = 70000
+    IF btc_price < threshold THEN
+        LET tx_id = CALL swap { from_token: "USDT", to_token: "BTC", amount: 100 }
+        PRINT("Swap executed for BTC.") // Print string literal
+        PRINT(tx_id)                   // Print variable (swap result)
     ELSE
-        LET action = "wait"
-        CALL reply { message: "Prices too high." }
+        PRINT("Price is too high, no swap.")
+        PRINT(btc_price)               // Print variable (price)
     END
-
-    LET current_time = NOW() // Test built-in function
+    PRINT(NOW())                       // Print result of built-in function
+    LET flag = true
+    PRINT(flag)                        // Print boolean
     """
 
-    simple_script_2 = """
-    LET listed_nfts = CALL get_nfts {}
-    LET bought_count = 0
-    LET high_rarity_threshold = 90
+    print("\n--- Running Script with Print ---")
+    # Use the globally defined run_script helper
+    interpreter_instance = run_script(test_script_print, mock_registry, output_handler=simple_output_handler)
+    print("\nCaptured script outputs:", script_outputs)
 
-    FOR nft IN listed_nfts DO
-        IF nft.rarity > high_rarity_threshold THEN
-            CALL buy_nft { id: nft.id, price: nft.price }
-            // LET bought_count = bought_count + 1 // Requires CALC or enhanced binary ops
-        END
-    END
-    CALL reply { message: "Finished checking NFTs." } // Simplified message
-    """
+    # Test print error handling (optional)
+    print("\n--- Testing Print with Error Handler ---")
+    def erroring_handler(value):
+        raise ValueError("Output failed!")
 
-    test_script_calc = """
-    LET base_price = 500
-    LET tax_rate = 0.1
-    LET final_price = CALC {
-        formula: "base_price * (1 + tax_rate)",
-        vars: { base_price: base_price, tax_rate: tax_rate }
-    }
-    """
+    error_script = 'PRINT("This will fail")'
+    run_script(error_script, mock_registry, output_handler=erroring_handler) # Should print Runtime Error
 
-
-    print("--- Running Script 1 (Simplified) ---")
-    run_script(test_script_1, mock_registry)
-
-    print("\n--- Running Simplified Script 2 ---")
-    run_script(simple_script_2, mock_registry)
-
-    print("\n--- Running Script CALC --- ")
-    run_script(test_script_calc, mock_registry)
+    print("\n--- Testing Print with wrong number of args (Parser should catch) ---")
+    error_script_args = 'PRINT("Too", "many")' # This should fail parsing
+    run_script(error_script_args, mock_registry, output_handler=simple_output_handler)
+    error_script_args2 = 'PRINT()' # This should fail parsing too
+    run_script(error_script_args2, mock_registry, output_handler=simple_output_handler)
 
 

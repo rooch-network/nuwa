@@ -3,32 +3,14 @@ import ply.lex as lex
 # List of token names. This is always required.
 tokens = (
     'LET', 'CALL', 'IF', 'THEN', 'ELSE', 'END', 'FOR', 'IN', 'DO', 'CALC',
-    'NOW', # Built-in function
-    'ID',       # Identifiers
-    'NUMBER',   # Integer or floating point
-    'STRING',   # String literals
-    'BOOLEAN',  # True or False
-    'ASSIGN',   # =
-    'EQ',       # ==
-    'NE',       # !=
-    'GT',       # >
-    'LT',       # <
-    'GE',       # >=
-    'LE',       # <=
-    'AND',      # AND
-    'OR',       # OR
-    'NOT',      # NOT
-    'LBRACE',   # {
-    'RBRACE',   # }
-    'LPAREN',   # (
-    'RPAREN',   # )
-    'COLON',    # :
-    'COMMA',    # ,
-    'DOT',      # . (for accessing struct fields like nft.rarity)
-    # We might need 'FORMULA' for CALC block content later
+    'PRINT', 'NOW',
+    'ID', 'NUMBER', 'STRING', 'BOOLEAN', # Ensure BOOLEAN type exists
+    'ASSIGN', 'EQ', 'NE', 'GT', 'LT', 'GE', 'LE',
+    'AND', 'OR', 'NOT',
+    'LBRACE', 'RBRACE', 'LPAREN', 'RPAREN', 'COLON', 'COMMA', 'DOT',
 )
 
-# Reserved words
+# Reserved words - UPPERCASE only
 reserved = {
     'LET': 'LET',
     'CALL': 'CALL',
@@ -40,13 +22,13 @@ reserved = {
     'IN': 'IN',
     'DO': 'DO',
     'CALC': 'CALC',
+    'PRINT': 'PRINT',
     'AND': 'AND',
     'OR': 'OR',
     'NOT': 'NOT',
     'NOW': 'NOW',
-    'true': 'BOOLEAN',
-    'false': 'BOOLEAN',
-    'null': 'LITERAL_NULL', # Maybe handle null later if needed
+    'TRUE': 'BOOLEAN', # Use uppercase TRUE
+    'FALSE': 'BOOLEAN', # Use uppercase FALSE
 }
 
 # Regular expression rules for simple tokens
@@ -89,15 +71,15 @@ t_ignore_COMMENT = r'//.*'
 # Rule for identifiers and reserved words
 def t_ID(t):
     r'[a-zA-Z_][a-zA-Z_0-9]*'
-    # Check for reserved words
+    # Check reserved words using the original value.
+    # Only uppercase versions are in 'reserved', so lowercase stays ID.
     t.type = reserved.get(t.value, 'ID')
-    # Check for boolean literals explicitly
-    if t.value == 'true':
-        t.value = True
-        t.type = 'BOOLEAN'
-    elif t.value == 'false':
-        t.value = False
-        t.type = 'BOOLEAN'
+
+    # If it was identified as a BOOLEAN token (t.value was 'TRUE' or 'FALSE')
+    # convert the value to a Python boolean.
+    if t.type == 'BOOLEAN':
+        t.value = (t.value == 'TRUE')
+
     return t
 
 # Rule for string literals (handling escaped quotes)
@@ -128,33 +110,40 @@ def tokenize_script(script_content: str):
     return tokens_list
 
 if __name__ == '__main__':
-    # Example usage for testing
-    test_script = """
-    // This is a sample script
-    LET price = CALL get_price { token: "BTC" }
-    LET threshold = 70000.5
-    IF price < threshold AND NOT (price == 0) THEN
-        CALL swap {
-            from_token: "USDT",
-            to_token: "BTC",
-            amount: 100
-        }
-        LET success = true
+    # Helper function needs to be defined here if not imported
+    def tokenize_script(script_content: str):
+        lexer.input(script_content)
+        tokens_list = []
+        while True:
+            tok = lexer.token()
+            if not tok:
+                break
+            tokens_list.append(tok)
+        return tokens_list
+
+    test_script_upper = """
+    LET PRICE = CALL GET_PRICE { token: "BTC" } // All caps
+    LET THRESHOLD = 70000.5
+    IF PRICE < THRESHOLD AND NOT (PRICE == 0) THEN
+        PRINT("Condition met!")
+        LET SUCCESS = TRUE     // Uppercase boolean
     ELSE
-        CALL reply { message: "Price too high or zero." }
-        LET success = false
+        PRINT("Price too high or zero.")
+        LET SUCCESS = FALSE    // Uppercase boolean
     END
-
-    LET user_name = "John \\"Agent\\" Doe" // Test string escape
-    LET config = { key: "value", count: 1 } // Simple map-like structure (needs parsing adjustment)
-    LET current_time = NOW()
-
-    FOR item IN items DO
-        // Loop body
-        LET item_value = item.value
-    END
+    LET CURRENT_TIME = NOW()
     """
 
-    tokens_found = tokenize_script(test_script)
+    tokens_found = tokenize_script(test_script_upper)
+    print("\n--- Lexer Test Output (Case Sensitive - UPPERCASE) ---")
     for token in tokens_found:
         print(token)
+
+    # Test case with lowercase keyword - should be treated as ID
+    test_script_lower = """
+    let price = 100
+    """
+    tokens_lower = tokenize_script(test_script_lower)
+    print("\n--- Lexer Test Output (Lowercase Keyword as ID) ---")
+    for token in tokens_lower:
+        print(token) # Expecting: LexToken(ID,'let',...), LexToken(ID,'price',...), ...

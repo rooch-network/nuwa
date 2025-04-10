@@ -38,10 +38,9 @@ class UnaryOp(Expression):
 
 @dataclasses.dataclass
 class FunctionCall(Expression):
-    """Represents a built-in function call (e.g., NOW())."""
+    """Represents a built-in function call (e.g., NOW(), print(value))."""
     function_name: str
-    # Currently no arguments for NOW(), but might need in future
-    # arguments: List[Expression] = dataclasses.field(default_factory=list)
+    arguments: List[Expression] = dataclasses.field(default_factory=list)
 
 @dataclasses.dataclass
 class CallExpression(Expression):
