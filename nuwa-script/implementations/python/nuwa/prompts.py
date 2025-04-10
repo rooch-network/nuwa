@@ -2,6 +2,45 @@ from typing import List, Dict
 # Assuming ToolRegistry, ToolSchema, ToolParameter are in .tools
 from .tools import ToolRegistry, ToolSchema, ToolParameter
 
+# Define the default syntax specification as a constant
+DEFAULT_NUWA_SYNTAX_SPECIFICATION = """
+### NuwaScript Syntax Specification
+
+1. Variables:
+   LET var_name = <expression>
+   Example: LET price = 65000
+
+2. Tool Calls (Statement):
+   CALL tool_name { arg1: <expr1>, arg2: <expr2>, ... }
+   Example: CALL swap { from_token: "USDT", to_token: "BTC", amount: 100 }
+
+3. Tool Calls (Expression, used in LET):
+   LET result = CALL tool_name { ... }
+   Example: LET price = CALL get_price { token: "BTC" }
+
+4. Conditionals:
+   IF <condition_expr> THEN
+     <statements>
+   [ELSE
+     <statements>]
+   END
+   Operators: ==, !=, >, <, >=, <=, AND, OR, NOT
+   Example: IF price < 70000 THEN CALL buy { amount: 1 } END
+
+5. Loops:
+   FOR item_var IN list_var DO
+     <statements>
+   END
+   Example: FOR nft IN my_nfts DO CALL list_nft { id: nft.id } END
+
+6. Calculations:
+   CALC { formula: "string_formula", vars: { name1: <expr1>, ... } }
+   Example: LET total = CALC { formula: "price * 1.1", vars: { price: base_price } }
+
+7. Built-ins:
+   NOW() // Returns current timestamp
+"""
+
 def _format_tool_parameter(param: ToolParameter) -> str:
     """Formats a single tool parameter for the prompt."""
     type_str = f": {param.type}"
@@ -64,23 +103,29 @@ def generate_tools_prompt_section(registry: ToolRegistry) -> str:
 # --- Optional: Higher-level prompt builder ---
 def build_system_prompt(
     registry: ToolRegistry,
-    syntax_spec: str = "", # Provide default or load from file
+    # Use the constant as the default value
+    syntax_spec: str = DEFAULT_NUWA_SYNTAX_SPECIFICATION,
     task_description: str = "", # Provide default
     examples: str = "" # Provide default or few-shot examples
 ) -> str:
     """
     Constructs the complete system prompt by combining syntax, tools, task, and examples.
+    Uses a default syntax specification if none is provided.
     """
     tools_section = generate_tools_prompt_section(registry)
 
-    # Basic structure, adjust formatting as needed
     prompt_parts = [
         "You are an AI assistant capable of generating NuwaScript code.",
         "NuwaScript is a language for defining agent actions.",
     ]
+    # Only add the section if syntax_spec is not empty
     if syntax_spec:
-        prompt_parts.append("\n### NuwaScript Syntax Specification\n" + syntax_spec)
-    if tools_section:
+        # Ensure the ### header is present if using custom spec too
+        if not syntax_spec.strip().startswith("###"):
+             prompt_parts.append("\n### NuwaScript Syntax Specification\n" + syntax_spec)
+        else:
+             prompt_parts.append("\n" + syntax_spec)
+    if tools_section and tools_section != "No tools are available.":
         prompt_parts.append("\n### Available Tools\n" + tools_section)
     if task_description:
         prompt_parts.append("\n### Your Task\n" + task_description)
@@ -123,8 +168,8 @@ if __name__ == '__main__':
     print(tools_prompt)
 
     # Example of building full prompt (using placeholder text)
-    syntax = "LET x = 1\nCALL tool {}"
     task = "Generate NuwaScript based on user request. Only output code."
-    full_prompt = build_system_prompt(registry, syntax_spec=syntax, task_description=task)
-    print("\n--- Generated Full System Prompt (Example) ---")
+    # Use default syntax_spec
+    full_prompt = build_system_prompt(registry, task_description=task)
+    print("\n--- Generated Full System Prompt (Using Default Syntax) ---")
     print(full_prompt) 
