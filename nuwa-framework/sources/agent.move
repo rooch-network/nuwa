@@ -81,11 +81,30 @@ module nuwa_framework::agent {
         agent_cap_id: ObjectID,
     }
 
+    struct AgentAddMemoryEvent has store, copy, drop {
+        agent_address: address,
+        memory_key: address,
+        memory_content: String,
+    }
+
+    struct AgentUpdateMemoryEvent has store, copy, drop {
+        agent_address: address,
+        memory_key: address,
+        memory_index: u64,
+        memory_content: String,
+    }
+
     struct AgentCompactMemoryEvent has store, copy, drop {
         agent_address: address,
         memory_key: address,
         original_memory: vector<memory::Memory>,
         compact_memory: String,
+    }
+
+    struct AgentRemoveMemoryEvent has store, copy, drop {
+        agent_address: address,
+        memory_key: address,
+        memory_index: u64,
     }
 
     struct AgentInstructionUpdateEvent has store, copy, drop {
@@ -260,18 +279,43 @@ module nuwa_framework::agent {
     }
 
     public(friend) fun add_memory(agent: &mut Object<Agent>, addr: address, content: String) {
+        let agent_address = get_agent_address(agent);
         let store = borrow_mut_memory_store(agent);
         memory::add_memory(store, addr, content);
+        let event = AgentAddMemoryEvent {
+            agent_address,
+            memory_key: addr,
+            memory_content: content,
+        };
+        let handle = event::custom_event_handle_id<address, AgentAddMemoryEvent>(agent_address);
+        event::emit_with_handle(handle, event);
     }
 
     public(friend) fun update_memory(agent: &mut Object<Agent>, addr: address, index: u64, content: String) {
+        let agent_address = get_agent_address(agent);
         let store = borrow_mut_memory_store(agent);
         memory::update_memory(store, addr, index, content);
+        let event = AgentUpdateMemoryEvent {
+            agent_address,
+            memory_key: addr,
+            memory_index: index,
+            memory_content: content,
+        };
+        let handle = event::custom_event_handle_id<address, AgentUpdateMemoryEvent>(agent_address);
+        event::emit_with_handle(handle, event);
     }
 
     public(friend) fun remove_memory(agent: &mut Object<Agent>, addr: address, index: u64) {
+        let agent_address = get_agent_address(agent);
         let store = borrow_mut_memory_store(agent);
         memory::remove_memory(store, addr, index);
+        let event = AgentRemoveMemoryEvent {
+            agent_address,
+            memory_key: addr,
+            memory_index: index,
+        };
+        let handle = event::custom_event_handle_id<address, AgentRemoveMemoryEvent>(agent_address);
+        event::emit_with_handle(handle, event);
     }
 
     public(friend) fun compact_memory(agent: &mut Object<Agent>, addr: address, original_memory: vector<memory::Memory>, compact_memory: String) {
