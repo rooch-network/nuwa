@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    /* Base Options: */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "ES2016", // Or newer target
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "types": ["node", "jest"],
+
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+
+    /* If NOT transpiling code: */
+    // "module": "preserve",
+    // "noEmit": true,
+
+    /* If your code runs in the DOM: */
+    // "lib": ["es2022", "dom", "dom.iterable"],
+
+    /* If your code runs in Node.js: */
+    "lib": ["es2022"],
+    "module": "NodeNext", // Use NodeNext for modern Node.js module resolution
+    "outDir": "./dist", // Output directory for compiled JS
+    "rootDir": "./src", // Root directory of source files
+
+    /* Declaration Files */
+    "declaration": true, // Generate .d.ts files
+    "declarationMap": true, // Create sourcemaps for d.ts files
+    "sourceMap": true, // Create sourcemaps for .js files
+
+    /* Module Resolution */
+    "moduleResolution": "NodeNext", // Align with 'module' setting
+    "baseUrl": ".", // Base directory for path aliases
+    "paths": {
+      // Define path aliases if needed
+      // "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"], // Which files TS should check
+  "exclude": ["node_modules", "dist"] // Which folders to ignore
+}
