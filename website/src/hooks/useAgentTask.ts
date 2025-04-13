@@ -1,8 +1,8 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 import { Args } from "@roochnetwork/rooch-sdk";
-import { TaskSpecification } from "../types/taska";
+import { TaskSpecification } from "@/types/task-types";
 
 export default function useAgentTask(id?: string) {
   const client = useRoochClient();

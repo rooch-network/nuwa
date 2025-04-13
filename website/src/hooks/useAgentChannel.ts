@@ -1,7 +1,7 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
 import { Args } from "@roochnetwork/rooch-sdk";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 
 export default function useAgentChannel(id?: string) {
   const client = useRoochClient();

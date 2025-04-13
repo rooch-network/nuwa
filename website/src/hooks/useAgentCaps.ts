@@ -1,7 +1,7 @@
-import { useNetworkVariable } from "./use-networks.ts";
+import { useNetworkVariable } from "./useNetworks";
 import { useCurrentAddress, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { AgentCapabilities } from "../types/agent.ts";
+import { AgentCapabilities } from "@/types/agent";
 
 interface AgentCap {
   id: string;
@@ -17,9 +17,9 @@ interface UseAgentCapsResult {
 }
 
 export default function useAgentCaps(): UseAgentCapsResult {
-  const client = useRoochClient()
-  const packageId = useNetworkVariable('packageId')
-  const address = useCurrentAddress()
+  const client = useRoochClient();
+  const packageId = useNetworkVariable("packageId");
+  const address = useCurrentAddress();
 
   const {
     data: caps,
@@ -27,16 +27,16 @@ export default function useAgentCaps(): UseAgentCapsResult {
     isError,
     refetch,
   } = useQuery<Map<string, AgentCap>>({
-    queryKey: ['useAgentCaps', address],
+    queryKey: ["useAgentCaps", address],
     queryFn: async () => {
       const agentCapsResponse = await client.queryObjectStates({
         filter: {
           object_type_with_owner: {
             object_type: `${packageId}::agent_cap::AgentCap`,
             owner: address!.toStr(),
-          }
+          },
         },
-      })
+      });
 
       return new Map(
         agentCapsResponse.data
@@ -44,9 +44,15 @@ export default function useAgentCaps(): UseAgentCapsResult {
           .map((obj) => {
             const capabilities: AgentCapabilities = {
               canChat: true,
-              canCreateChannels: Boolean(obj.decoded_value?.value?.can_create_channels || true),
-              canManageMembers: Boolean(obj.decoded_value?.value?.can_manage_members || true),
-              canSendMessages: Boolean(obj.decoded_value?.value?.can_send_messages || true),
+              canCreateChannels: Boolean(
+                obj.decoded_value?.value?.can_create_channels || true
+              ),
+              canManageMembers: Boolean(
+                obj.decoded_value?.value?.can_manage_members || true
+              ),
+              canSendMessages: Boolean(
+                obj.decoded_value?.value?.can_send_messages || true
+              ),
             };
 
             return [
@@ -54,16 +60,19 @@ export default function useAgentCaps(): UseAgentCapsResult {
               {
                 id: obj.id,
                 agentId: String(obj.decoded_value!.value.agent_obj_id),
-                capabilities
+                capabilities,
               },
             ];
           })
       );
     },
-    enabled: !!address
-  })
+    enabled: !!address,
+  });
 
   return {
-    caps: caps ?? new Map(), isPending, isError, refetch
-  }
+    caps: caps ?? new Map(),
+    isPending,
+    isError,
+    refetch,
+  };
 }

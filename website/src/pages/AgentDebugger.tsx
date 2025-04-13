@@ -1,19 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon, PencilIcon, LockClosedIcon } from "@heroicons/react/24/outline";
-import { useRoochClient, useCurrentAddress, SessionKeyGuard } from "@roochnetwork/rooch-sdk-kit";
-import { RoochClient, RoochAddress, Serializer, Args } from "@roochnetwork/rooch-sdk";
-import { useNetworkVariable } from "../hooks/use-networks";
-import { LoadingScreen } from "../components/layout/LoadingScreen";
+import { LoadingScreen } from "@/components/layout/LoadingScreen";
+import {
+  AgentProfileProvider,
+  useAgentProfile,
+} from "@/components/profile/AgentProfileContext";
+import useAddressByUsername from "@/hooks/useAddressByUsername";
+import { useNetworkVariable } from "@/hooks/useNetworks";
+import {
+  ArrowLeftIcon,
+  LockClosedIcon,
+  PencilIcon,
+} from "@heroicons/react/24/outline";
+import { Args, RoochAddress } from "@roochnetwork/rooch-sdk";
+import {
+  SessionKeyGuard,
+  useCurrentAddress,
+  useRoochClient,
+} from "@roochnetwork/rooch-sdk-kit";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import { NotFound } from "./NotFound";
-import useAddressByUsername from '../hooks/use-address-by-username'
-import { toast } from 'react-toastify';
-import { AgentProfileProvider, useAgentProfile } from '../components/profile/AgentProfileContext';
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
-  actions?: Array<{name: string; params: any}>;
+  actions?: Array<{ name: string; params: any }>;
 }
 
 interface ChatMessage {
@@ -30,11 +41,13 @@ function AgentDebuggerContent() {
   const { agent, isOwner, caps, updateAgent } = useAgentProfile();
 
   const [loading, setLoading] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
-  const [agentPrompt, setAgentPrompt] = useState('');
-  const [renderedPrompt, setRenderedPrompt] = useState('');
+  const [apiKey, setApiKey] = useState(
+    localStorage.getItem("openai_api_key") || ""
+  );
+  const [agentPrompt, setAgentPrompt] = useState("");
+  const [renderedPrompt, setRenderedPrompt] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [userInput, setUserInput] = useState('');
+  const [userInput, setUserInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [temperature, setTemperature] = useState<number>(0.7);
   const [mockRgasAmount, setMockRgasAmount] = useState<string>("0");
@@ -45,15 +58,17 @@ function AgentDebuggerContent() {
 
   // Initialize prompt only once when agent is loaded
   useEffect(() => {
-    if (agent?.instructions && agentPrompt === '') {
+    if (agent?.instructions && agentPrompt === "") {
       setAgentPrompt(agent.instructions);
     }
   }, [agent]); // Remove agentPrompt from dependencies
 
   // Parse Actions from AI response
-  const parseActions = (response: string): Array<{name: string; params: any}> => {
-    const actions: Array<{name: string; params: any}> = [];
-    const lines = response.split('\n');
+  const parseActions = (
+    response: string
+  ): Array<{ name: string; params: any }> => {
+    const actions: Array<{ name: string; params: any }> = [];
+    const lines = response.split("\n");
 
     for (const line of lines) {
       const match = line.match(/^(\w+::\w+)\s+(.+)$/);
@@ -61,10 +76,10 @@ function AgentDebuggerContent() {
         try {
           actions.push({
             name: match[1],
-            params: JSON.parse(match[2])
+            params: JSON.parse(match[2]),
           });
         } catch (e) {
-          console.warn('Failed to parse action:', line);
+          console.warn("Failed to parse action:", line);
         }
       }
     }
@@ -73,9 +88,11 @@ function AgentDebuggerContent() {
   };
 
   // Extract response::say content from actions
-  const extractResponseContent = (actions: Array<{name: string; params: any}>): string => {
-    const sayAction = actions.find(action => action.name === 'response::say');
-    return sayAction?.params?.content || '';
+  const extractResponseContent = (
+    actions: Array<{ name: string; params: any }>
+  ): string => {
+    const sayAction = actions.find((action) => action.name === "response::say");
+    return sayAction?.params?.content || "";
   };
 
   // Convert RGAS float value to raw value (8 decimal places)
@@ -84,7 +101,7 @@ function AgentDebuggerContent() {
       // Parse the float value
       const floatValue = parseFloat(amount);
       if (isNaN(floatValue)) {
-        throw new Error('Invalid number');
+        throw new Error("Invalid number");
       }
       // Convert to raw value (multiply by 10^8)
       const rawValue = Math.floor(floatValue * 100000000).toString();
@@ -98,7 +115,7 @@ function AgentDebuggerContent() {
   const handleRgasInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Allow empty string, numbers, and one decimal point
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
       setMockRgasAmount(value);
     }
   };
@@ -106,7 +123,7 @@ function AgentDebuggerContent() {
   // Call OpenAI API
   const handleTestWithOpenAI = async (chatRequest: any) => {
     if (!apiKey) {
-      setError('Please enter OpenAI API Key');
+      setError("Please enter OpenAI API Key");
       return;
     }
 
@@ -115,14 +132,17 @@ function AgentDebuggerContent() {
       setError(null);
 
       // Call OpenAI API directly with the chat request from contract
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(chatRequest)
-      });
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(chatRequest),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`OpenAI API error: ${response.statusText}`);
@@ -135,13 +155,16 @@ function AgentDebuggerContent() {
 
       // Add assistant message with actions
       const assistantMessage: Message = {
-        role: 'assistant',
+        role: "assistant",
         content: responseContent,
-        actions: actions.filter(action => action.name !== 'response::say') // Store other actions
+        actions: actions.filter((action) => action.name !== "response::say"), // Store other actions
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
-      setError('Failed to call OpenAI API: ' + (error instanceof Error ? error.message : String(error)));
+      setError(
+        "Failed to call OpenAI API: " +
+          (error instanceof Error ? error.message : String(error))
+      );
       console.error(error);
     } finally {
       setLoading(false);
@@ -155,23 +178,23 @@ function AgentDebuggerContent() {
     }
 
     if (!currentAddress) {
-      setError('Please connect your wallet');
+      setError("Please connect your wallet");
       return;
     }
 
     if (!agent?.address) {
-      setError('Agent address not found');
+      setError("Agent address not found");
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      
+
       // Add user message to chat
-      const userMessage = { role: 'user' as const, content: userInput };
-      setMessages(prev => [...prev, userMessage]);
-      setUserInput(''); // Clear input after sending
+      const userMessage = { role: "user" as const, content: userInput };
+      setMessages((prev) => [...prev, userMessage]);
+      setUserInput(""); // Clear input after sending
 
       // Get current account address in bech32 format
       const userAddress = currentAddress.genRoochAddress().toBech32Address();
@@ -183,7 +206,7 @@ function AgentDebuggerContent() {
         messages: [...messages, userMessage].map((msg, index) => ({
           index: index,
           // Use agent address for assistant messages, user address for user messages
-          sender: msg.role === 'assistant' ? agentAddress : userAddress,
+          sender: msg.role === "assistant" ? agentAddress : userAddress,
           content: msg.content,
           timestamp: Date.now(),
           attachments: [],
@@ -195,29 +218,38 @@ function AgentDebuggerContent() {
       // Call contract to get chat request
       const response = await client.executeViewFunction({
         target: `${packageId}::agent_debugger::make_debug_ai_request`,
-        args: [Args.objectId(agent.id || ''), Args.string(JSON.stringify(debugInput))],
+        args: [
+          Args.objectId(agent.id || ""),
+          Args.string(JSON.stringify(debugInput)),
+        ],
       });
       console.log(response);
 
       if (!response.return_values?.[0]?.decoded_value) {
-        throw new Error('Failed to get response from contract: ' + JSON.stringify(response));
+        throw new Error(
+          "Failed to get response from contract: " + JSON.stringify(response)
+        );
       }
 
       const chatRequestJson = response.return_values[0].decoded_value as string;
       const chatRequest = JSON.parse(chatRequestJson);
       // Extract the system prompt from the chat request
-      const systemMessage = (chatRequest.messages as ChatMessage[]).find(msg => msg.role === 'system');
+      const systemMessage = (chatRequest.messages as ChatMessage[]).find(
+        (msg) => msg.role === "system"
+      );
       if (!systemMessage?.content) {
-        throw new Error('Invalid response format: missing system message');
+        throw new Error("Invalid response format: missing system message");
       }
-      setRenderedPrompt(systemMessage.content); 
+      setRenderedPrompt(systemMessage.content);
       // Call OpenAI API with the chat request
       await handleTestWithOpenAI(chatRequest);
     } catch (error) {
-      console.error('Send message error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to send message');
+      console.error("Send message error:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to send message"
+      );
       // Remove the user message if the request failed
-      setMessages(prev => prev.slice(0, -1));
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setLoading(false);
     }
@@ -225,22 +257,22 @@ function AgentDebuggerContent() {
 
   const validatePrompt = (prompt: string): string | null => {
     if (prompt.length > 4096) {
-      return 'Prompt cannot be longer than 4096 characters'
+      return "Prompt cannot be longer than 4096 characters";
     }
     if (prompt.trim() && /^\s+$/.test(prompt)) {
-      return 'Prompt cannot only contain spaces'
+      return "Prompt cannot only contain spaces";
     }
-    return null
-  }
+    return null;
+  };
 
   const handleSavePrompt = async () => {
     if (!agent) return;
 
     const promptError = validatePrompt(agentPrompt);
     if (promptError) {
-      setFormErrors(prev => ({
+      setFormErrors((prev) => ({
         ...prev,
-        prompt: promptError
+        prompt: promptError,
       }));
       return;
     }
@@ -252,7 +284,7 @@ function AgentDebuggerContent() {
         instructions: agentPrompt,
       });
 
-      toast.success('Agent prompt updated successfully!', {
+      toast.success("Agent prompt updated successfully!", {
         position: "top-right",
         autoClose: 2000,
         hideProgressBar: false,
@@ -263,7 +295,7 @@ function AgentDebuggerContent() {
         theme: "light",
       });
     } catch (error) {
-      toast.error('Failed to update agent prompt', {
+      toast.error("Failed to update agent prompt", {
         position: "top-right",
         autoClose: 2000,
         hideProgressBar: false,
@@ -284,7 +316,7 @@ function AgentDebuggerContent() {
   }
 
   return (
-    <> 
+    <>
       <div className="h-screen flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex-shrink-0">
@@ -303,7 +335,7 @@ function AgentDebuggerContent() {
             </div>
             {isOwner ? (
               <SessionKeyGuard onClick={handleSavePrompt}>
-                <button 
+                <button
                   disabled={isSavingPrompt}
                   className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
                 >
@@ -362,14 +394,16 @@ function AgentDebuggerContent() {
                   value={apiKey}
                   onChange={(e) => {
                     setApiKey(e.target.value);
-                    localStorage.setItem('openai_api_key', e.target.value);
+                    localStorage.setItem("openai_api_key", e.target.value);
                   }}
                   placeholder="Enter your OpenAI API Key"
                   className="w-80 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
 
                 <div className="flex items-center space-x-2">
-                  <label className="text-sm text-gray-600 dark:text-gray-300">Temperature:</label>
+                  <label className="text-sm text-gray-600 dark:text-gray-300">
+                    Temperature:
+                  </label>
                   <input
                     type="number"
                     value={temperature}
@@ -382,7 +416,9 @@ function AgentDebuggerContent() {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <label className="text-sm text-gray-600 dark:text-gray-300">Mock RGas:</label>
+                  <label className="text-sm text-gray-600 dark:text-gray-300">
+                    Mock RGas:
+                  </label>
                   <input
                     type="text"
                     value={mockRgasAmount}
@@ -390,7 +426,9 @@ function AgentDebuggerContent() {
                     placeholder="RGAS amount"
                     className="w-32 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">RGAS</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    RGAS
+                  </span>
                 </div>
               </div>
 
@@ -429,36 +467,40 @@ function AgentDebuggerContent() {
                   <div
                     key={index}
                     className={`flex ${
-                      message.role === 'assistant' ? 'justify-start' : 'justify-end'
+                      message.role === "assistant"
+                        ? "justify-start"
+                        : "justify-end"
                     }`}
                   >
                     <div
                       className={`max-w-[80%] rounded-lg p-4 ${
-                        message.role === 'assistant'
-                          ? 'bg-gray-100 dark:bg-gray-700'
-                          : 'bg-blue-500 text-white'
+                        message.role === "assistant"
+                          ? "bg-gray-100 dark:bg-gray-700"
+                          : "bg-blue-500 text-white"
                       }`}
                     >
                       <pre className="whitespace-pre-wrap font-mono text-sm">
                         {message.content}
                       </pre>
-                      {message.role === 'assistant' && message.actions && message.actions.length > 0 && (
-                        <div className="mt-4 space-y-4">
-                          {message.actions.map((action, actionIndex) => (
-                            <div
-                              key={actionIndex}
-                              className="border border-gray-300 dark:border-gray-600 rounded-md p-4 bg-white dark:bg-gray-800"
-                            >
-                              <h4 className="text-blue-500 dark:text-blue-400 font-medium mb-2">
-                                {action.name}
-                              </h4>
-                              <pre className="bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto text-xs">
-                                {JSON.stringify(action.params, null, 2)}
-                              </pre>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {message.role === "assistant" &&
+                        message.actions &&
+                        message.actions.length > 0 && (
+                          <div className="mt-4 space-y-4">
+                            {message.actions.map((action, actionIndex) => (
+                              <div
+                                key={actionIndex}
+                                className="border border-gray-300 dark:border-gray-600 rounded-md p-4 bg-white dark:bg-gray-800"
+                              >
+                                <h4 className="text-blue-500 dark:text-blue-400 font-medium mb-2">
+                                  {action.name}
+                                </h4>
+                                <pre className="bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto text-xs">
+                                  {JSON.stringify(action.params, null, 2)}
+                                </pre>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                     </div>
                   </div>
                 ))}
@@ -472,7 +514,7 @@ function AgentDebuggerContent() {
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
                     }
@@ -485,11 +527,11 @@ function AgentDebuggerContent() {
                   disabled={!userInput.trim() || !apiKey || loading}
                   className={`px-6 self-end h-10 rounded-md text-white ${
                     !userInput.trim() || !apiKey || loading
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-500 hover:bg-blue-600'
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-blue-500 hover:bg-blue-600"
                   }`}
                 >
-                  {loading ? 'Sending...' : 'Send'}
+                  {loading ? "Sending..." : "Send"}
                 </button>
               </div>
             </div>
@@ -504,15 +546,19 @@ export function AgentDebugger() {
   const { identifier } = useParams<{ identifier: string }>();
   const isAddress = (() => {
     try {
-      if (!identifier) return false
-      new RoochAddress(identifier)
-      return true
+      if (!identifier) return false;
+      new RoochAddress(identifier);
+      return true;
     } catch {
-      return false
+      return false;
     }
-  })()
+  })();
 
-  const { address, isPending: isAddressPending, isError: isAddressError } = useAddressByUsername(!isAddress ? identifier : undefined)
+  const {
+    address,
+    isPending: isAddressPending,
+    isError: isAddressError,
+  } = useAddressByUsername(!isAddress ? identifier : undefined);
 
   if (isAddressPending) {
     return <LoadingScreen agentName={identifier} />;

@@ -1,6 +1,6 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 import { Args } from "@roochnetwork/rooch-sdk";
 
 export default function useChannelMessageCount(channelId?: string) {

@@ -8,7 +8,7 @@ import {
 import { Transaction, Args } from "@roochnetwork/rooch-sdk";
 import { useCurrentSession, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { mutationKeys } from "./mutationKeys";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 
 type UseUserInitArgs = {
   name: string;
@@ -40,7 +40,7 @@ export function useUserInit({
   return useMutation({
     mutationKey: mutationKeys.initUser(mutationKey),
     mutationFn: async (args) => {
-      console.log(args)
+      console.log(args);
 
       // verify the parameters
       if (!args.username) {
@@ -54,14 +54,15 @@ export function useUserInit({
 
       // verify the username format
       if (!/^[a-zA-Z0-9_]+$/.test(args.username)) {
-        throw new Error("Username can only contain letters, numbers, and underscores");
+        throw new Error(
+          "Username can only contain letters, numbers, and underscores"
+        );
       }
 
       // verify the username cannot be all numbers
       if (/^\d+$/.test(args.username)) {
         throw new Error("Username cannot be all numbers");
       }
-
 
       const tx = new Transaction();
       tx.callFunction({

@@ -7,26 +7,33 @@ import {
 import { Transaction, Args } from "@roochnetwork/rooch-sdk";
 import { useCurrentSession, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { mutationKeys } from "./mutationKeys";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 
-type UseChannelJoinArgs = {
-  id: string;
+type UseChannelCreateTopicArgs = {
+  channelId: string;
+  topic: string;
+  joinPolicy: 0 | 1; // 0 public 1 private
 };
 
-type UseChannelJoinResult = void;
+type UseChannelCreateTopicResult = void;
 
-type UseChannelJoinOptions = Omit<
-  UseMutationOptions<UseChannelJoinResult, Error, UseChannelJoinArgs, unknown>,
+type UseChannelCreateTopicOptions = Omit<
+  UseMutationOptions<
+    UseChannelCreateTopicResult,
+    Error,
+    UseChannelCreateTopicArgs,
+    unknown
+  >,
   "mutationFn"
 >;
 
-export function useChannelJoin({
+export function useChannelCreateTopic({
   mutationKey,
   ...mutationOptions
-}: UseChannelJoinOptions = {}): UseMutationResult<
-UseChannelJoinResult,
+}: UseChannelCreateTopicOptions = {}): UseMutationResult<
+  UseChannelCreateTopicResult,
   Error,
-  UseChannelJoinArgs,
+  UseChannelCreateTopicArgs,
   unknown
 > {
   const client = useRoochClient();
@@ -38,9 +45,11 @@ UseChannelJoinResult,
     mutationFn: async (args) => {
       const agentTx = new Transaction();
       agentTx.callFunction({
-        target: `${packageId}::channel_entry::join_channel`,
+        target: `${packageId}::channel_entry::create_topic_channel`,
         args: [
-          Args.objectId(args.id),
+          Args.objectId(args.channelId),
+          Args.string(args.topic),
+          Args.u8(args.joinPolicy),
         ],
       });
 
@@ -49,8 +58,8 @@ UseChannelJoinResult,
         signer: session!,
       });
 
-      if (result.execution_info.status.type !== 'executed') {
-        throw new Error('Failed to join channel');
+      if (result.execution_info.status.type !== "executed") {
+        throw new Error("Failed to join channel");
       }
     },
     ...mutationOptions,

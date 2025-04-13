@@ -7,7 +7,7 @@ import {
 import { Transaction, Args } from "@roochnetwork/rooch-sdk";
 import { useCurrentSession, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { mutationKeys } from "./mutationKeys";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 
 type UseCreateAgentArgs = {
   name: string;

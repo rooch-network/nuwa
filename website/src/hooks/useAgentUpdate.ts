@@ -7,7 +7,7 @@ import {
 import { Transaction, Args } from "@roochnetwork/rooch-sdk";
 import { useCurrentSession, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { mutationKeys } from "./mutationKeys";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 
 type UseUpdateAgentArgs = {
   cap: string;
@@ -77,13 +77,11 @@ export function useUpdateAgent({
         signer: session!,
       });
 
-      console.log(result)
+      console.log(result);
 
       if (result.execution_info.status.type !== "executed") {
         throw new Error(
-          `Agent update failed: ${JSON.stringify(
-            result.execution_info.status
-          )}`
+          `Agent update failed: ${JSON.stringify(result.execution_info.status)}`
         );
       }
     },

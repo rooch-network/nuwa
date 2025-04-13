@@ -1,7 +1,7 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
 import { AnnotatedMoveStructView, Args } from "@roochnetwork/rooch-sdk";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 
 export default function useAgentWithAddress(address?: string) {
   const client = useRoochClient();
@@ -15,7 +15,6 @@ export default function useAgentWithAddress(address?: string) {
   } = useQuery({
     queryKey: ["useAgentWithAddress", address],
     queryFn: async () => {
-
       if (!client || !packageId) {
         return null;
       }
@@ -25,7 +24,6 @@ export default function useAgentWithAddress(address?: string) {
           target: `${packageId}::agent::get_agent_info_by_address`,
           args: [Args.address(address!)],
         });
-
 
         if (result.return_values && result.return_values.length > 0) {
           const agentInfoValue = (
@@ -57,9 +55,8 @@ export default function useAgentWithAddress(address?: string) {
     },
     enabled: !!address && !!client && !!packageId,
     retry: false,
-    staleTime: 0
+    staleTime: 0,
   });
-
 
   return {
     agent,

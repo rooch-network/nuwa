@@ -1,6 +1,6 @@
 import { useCurrentAddress, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 import { Args } from "@roochnetwork/rooch-sdk";
 
 export default function useUserCheck() {
@@ -21,7 +21,7 @@ export default function useUserCheck() {
         args: [Args.address(address!.genRoochAddress().toHexAddress())],
       });
 
-      console.log(result)
+      console.log(result);
       return (result?.return_values?.[0]?.decoded_value as boolean) || false;
     },
     enabled: !!address,

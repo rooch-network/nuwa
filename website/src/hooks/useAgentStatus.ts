@@ -1,8 +1,8 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
 import { Args } from "@roochnetwork/rooch-sdk";
-import { useNetworkVariable } from "./use-networks";
-import { AgentStatus } from "../types/agent";
+import { useNetworkVariable } from "./useNetworks";
+import { AgentStatus } from "@/types/agent";
 
 interface UseAgentStatusResult {
   status: AgentStatus;
@@ -45,7 +45,7 @@ export default function useAgentStatus(id?: string): UseAgentStatusResult {
       return {
         isOnline: !isProcessing, // 如果不在处理请求，则视为在线
         lastActive,
-        currentTask: isProcessing ? "processing" : undefined
+        currentTask: isProcessing ? "processing" : undefined,
       };
     },
     enabled: !!id,

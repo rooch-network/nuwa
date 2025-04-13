@@ -7,8 +7,8 @@ import {
 import { Transaction, Args } from "@roochnetwork/rooch-sdk";
 import { useCurrentSession, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { mutationKeys } from "./mutationKeys";
-import { useNetworkVariable } from "./use-networks";
-import { MessageSendParams } from "../types/channel";
+import { useNetworkVariable } from "./useNetworks";
+import { MessageSendParams } from "../types/message";
 
 interface MessageSendWithPayment extends MessageSendParams {
   aiAddress: string;
@@ -20,7 +20,12 @@ type UseChannelMessageSendArgs = MessageSendWithPayment;
 type UseChannelMessageSendResult = void;
 
 type UseChannelMessageSendOptions = Omit<
-  UseMutationOptions<UseChannelMessageSendResult, Error, UseChannelMessageSendArgs, unknown>,
+  UseMutationOptions<
+    UseChannelMessageSendResult,
+    Error,
+    UseChannelMessageSendArgs,
+    unknown
+  >,
   "mutationFn"
 >;
 
@@ -45,7 +50,7 @@ export function useChannelMessageSend({
       const mentions = args.mentions || [];
       const content = args.content.toLowerCase();
       let finalContent = args.content;
-      if (content.startsWith('/ai') || content.startsWith('@ai')) {
+      if (content.startsWith("/ai") || content.startsWith("@ai")) {
         finalContent = args.content.substring(3).trim();
         mentions.push(args.aiAddress);
       }
@@ -57,12 +62,12 @@ export function useChannelMessageSend({
           args: [
             Args.objectId(args.channelId),
             Args.string(args.content),
-            Args.vec('address', mentions),
+            Args.vec("address", mentions),
             Args.u64(args.replyTo ? BigInt(args.replyTo) : 0n),
             Args.address(args.aiAddress),
             Args.u256(BigInt(args.payment || 0)),
           ],
-          typeArgs: ['0x3::gas_coin::RGas'],
+          typeArgs: ["0x3::gas_coin::RGas"],
         });
       } else {
         tx.callFunction({
@@ -70,7 +75,7 @@ export function useChannelMessageSend({
           args: [
             Args.objectId(args.channelId),
             Args.string(finalContent),
-            Args.vec('address', mentions),
+            Args.vec("address", mentions),
             Args.u64(args.replyTo ? BigInt(args.replyTo) : 0n),
           ],
         });
@@ -83,8 +88,8 @@ export function useChannelMessageSend({
         signer: session!,
       });
 
-      if (result.execution_info.status.type !== 'executed') {
-        throw new Error('Failed to send message');
+      if (result.execution_info.status.type !== "executed") {
+        throw new Error("Failed to send message");
       }
     },
     ...mutationOptions,

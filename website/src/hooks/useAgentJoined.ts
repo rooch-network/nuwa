@@ -1,8 +1,8 @@
 import { useCurrentAddress, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
 import { RoochAddress, Serializer } from "@roochnetwork/rooch-sdk";
-import { useNetworkVariable } from "./use-networks";
-import { Agent } from "../types/agent";
+import { useNetworkVariable } from "./useNetworks";
+import { Agent } from "@/types/agent";
 
 export default function useAgentJoined() {
   const client = useRoochClient();
@@ -24,7 +24,7 @@ export default function useAgentJoined() {
 
       const result = await client.listFieldStates({
         objectId: userChannelStoreId,
-      })
+      });
 
       const decode = result.data
         .map((item: any) => {
@@ -46,11 +46,13 @@ export default function useAgentJoined() {
             object_id: Array.from(agentIds).join(","),
           },
         });
-  
+
         return res.data.map((obj) => {
           const agentData = obj.decoded_value?.value || {};
           const agentAddress = agentData.agent_address
-            ? new RoochAddress(String(agentData.agent_address)).toBech32Address()
+            ? new RoochAddress(
+                String(agentData.agent_address)
+              ).toBech32Address()
             : "";
           const username = String(agentData.username || "unnamed");
           return {
@@ -79,11 +81,11 @@ export default function useAgentJoined() {
             isTrending: false,
             instructions: String(agentData.instructions || ""),
           } as Agent;
-        }); 
+        });
       } catch (error) {
-        console.log(error)
+        console.log(error);
       }
-      return []
+      return [];
     },
     enabled: !!address,
   });

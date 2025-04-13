@@ -7,8 +7,8 @@ import {
 import { Transaction, Args } from "@roochnetwork/rooch-sdk";
 import { useCurrentSession, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { mutationKeys } from "./mutationKeys";
-import { useNetworkVariable } from "./use-networks";
-import { TaskSpecification } from "../types/task-types";
+import { useNetworkVariable } from "./useNetworks";
+import { TaskSpecification } from "@/types/task-types";
 
 type UseUpdateAgentTaskArgs = {
   cap: string;
@@ -18,7 +18,12 @@ type UseUpdateAgentTaskArgs = {
 type UseUpdateAgentTaskResult = void;
 
 type UseUpdateAgentTaskOptions = Omit<
-  UseMutationOptions<UseUpdateAgentTaskResult, Error, UseUpdateAgentTaskArgs, unknown>,
+  UseMutationOptions<
+    UseUpdateAgentTaskResult,
+    Error,
+    UseUpdateAgentTaskArgs,
+    unknown
+  >,
   "mutationFn"
 >;
 
@@ -73,7 +78,7 @@ export function useUpdateAgentTaskTask({
       if (result.execution_info.status.type !== "executed") {
         throw new Error(
           "Failed to update task specifications" +
-          JSON.stringify(result.execution_info)
+            JSON.stringify(result.execution_info)
         );
       }
     },

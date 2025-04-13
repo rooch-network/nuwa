@@ -1,6 +1,6 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { Channel, CHANNEL_STATUS } from "../types/channel";
+import { Channel, CHANNEL_STATUS } from "@/types/channel";
 
 export default function useChannel(id?: string) {
   const client = useRoochClient();
@@ -18,7 +18,7 @@ export default function useChannel(id?: string) {
           object_id: id!,
         },
       });
-      console.log('chan info', result)
+      console.log("chan info", result);
       const channel = result?.data?.[0]?.decoded_value?.value;
 
       const isChannelActive = channel?.status === CHANNEL_STATUS.ACTIVE;

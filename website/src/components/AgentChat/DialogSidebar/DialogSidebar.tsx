@@ -1,8 +1,8 @@
+import { useAgentChat } from "@/contexts/AgentChatContext";
+import { useChannelCreateTopic } from "@/hooks/useChannelCreateTopic";
 import { ChatBubbleLeftIcon, PlusIcon } from "@heroicons/react/24/outline";
-import { useChannelCreateTopic } from "../../../hooks/use-channel-create-topic";
 import { SessionKeyGuard } from "@roochnetwork/rooch-sdk-kit";
 import { useState } from "react";
-import { useAgentChat } from "../../../contexts/AgentChatContext";
 
 /**
  * Props for the DialogSidebar component
@@ -10,8 +10,8 @@ import { useAgentChat } from "../../../contexts/AgentChatContext";
 interface DialogSidebarProps {
   /** Current channel ID */
   channels: {
-    title: string,
-    id: string
+    title: string;
+    id: string;
   }[];
   onChannelSelect: (id: string) => void;
   /** Callback to refresh the dialog list */
@@ -25,7 +25,11 @@ interface DialogSidebarProps {
  * - Unread message indicators
  * - Active dialog highlighting
  */
-export function DialogSidebar({ channels, onChannelSelect, onRefresh }: DialogSidebarProps) {
+export function DialogSidebar({
+  channels,
+  onChannelSelect,
+  onRefresh,
+}: DialogSidebarProps) {
   const { mutateAsync, isPending } = useChannelCreateTopic();
   const [showInput, setShowInput] = useState(false);
   const [topicName, setTopicName] = useState("");
@@ -34,16 +38,16 @@ export function DialogSidebar({ channels, onChannelSelect, onRefresh }: DialogSi
 
   const validateTopicName = (name: string): string | null => {
     if (!name.trim()) {
-      return 'Topic name cannot be empty';
+      return "Topic name cannot be empty";
     }
     if (name.length > 50) {
-      return 'Topic name cannot exceed 50 characters';
+      return "Topic name cannot exceed 50 characters";
     }
-    if (name.includes('\n')) {
-      return 'Topic name cannot contain line breaks';
+    if (name.includes("\n")) {
+      return "Topic name cannot contain line breaks";
     }
     if (/^\s+$/.test(name)) {
-      return 'Topic name cannot contain only whitespace';
+      return "Topic name cannot contain only whitespace";
     }
     return null;
   };
@@ -70,7 +74,7 @@ export function DialogSidebar({ channels, onChannelSelect, onRefresh }: DialogSi
       console.error("Error creating topic:", error);
       setError("Failed to create topic");
     }
-  }
+  };
 
   return (
     <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
@@ -83,10 +87,11 @@ export function DialogSidebar({ channels, onChannelSelect, onRefresh }: DialogSi
           <SessionKeyGuard onClick={() => setShowInput(true)}>
             <button
               disabled={isPending}
-              className={`p-2 rounded-lg transition-colors ${isPending
-                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-400 dark:text-purple-500 cursor-not-allowed"
-                : "bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
-                }`}
+              className={`p-2 rounded-lg transition-colors ${
+                isPending
+                  ? "bg-purple-100 dark:bg-purple-900/30 text-purple-400 dark:text-purple-500 cursor-not-allowed"
+                  : "bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+              }`}
             >
               <PlusIcon className="w-5 h-5" />
             </button>
@@ -135,22 +140,29 @@ export function DialogSidebar({ channels, onChannelSelect, onRefresh }: DialogSi
         {channels.map((channel) => (
           <div
             key={channel.id}
-            className={`py-2.5 px-4 cursor-pointer transition-colors border-b dark:border-gray-700 ${selectedChannel === channel.id
-              ? "border-l-4 border-l-purple-500 dark:border-l-purple-400"
-              : "hover:border-l-4 hover:border-l-purple-300 dark:hover:border-l-purple-500"
-              }`}
+            className={`py-2.5 px-4 cursor-pointer transition-colors border-b dark:border-gray-700 ${
+              selectedChannel === channel.id
+                ? "border-l-4 border-l-purple-500 dark:border-l-purple-400"
+                : "hover:border-l-4 hover:border-l-purple-300 dark:hover:border-l-purple-500"
+            }`}
             onClick={() => onChannelSelect(channel.id)}
           >
             <div className="flex items-center space-x-3 w-full bg-transparent hover:ring-none hover:border-none">
-              <ChatBubbleLeftIcon className={`w-4 h-5 ${selectedChannel === channel.id
-                ? "text-purple-600 dark:text-purple-400"
-                : "text-gray-400"
-                }`} />
+              <ChatBubbleLeftIcon
+                className={`w-4 h-5 ${
+                  selectedChannel === channel.id
+                    ? "text-purple-600 dark:text-purple-400"
+                    : "text-gray-400"
+                }`}
+              />
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium truncate ${selectedChannel === channel.id
-                  ? "text-purple-700 dark:text-purple-300"
-                  : "text-gray-600 dark:text-gray-300"
-                  }`}>
+                <p
+                  className={`text-sm font-medium truncate ${
+                    selectedChannel === channel.id
+                      ? "text-purple-700 dark:text-purple-300"
+                      : "text-gray-600 dark:text-gray-300"
+                  }`}
+                >
                   {channel.title}
                 </p>
               </div>

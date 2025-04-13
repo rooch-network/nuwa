@@ -1,6 +1,6 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 import { UserInfo } from "../types/user";
 
 export default function useUserInfo(address?: string) {
@@ -22,19 +22,26 @@ export default function useUserInfo(address?: string) {
             owner: address!,
           },
         },
-      })
-      const id = String(resultA.data[0]?.id || '')
-      const username = String(resultA.data[0]?.decoded_value?.value?.username || '')
-      const name = String(resultA.data[0]?.decoded_value?.value?.name || '')
-      const avatar = String(resultA.data[0]?.decoded_value?.value?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=+${username}`)
+      });
+      const id = String(resultA.data[0]?.id || "");
+      const username = String(
+        resultA.data[0]?.decoded_value?.value?.username || ""
+      );
+      const name = String(resultA.data[0]?.decoded_value?.value?.name || "");
+      const avatar = String(
+        resultA.data[0]?.decoded_value?.value?.avatar ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=+${username}`
+      );
 
       return {
         id,
         username,
         name,
         avatar,
-      }
+      };
     },
+    staleTime: 1000 * 60 * 60, // 1 hour
+    gcTime: 1000 * 60 * 60, // 1 hour
     enabled: !!address,
   });
 

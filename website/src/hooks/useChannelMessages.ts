@@ -1,6 +1,6 @@
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 import { Args, bcs } from "@roochnetwork/rooch-sdk";
 import { Message } from "../types/message";
 
@@ -21,7 +21,9 @@ interface UseChannelMessagesResult {
   refetch: () => void;
 }
 
-export default function useChannelMessages(input: ChannelMessagesInput): UseChannelMessagesResult {
+export default function useChannelMessages(
+  input: ChannelMessagesInput
+): UseChannelMessagesResult {
   const client = useRoochClient();
   const packageId = useNetworkVariable("packageId");
 
@@ -31,7 +33,7 @@ export default function useChannelMessages(input: ChannelMessagesInput): UseChan
     isError,
     refetch,
   } = useQuery<Message[]>({
-    queryKey: ["useChannelMessages", input],
+    queryKey: ["useChannelMessages", input.channelId, input.page, input.size],
     queryFn: async () => {
       const result = await client.executeViewFunction({
         target: `${packageId}::channel::get_messages_paginated`,
@@ -85,10 +87,10 @@ export default function useChannelMessages(input: ChannelMessagesInput): UseChan
               reply_to: Number(value.reply_to) || undefined,
               attachments: Array.isArray(value.attachments?.value)
                 ? value.attachments.value.map((att: any) => ({
-                  attachment_type: Number(att[0]),
-                  attachment_json: String(att[1])
-                }))
-                : []
+                    attachment_type: Number(att[0]),
+                    attachment_json: String(att[1]),
+                  }))
+                : [],
             } as Message;
           })
           .filter((msg): msg is Message => msg !== null);
@@ -96,7 +98,11 @@ export default function useChannelMessages(input: ChannelMessagesInput): UseChan
 
       return [];
     },
-    refetchInterval: 5000,
+    refetchInterval: 1000 * 30,
+    staleTime: 1000 * 30,
+    gcTime: 1000 * 30,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     enabled: !!input.channelId && input.size > 0,
   });
 

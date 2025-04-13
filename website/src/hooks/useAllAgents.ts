@@ -1,16 +1,14 @@
-import { useNetworkVariable } from "./use-networks.ts";
+import { useNetworkVariable } from "@/hooks/useNetworks";
 import { useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
 import { IndexerStateIDView, RoochAddress } from "@roochnetwork/rooch-sdk";
-import { Agent } from "../types/agent.ts";
-import { FEATURED_AGENTS, TRENDING_AGENTS } from "../config/featured-agents";
+import { Agent } from "@/types/agent";
+import { FEATURED_AGENTS, TRENDING_AGENTS } from "@/config/featured-agents";
 
-export default function useAllAgents(
-  input?: {
-    limit?: string,
-    cursor?: IndexerStateIDView
-  }
-) {
+export default function useAllAgents(input?: {
+  limit?: string;
+  cursor?: IndexerStateIDView;
+}) {
   const client = useRoochClient();
   const packageId = useNetworkVariable("packageId");
 
@@ -37,8 +35,8 @@ export default function useAllAgents(
           const agentData = obj.decoded_value?.value || {};
           const agentAddress = agentData.agent_address
             ? new RoochAddress(
-              String(agentData.agent_address)
-            ).toBech32Address()
+                String(agentData.agent_address)
+              ).toBech32Address()
             : "";
           const username = String(agentData.username || "unnamed");
 
@@ -49,8 +47,8 @@ export default function useAllAgents(
             name: String(agentData.name || "Unnamed Agent"),
             avatar: String(
               agentData.avatar ||
-              "https://api.dicebear.com/7.x/bottts/svg?seed=" +
-              agentData.username
+                "https://api.dicebear.com/7.x/bottts/svg?seed=" +
+                  agentData.username
             ),
             description: String(
               agentData.description || "No description available"

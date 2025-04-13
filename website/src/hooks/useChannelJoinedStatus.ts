@@ -1,12 +1,12 @@
 import { useCurrentAddress, useRoochClient } from "@roochnetwork/rooch-sdk-kit";
 import { useQuery } from "@tanstack/react-query";
-import { useNetworkVariable } from "./use-networks";
+import { useNetworkVariable } from "./useNetworks";
 import { Args } from "@roochnetwork/rooch-sdk";
 
-export default function useChannelJoinedStatus(channelId?: string,) {
+export default function useChannelJoinedStatus(channelId?: string) {
   const client = useRoochClient();
   const packageId = useNetworkVariable("packageId");
-  const address = useCurrentAddress()
+  const address = useCurrentAddress();
 
   const {
     data: isJoined,

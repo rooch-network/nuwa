@@ -5,12 +5,12 @@ import {
   ArrowLeftOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
-import useAgentBalance from "../../../hooks/use-agent-balance";
-import { useChannelLeave } from "../../../hooks/use-channel-leave";
-import useChannelJoinedStatus from "../../../hooks/use-channel-joined-status";
-import useAgentJoined from "../../../hooks/use-agent-joined";
-import useChannelMembers from "../../../hooks/use-channel-member";
-import { useAgentChat } from "../../../contexts/AgentChatContext";
+import useAgentBalance from "@/hooks/useAgentBalance";
+import { useChannelLeave } from "@/hooks/useChannelLeave";
+import useChannelJoinedStatus from "@/hooks/useChannelJoinedStatus";
+import useAgentJoined from "@/hooks/useAgentJoined";
+import useChannelMembers from "@/hooks/useChannelMembers";
+import { useAgentChat } from "@/contexts/AgentChatContext";
 import { SessionKeyGuard } from "@roochnetwork/rooch-sdk-kit";
 
 /**
@@ -27,7 +27,7 @@ export function AgentInfo() {
   const { balance, isPending: isBalancePending } = useAgentBalance(
     agent?.agent_address
   );
-  
+
   const { isJoined, refetch: refetchIsjoined } = useChannelJoinedStatus(
     selectedChannel || ""
   );
@@ -109,7 +109,7 @@ export function AgentInfo() {
               <span className="animate-pulse">...</span>
             ) : (
               <span>
-                {(Number(balance?.balance || 0) / 1e8).toFixed(0)} RGAS
+                {(Number(balance?.balance || 0) / 1e8).toLocaleString()} RGAS
               </span>
             )}
           </div>

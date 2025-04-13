@@ -1,24 +1,30 @@
-import { MESSAGE_TYPE, ChatMessageProps, TransferAttachment, ActionEvent } from "../../../../types/message";
-import { UserCircleIcon } from "@heroicons/react/24/solid";
-import { formatTimestamp } from "../../../../utils/time";
+import { useAgentChat } from "@/contexts/AgentChatContext";
+import useUserInfo from "@/hooks/useUserInfo";
+import {
+  ActionEvent,
+  ChatMessageProps,
+  MESSAGE_TYPE,
+  TransferAttachment,
+} from "@/types/message";
+import { shortenAddress } from "@/utils/address";
+import { formatTimestamp } from "@/utils/time";
+import { ClipboardDocumentIcon, ShareIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, UserCircleIcon } from "@heroicons/react/24/solid";
+import { RoochAddress } from "@roochnetwork/rooch-sdk";
+import React, { ComponentPropsWithoutRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Link } from "react-router-dom";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { useState, ComponentPropsWithoutRef } from "react";
-import { ClipboardDocumentIcon, ShareIcon } from "@heroicons/react/24/outline";
-import { CheckIcon } from "@heroicons/react/24/solid";
-import { shortenAddress } from "../../../../utils/address";
-import { Link } from "react-router-dom";
-import { RoochAddress } from "@roochnetwork/rooch-sdk";
-import useUserInfo from "../../../../hooks/use-user-info";
-import React from "react";
-import { useAgentChat } from "../../../../contexts/AgentChatContext";
+import remarkGfm from "remark-gfm";
 
 // 添加辅助函数来获取用户信息和显示名称
 const useUserDisplay = (address: string) => {
   const { userInfo } = useUserInfo(address);
-  const displayName = (userInfo?.username != "" && (`@` + userInfo?.username)) || userInfo?.name || shortenAddress(address);
+  const displayName =
+    (userInfo?.username != "" && `@` + userInfo?.username) ||
+    userInfo?.name ||
+    shortenAddress(address);
   return { userInfo, displayName };
 };
 
@@ -26,10 +32,7 @@ const useUserDisplay = (address: string) => {
 const UserLink = ({ address }: { address: string }) => {
   const { displayName } = useUserDisplay(address);
   return (
-    <Link
-      to={`/profile/${address}`}
-      className="text-blue-600 hover:underline"
-    >
+    <Link to={`/profile/${address}`} className="text-blue-600 hover:underline">
       {displayName}
     </Link>
   );
@@ -67,9 +70,11 @@ export function ChatMessage({
 
   // 检查消息是否包含转账附件
   const hasTransferAttachment = React.useMemo(() => {
-    return message.attachments.some(attachment => {
+    return message.attachments.some((attachment) => {
       try {
-        const data = JSON.parse(attachment.attachment_json) as TransferAttachment;
+        const data = JSON.parse(
+          attachment.attachment_json
+        ) as TransferAttachment;
         return data.amount && data.coin_type && data.to;
       } catch (error) {
         return false;
@@ -80,26 +85,30 @@ export function ChatMessage({
   // 获取转账附件信息
   const transferAttachment = React.useMemo(() => {
     if (!hasTransferAttachment) return null;
-    const attachment = message.attachments.find(attachment => {
+    const attachment = message.attachments.find((attachment) => {
       try {
-        const data = JSON.parse(attachment.attachment_json) as TransferAttachment;
+        const data = JSON.parse(
+          attachment.attachment_json
+        ) as TransferAttachment;
         return data.amount && data.coin_type && data.to;
       } catch (error) {
         return false;
       }
     });
-    return attachment ? JSON.parse(attachment.attachment_json) as TransferAttachment : null;
+    return attachment
+      ? (JSON.parse(attachment.attachment_json) as TransferAttachment)
+      : null;
   }, [message.attachments, hasTransferAttachment]);
 
   // 检查消息是否发送给 AI
   const isToAI = React.useMemo(() => {
     if (!agent?.address) return false;
-    return message.mentions.some(mention => {
+    return message.mentions.some((mention) => {
       try {
         const mentionAddress = new RoochAddress(mention).toBech32Address();
         return mentionAddress === agent.address;
       } catch (error) {
-        console.error('Error parsing mention address:', error);
+        console.error("Error parsing mention address:", error);
         return false;
       }
     });
@@ -119,7 +128,9 @@ export function ChatMessage({
 
   const handleShare = () => {
     const shareText = `${message.content}\n\n${window.location.href}`;
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+      shareText
+    )}`;
     window.open(twitterUrl, "_blank");
   };
 
@@ -159,18 +170,12 @@ export function ChatMessage({
 
         return (
           <span>
-
             {actionEvent.success ? "Agent Transferred " : "Failed to transfer "}
             <span className="font-medium">
               {amount} {coinType}
             </span>{" "}
-            to{" "}
-            <UserLink address={args.to} />
-
-            {args.memo && (
-              <span className="italic"> - "{args.memo}"</span>
-
-            )}
+            to <UserLink address={args.to} />
+            {args.memo && <span className="italic"> - "{args.memo}"</span>}
           </span>
         );
       }
@@ -182,8 +187,7 @@ export function ChatMessage({
         const args = formatActionArgs(actionEvent.args);
         return (
           <span>
-            Agent added a new memory about{" "}
-            <UserLink address={args.addr} />
+            Agent added a new memory about <UserLink address={args.addr} />
           </span>
         );
       } else if (actionEvent.action === "memory::update") {
@@ -206,8 +210,7 @@ export function ChatMessage({
         const args = formatActionArgs(actionEvent.args);
         return (
           <span>
-            Agent compacted memories for{" "}
-            <UserLink address={args.addr} />
+            Agent compacted memories for <UserLink address={args.addr} />
           </span>
         );
       } else if (actionEvent.action === "memory::none") {
@@ -276,7 +279,7 @@ export function ChatMessage({
   // 获取被回复的消息
   const getReplyToMessage = () => {
     if (!messages || message.reply_to === -1) return null;
-    return messages.find(m => m.index === message.reply_to);
+    return messages.find((m) => m.index === message.reply_to);
   };
 
   const replyToMessage = getReplyToMessage();
@@ -304,7 +307,9 @@ export function ChatMessage({
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white text-sm font-bold">
-                      {agent.name ? agent.name.substring(0, 2).toUpperCase() : "AI"}
+                      {agent.name
+                        ? agent.name.substring(0, 2).toUpperCase()
+                        : "AI"}
                     </div>
                   )}
                 </Link>
@@ -335,7 +340,9 @@ export function ChatMessage({
           </div>
         )}
         <div
-          className={`flex flex-col flex-1 ${isCurrentUser ? "items-end" : "items-start"}`}
+          className={`flex flex-col flex-1 ${
+            isCurrentUser ? "items-end" : "items-start"
+          }`}
         >
           <div className="flex gap-2 text-xs text-gray-500 mb-1">
             <span className="font-medium">
@@ -373,47 +380,75 @@ export function ChatMessage({
             )}
           </div>
           {replyToMessage && (
-            <div className={`mb-1 text-xs rounded px-2 py-1 ${isAI
-              ? "bg-purple-100 text-purple-700 dark:bg-purple-800/50 dark:text-purple-200"
-              : "bg-gray-100 text-gray-500 dark:bg-gray-800"
-              }`}>
+            <div
+              className={`mb-1 text-xs rounded px-2 py-1 ${
+                isAI
+                  ? "bg-purple-100 text-purple-700 dark:bg-purple-800/50 dark:text-purple-200"
+                  : "bg-gray-100 text-gray-500 dark:bg-gray-800"
+              }`}
+            >
               <div className="flex flex-col gap-1">
                 <span className="font-medium">
-                  Reply to {`@` + replyToUserInfo?.username || replyToUserInfo?.name || shortenAddress(new RoochAddress(replyToMessage.sender).toBech32Address())}
+                  Reply to{" "}
+                  {`@` + replyToUserInfo?.username ||
+                    replyToUserInfo?.name ||
+                    shortenAddress(
+                      new RoochAddress(replyToMessage.sender).toBech32Address()
+                    )}
                 </span>
                 <span>
                   {replyToMessage.content.length > 50
-                    ? `${replyToMessage.content.replace(/^@\w+\s/, '').substring(0, 50)}...`
-                    : replyToMessage.content.replace(/^@\w+\s/, '')}
+                    ? `${replyToMessage.content
+                        .replace(/^@\w+\s/, "")
+                        .substring(0, 50)}...`
+                    : replyToMessage.content.replace(/^@\w+\s/, "")}
                 </span>
               </div>
             </div>
           )}
           <div className="relative group">
             <div
-              className={`rounded-lg px-2 py-0.5 ${isAI
-                ? "bg-purple-200 text-purple-900 dark:bg-purple-900 dark:text-white"
-                : hasTransferAttachment
+              className={`rounded-lg px-2 py-0.5 ${
+                isAI
+                  ? "bg-purple-200 text-purple-900 dark:bg-purple-900 dark:text-white"
+                  : hasTransferAttachment
                   ? "bg-gray-100 text-gray-900 border border-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-700"
                   : "bg-gray-100 text-gray-900 border border-gray-200 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                }`}
+              }`}
             >
               {hasTransferAttachment && transferAttachment && (
                 <div className="p-2 my-2 bg-purple-300/80 dark:bg-black/20 rounded-xl">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-yellow-600 dark:text-yellow-400">💸</span>
+                    <span className="text-yellow-600 dark:text-yellow-400">
+                      💸
+                    </span>
                     <span>Transfer</span>
-                    <span className="font-medium">{transferAttachment.amount}</span>
-                    <span>{transferAttachment.coin_type.split("::").pop()}</span>
-                    <span>to Agent ({`@` + agent?.username || agent?.name || agent?.address.substring(0, 8) + '...' + agent?.address.substring(agent.address.length - 6)})</span>
+                    <span className="font-medium">
+                      {transferAttachment.amount}
+                    </span>
+                    <span>
+                      {transferAttachment.coin_type.split("::").pop()}
+                    </span>
+                    <span>
+                      to Agent (
+                      {`@` + agent?.username ||
+                        agent?.name ||
+                        agent?.address.substring(0, 8) +
+                          "..." +
+                          agent?.address.substring(agent.address.length - 6)}
+                      )
+                    </span>
 
                     {transferAttachment.memo && (
-                      <span className="italic"> — "{transferAttachment.memo}"</span>
+                      <span className="italic">
+                        {" "}
+                        — "{transferAttachment.memo}"
+                      </span>
                     )}
                   </div>
                 </div>
               )}
-              {(
+              {
                 <div className="flex flex-col justify-between items-start">
                   <div className="text-sm leading-tight">
                     <ReactMarkdown
@@ -426,7 +461,9 @@ export function ChatMessage({
                           className,
                           children,
                           ...props
-                        }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) => {
+                        }: ComponentPropsWithoutRef<"code"> & {
+                          inline?: boolean;
+                        }) => {
                           const match = /language-(\w+)/.exec(className || "");
                           const language = match ? match[1] : "";
 
@@ -436,11 +473,13 @@ export function ChatMessage({
                                 language={language}
                                 style={oneLight}
                                 customStyle={{
-                                  backgroundColor: "var(--tw-prose-pre-bg, #f8fafc)",
+                                  backgroundColor:
+                                    "var(--tw-prose-pre-bg, #f8fafc)",
                                   padding: "0.75rem",
                                   margin: 0,
                                   borderRadius: "0.375rem",
-                                  border: "1px solid var(--tw-prose-pre-border, #e2e8f0)",
+                                  border:
+                                    "1px solid var(--tw-prose-pre-border, #e2e8f0)",
                                 }}
                                 className="dark:!bg-gray-800 dark:border-gray-700"
                               >
@@ -449,10 +488,11 @@ export function ChatMessage({
                             </div>
                           ) : (
                             <code
-                              className={`px-1.5 py-0.5 rounded ${isCurrentUser
-                                ? "bg-blue-200/70 text-blue-800 dark:bg-blue-500/30 dark:text-white"
-                                : "bg-gray-200/70 text-gray-800 dark:bg-gray-500/30 dark:text-white"
-                                }`}
+                              className={`px-1.5 py-0.5 rounded ${
+                                isCurrentUser
+                                  ? "bg-blue-200/70 text-blue-800 dark:bg-blue-500/30 dark:text-white"
+                                  : "bg-gray-200/70 text-gray-800 dark:bg-gray-500/30 dark:text-white"
+                              }`}
                               {...props}
                             >
                               {children}
@@ -465,7 +505,7 @@ export function ChatMessage({
                     </ReactMarkdown>
                   </div>
                 </div>
-              )}
+              }
 
               {/* 按钮移到气泡外部 */}
               <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
