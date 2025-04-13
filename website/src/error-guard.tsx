@@ -53,6 +53,13 @@ export function ErrorGuard() {
 
       let friendlyMessage = error.message;
 
+      // Eliminate this error
+      // https://github.com/rooch-network/nuwa/issues/143
+      if (error.code === 32602) {
+        console.log(error.message);
+        return 
+      }
+
       // Handle Move contract errors
       if ('status' in error && (error.status as MoveAbortStatus).type === 'moveabort') {
         const status = error.status as MoveAbortStatus;

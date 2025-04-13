@@ -3,6 +3,7 @@ module nuwa_framework::message {
     use std::string::{String};
     use moveos_std::timestamp;
     use moveos_std::object::{Self, ObjectID};
+    use moveos_std::event;
     use nuwa_framework::attachment::{Attachment};
 
     friend nuwa_framework::channel;
@@ -42,6 +43,14 @@ module nuwa_framework::message {
         attachments: vector<Attachment>,
     }
 
+    struct MessageEvent has copy, store, drop {
+        message_id: ObjectID,
+        index: u64,
+        channel_id: ObjectID,
+        sender: address,
+        message_type: u8,
+    }
+
     /// Constructor - message belongs to the sender
     public(friend) fun new_message_object(
         index: u64, 
@@ -69,6 +78,15 @@ module nuwa_framework::message {
         let msg_obj = object::new(message);
         let msg_id = object::id(&msg_obj);
         object::transfer_extend(msg_obj, sender);
+        let event = MessageEvent {
+            message_id: msg_id,
+            index,
+            channel_id,
+            sender,
+            message_type,
+        };
+        let handle = event::custom_event_handle_id<ObjectID, MessageEvent>(channel_id);
+        event::emit_with_handle(handle, event);
         msg_id
     }
 

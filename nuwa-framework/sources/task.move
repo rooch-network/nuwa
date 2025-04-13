@@ -71,7 +71,8 @@ module nuwa_framework::task{
                 arguments,
             });
         }else{
-            event::emit(TaskPublishEvent {
+            let handle = event::custom_event_handle_id<address, TaskPublishEvent>(agent_address);
+            event::emit_with_handle(handle, TaskPublishEvent {
                 agent_address,
                 task_id: task_obj_id,
                 name,
