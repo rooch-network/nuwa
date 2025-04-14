@@ -1,23 +1,85 @@
-/* 全局样式将通过 Tailwind CSS 管理，此文件用于额外的自定义样式 */
+/* Global styles are managed through Tailwind CSS, this file is for additional custom styles */
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+:root {
+  --brand-primary: #646cff;
+  --brand-primary-hover: #535bf2;
+  --brand-secondary: #42b883;
+  --background-light: #ffffff;
+  --background-dark: #242424;
+  --text-light: #213547;
+  --text-dark: rgba(255, 255, 255, 0.87);
 }
 
+#root {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  background-color: var(--background-light);
+  color: var(--text-light);
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Scrollbar in dark mode */
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Animation effects for code editor and output panel */
+.editor-transition {
+  transition: height 0.3s ease;
+}
+
+/* Hover effects for buttons and interactive elements */
+.action-button {
+  transition: all 0.2s ease;
+  transform: translateY(0);
+}
+
+.action-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Logo animation */
 .logo {
-  height: 6em;
-  padding: 1.5em;
+  height: 2em;
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  filter: drop-shadow(0 0 1em var(--brand-primary));
 }
 
 @keyframes logo-spin {
@@ -41,4 +103,112 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* Make sure the output section is visible */
+.output-section {
+  min-height: 30px;
+  background-color: white;
+}
+
+/* Ensure line numbers in the editor are visible */
+.cm-lineNumbers {
+  color: #888 !important;
+  background-color: #f8f9fa !important;
+}
+
+/* Syntax highlighting specifics - using colors that match Nuwa website */
+.cm-keyword {
+  color: #9d65ff !important; /* Purple shade */
+}
+
+.cm-operator {
+  color: #3e999f !important;
+}
+
+.cm-string {
+  color: #42b883 !important; /* Green shade */
+}
+
+.cm-comment {
+  color: #8e908c !important;
+  font-style: italic !important;
+}
+
+.cm-number {
+  color: #f5871f !important;
+}
+
+/* Tab highlight - using primary brand color */
+.tab-active {
+  border-bottom: 2px solid var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+/* Ensure that the editor container fills the available space */
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Style for the resize handle */
+.resize-handle {
+  height: 4px;
+  background-color: #e5e7eb;
+  cursor: ns-resize;
+  position: relative;
+}
+
+.resize-handle:hover {
+  background-color: #d1d5db;
+}
+
+.resize-handle:active {
+  background-color: var(--brand-primary);
+}
+
+/* Header and button styles to match Nuwa site */
+.nuwa-header {
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;
+}
+
+.nuwa-button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.5em 1em;
+  font-size: 0.9em;
+  font-weight: 500;
+  background-color: var(--brand-primary);
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+
+.nuwa-button:hover {
+  background-color: var(--brand-primary-hover);
+}
+
+.nuwa-button-secondary {
+  background-color: transparent;
+  color: var(--text-light);
+  border: 1px solid #e5e7eb;
+}
+
+.nuwa-button-secondary:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+/* Adding a floating animation similar to the one on the website */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }

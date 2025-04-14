@@ -4,14 +4,14 @@ import basicExample from './basic';
 import tradingExample from './trading';
 import weatherExample from './weather';
 
-// 导出所有示例配置
+// Export all example configurations
 export const examples: ExampleConfig[] = [
   basicExample,
   tradingExample,
   weatherExample,
 ];
 
-// 按 ID 索引示例
+// Index examples by ID
 export const examplesById = examples.reduce((acc, example) => {
   acc[example.id] = example;
   return acc;

@@ -1,78 +1,78 @@
 # NuwaScript Playground
 
-NuwaScript Playground 是一个交互式环境，允许用户探索和体验 NuwaScript 语言。通过此平台，你可以学习 NuwaScript 的语法、测试工具调用，以及使用 AI 助手生成脚本。
+NuwaScript Playground is an interactive environment that allows users to explore and experience the NuwaScript language. Through this platform, you can learn NuwaScript syntax, test tool calls, and generate scripts using the AI assistant.
 
-## 特点
+## Features
 
-- 多个预置示例展示不同场景下的 NuwaScript 使用
-- 内置代码编辑器，支持语法高亮
-- 实时执行 NuwaScript 代码
-- 工具文档和描述
-- AI 助手集成，帮助生成和解释脚本
-- 完全在前端运行，无需后端服务
+- Multiple pre-configured examples showcasing NuwaScript usage in different scenarios
+- Built-in code editor with syntax highlighting
+- Real-time execution of NuwaScript code
+- Tool documentation and descriptions
+- AI assistant integration to help generate and explain scripts
+- Fully client-side, no backend services required
 
-## 快速开始
+## Quick Start
 
-### 安装依赖
+### Install Dependencies
 
-首先，安装项目依赖：
+First, install the project dependencies:
 
 ```bash
 npm install
 ```
 
-### 启动开发服务器
+### Start the Development Server
 
-运行以下命令启动开发服务器：
+Run the following command to start the development server:
 
 ```bash
 npm run dev
 ```
 
-服务启动后，通常会在 [http://localhost:5173](http://localhost:5173) 打开。
+After the service starts, it typically opens at [http://localhost:5173](http://localhost:5173).
 
-## 使用说明
+## Usage Guide
 
-### 选择示例
+### Select an Example
 
-左侧面板显示了可用的示例。每个示例都有自己的工具集和示例代码。点击示例名称加载到编辑器中。
+The left panel displays available examples. Each example has its own set of tools and sample code. Click on an example name to load it into the editor.
 
-### 编辑和运行脚本
+### Edit and Run Scripts
 
-1. 在中央编辑器中编辑 NuwaScript 代码
-2. 点击顶部的"运行"按钮执行脚本
-3. 查看底部面板中的输出结果或错误信息
+1. Edit NuwaScript code in the central editor
+2. Click the "Run" button at the top to execute the script
+3. View the output results or error messages in the bottom panel
 
-### 使用 AI 助手
+### Using the AI Assistant
 
-1. 点击顶部的"AI 助手"按钮打开 AI 面板
-2. 输入你的 OpenAI API Key（仅保存在浏览器本地）
-3. 提出问题或请求，例如"创建一个获取比特币价格的脚本"
-4. AI 将生成 NuwaScript 代码并填入编辑器
+1. Click the "AI Assistant" button at the top to open the AI panel
+2. Enter your OpenAI API Key (stored only in your browser's local storage)
+3. Ask questions or make requests, such as "Create a script to get Bitcoin prices"
+4. The AI will generate NuwaScript code and populate it in the editor
 
-## 示例介绍
+## Example Introduction
 
-Playground 包含多个示例：
+The Playground includes multiple examples:
 
-1. **基础示例** - 演示基本的 NuwaScript 语法，包括变量声明和简单工具调用
-2. **加密货币交易助手** - 展示如何创建一个自动交易决策系统
-3. **天气助手** - 使用多个 API 获取和分析天气信息，提供穿衣建议
+1. **Basic Example** - Demonstrates basic NuwaScript syntax, including variable declarations and simple tool calls
+2. **Cryptocurrency Trading Assistant** - Shows how to create an automated trading decision system
+3. **Weather Assistant** - Uses multiple APIs to retrieve and analyze weather information, providing clothing recommendations
 
-## 开发和扩展
+## Development and Extension
 
-### 添加新示例
+### Adding New Examples
 
-1. 在 `src/examples/` 目录下创建新的示例文件
-2. 定义工具实现和示例配置
-3. 将新示例导出并添加到 `src/examples/index.ts` 中
+1. Create a new example file in the `src/examples/` directory
+2. Define tool implementations and example configuration
+3. Export the new example and add it to `src/examples/index.ts`
 
-### 与真实 NuwaScript 解释器集成
+### Integration with the Real NuwaScript Interpreter
 
-当前实现使用了一个简化的解释器。要与完整的 NuwaScript TypeScript 实现集成：
+The current implementation uses a simplified interpreter. To integrate with the complete NuwaScript TypeScript implementation:
 
-1. 导入 nuwa-script TypeScript 实现
-2. 修改 `src/services/interpreter.ts` 文件以使用真实解释器
+1. Import the nuwa-script TypeScript implementation
+2. Modify the `src/services/interpreter.ts` file to use the real interpreter
 
-## 许可证
+## License
 
 [MIT](LICENSE)

@@ -1,7 +1,7 @@
 import { ExampleConfig } from '../types/Example';
 import { Tool } from '../services/interpreter';
 
-// Tool implementations for weather example
+// Weather tool implementations
 export const tools: Tool[] = [
   {
     name: 'getWeather',
@@ -19,41 +19,16 @@ export const tools: Tool[] = [
     handler: async (args) => {
       const { city } = args;
       
-      // Mock weather data
+      // Mock weather data for demonstration
       const weatherData: Record<string, any> = {
-        'Beijing': {
-          temperature: 25,
-          condition: 'Sunny',
-          humidity: 40,
-          windSpeed: 12
-        },
-        'Shanghai': {
-          temperature: 28,
-          condition: 'Cloudy',
-          humidity: 65,
-          windSpeed: 8
-        },
-        'Guangzhou': {
-          temperature: 32,
-          condition: 'Light Rain',
-          humidity: 80,
-          windSpeed: 5
-        },
-        'Shenzhen': {
-          temperature: 30,
-          condition: 'Showers',
-          humidity: 75,
-          windSpeed: 10
-        },
-        'Hangzhou': {
-          temperature: 26,
-          condition: 'Cloudy',
-          humidity: 60,
-          windSpeed: 7
-        }
+        'Beijing': { temperature: 28, condition: 'Sunny', humidity: 40, windSpeed: 10 },
+        'Shanghai': { temperature: 26, condition: 'Overcast', humidity: 65, windSpeed: 8 },
+        'Tokyo': { temperature: 24, condition: 'Light Rain', humidity: 75, windSpeed: 12 },
+        'New York': { temperature: 22, condition: 'Cloudy', humidity: 55, windSpeed: 15 },
+        'London': { temperature: 18, condition: 'Moderate Rain', humidity: 80, windSpeed: 14 }
       };
       
-      // Default to Beijing weather if city not found
+      // Return data for the requested city or default to Beijing
       return weatherData[city] || weatherData['Beijing'];
     }
   },
@@ -84,23 +59,24 @@ export const tools: Tool[] = [
       const conditions = ['Sunny', 'Cloudy', 'Overcast', 'Light Rain', 'Moderate Rain', 'Heavy Rain', 'Thunderstorms'];
       const forecast = [];
       
-      // Generate consistent random data based on city input
-      const cityHash = Array.from(city).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      // Use a fixed seed for consistent results
+      let seed = 12345;
       
       for (let i = 0; i < forecastDays; i++) {
         const dayOffset = i + 1;
         const dateObj = new Date();
         dateObj.setDate(dateObj.getDate() + dayOffset);
         
-        // Calculate a pseudo-random value based on city name and date
-        const daySeed = cityHash + dateObj.getDate() + dateObj.getMonth();
+        // Simple pseudo-random number generator
+        seed = (seed * 9301 + 49297) % 233280;
+        const rnd = seed / 233280;
         
         forecast.push({
           date: dateObj.toISOString().split('T')[0],
-          temperature: 20 + (daySeed % 20), // 20-39 degrees
-          condition: conditions[daySeed % conditions.length],
-          humidity: 40 + (daySeed % 50), // 40-89%
-          windSpeed: 5 + (daySeed % 15) // 5-19 km/h
+          temperature: Math.floor(20 + rnd * 20), // 20-39 degrees
+          condition: conditions[Math.floor(rnd * conditions.length)],
+          humidity: Math.floor(40 + rnd * 50), // 40-89%
+          windSpeed: Math.floor(5 + rnd * 15) // 5-19 km/h
         });
       }
       
@@ -127,9 +103,9 @@ export const tools: Tool[] = [
       const aqiData: Record<string, any> = {
         'Beijing': { aqi: 120, quality: 'Moderately Polluted', pm25: 75, pm10: 120 },
         'Shanghai': { aqi: 65, quality: 'Good', pm25: 38, pm10: 60 },
-        'Guangzhou': { aqi: 50, quality: 'Excellent', pm25: 25, pm10: 45 },
-        'Shenzhen': { aqi: 45, quality: 'Excellent', pm25: 20, pm10: 40 },
-        'Hangzhou': { aqi: 80, quality: 'Good', pm25: 45, pm10: 75 }
+        'Tokyo': { aqi: 50, quality: 'Excellent', pm25: 25, pm10: 45 },
+        'New York': { aqi: 45, quality: 'Excellent', pm25: 20, pm10: 40 },
+        'London': { aqi: 80, quality: 'Good', pm25: 45, pm10: 75 }
       };
       
       // Default to Beijing air quality if city not found
@@ -269,7 +245,7 @@ LET report = report + "\\n\\nForecast for upcoming days:"
     },
     {
       name: 'getAirQuality',
-      description: 'Get air quality index',
+      description: 'Get air quality index for a specified city',
       parameters: {
         type: 'object',
         properties: {
@@ -284,7 +260,7 @@ LET report = report + "\\n\\nForecast for upcoming days:"
     },
     {
       name: 'getClothingRecommendation',
-      description: 'Get clothing recommendations based on weather',
+      description: 'Get clothing recommendations based on weather conditions',
       parameters: {
         type: 'object',
         properties: {
@@ -301,8 +277,7 @@ LET report = report + "\\n\\nForecast for upcoming days:"
       },
       returnType: 'object'
     }
-  ],
-  aiPrompt: 'Please create a NuwaScript script that gets weather information for a specified city and provides clothing recommendations.'
+  ]
 };
 
 export default weatherExample;
