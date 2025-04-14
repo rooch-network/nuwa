@@ -3,11 +3,11 @@
     /* Base Options: */
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "target": "ES2016", // Or newer target
+    "target": "ES2022", // Keep target modern
     "allowJs": true,
     "resolveJsonModule": true,
     "moduleDetection": "force",
-    "isolatedModules": true,
+    "isolatedModules": true, // Keep this for faster transpilation? Or remove?
     "types": ["node", "jest"],
 
     /* Strictness */
@@ -16,18 +16,12 @@
     "noImplicitAny": true,
     "strictNullChecks": true,
 
-    /* If NOT transpiling code: */
-    // "module": "preserve",
-    // "noEmit": true,
+    /* Transpiling for ESM */
+    "module": "ESNext", // Changed to ESNext for ESM output
+    "outDir": "./dist",
 
-    /* If your code runs in the DOM: */
-    // "lib": ["es2022", "dom", "dom.iterable"],
-
-    /* If your code runs in Node.js: */
+    /* If your code runs in Node.js (Keep for type checking) */
     "lib": ["es2022"],
-    "module": "NodeNext", // Use NodeNext for modern Node.js module resolution
-    "outDir": "./dist", // Output directory for compiled JS
-    // "rootDir": "./src", // REMOVED: Allow compiling files outside src
 
     /* Declaration Files */
     "declaration": true, // Generate .d.ts files
@@ -35,16 +29,17 @@
     "sourceMap": true, // Create sourcemaps for .js files
 
     /* Module Resolution */
-    "moduleResolution": "NodeNext", // Align with 'module' setting
-    "baseUrl": ".", // Base directory for path aliases
+    // "NodeNext" might work, but "Bundler" is often recommended with Vite/ESM
+    "moduleResolution": "Bundler", // Changed to Bundler 
+    "baseUrl": ".", 
     "paths": {
       // Define path aliases if needed
       // "@/*": ["src/*"]
     }
   },
   "include": [
-    "src/**/*.ts",
-    "examples/**/*.ts" // ADDED: Include examples for compilation
+    "src/**/*.ts", // Include all ts files in src
+    // "examples/**/*.ts" // Optional: Keep if examples need building
   ],
-  "exclude": ["node_modules", "dist"] // Which folders to ignore
+  "exclude": ["node_modules", "dist", "tests"] // Exclude tests from primary build
 }

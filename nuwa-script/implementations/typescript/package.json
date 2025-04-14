@@ -2,8 +2,16 @@
   "name": "nuwa-script",
   "version": "0.0.1",
   "description": "TypeScript implementation of the NuwaScript interpreter",
-  "main": "dist/interpreter.js",
-  "types": "dist/interpreter.d.ts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "jest",

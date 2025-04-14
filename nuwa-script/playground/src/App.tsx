@@ -4,14 +4,20 @@ import Examples from './components/Examples';
 import Output from './components/Output';
 import ToolPanel from './components/ToolPanel';
 import AIChat from './components/AIChat';
-import { BoltIcon, CodeFileIcon } from './components/AppIcons';
+import { BoltIcon } from './components/AppIcons';
 import { examples, examplesById } from './examples';
-import { createInterpreter, Interpreter, Tool } from './services/interpreter';
+import { 
+  Interpreter, 
+  ToolRegistry,
+  ToolSchema,
+  ToolFunction,
+  NuwaInterface
+} from './services/nuwaInterpreter';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
-import { tools as basicTools } from './examples/basic';
-import { tools as tradingTools } from './examples/trading';
-import { tools as weatherTools } from './examples/weather';
+import { basicTools } from './examples/basic';
+import { tradingTools } from './examples/trading';
+import { weatherTools } from './examples/weather';
 import { ExampleConfig } from './types/Example';
 
 import './App.css';
@@ -28,7 +34,7 @@ function App() {
   const [script, setScript] = useState('');
   const [output, setOutput] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
-  const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
+  const [nuwaInterface, setNuwaInterface] = useState<NuwaInterface | null>(null);
   const [apiKey, setApiKey] = useState(storageService.getApiKey());
   const [isRunning, setIsRunning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -37,6 +43,7 @@ function App() {
   const [scriptPanelHeight, setScriptPanelHeight] = useState<string>('40%');
   const [isDragging, setIsDragging] = useState(false);
   const [messages, setMessages] = useState<CustomMessage[]>([]);
+  const [currentToolSchemas, setCurrentToolSchemas] = useState<ToolSchema[]>([]);
 
   // Initialization
   useEffect(() => {
@@ -61,12 +68,20 @@ function App() {
     setupInterpreter(example);
   };
 
-  // Setup interpreter and tools
+  // Setup interpreter and tools - Updated
   const setupInterpreter = (example: ExampleConfig) => {
-    const newInterpreter = createInterpreter();
+    const toolRegistry = new ToolRegistry();
     
-    // Register tools based on the selected example
-    let exampleTools: Tool[] = [];
+    // Define output handler inline or ensure it updates state correctly
+    const tempOutputBuffer: string[] = [];
+    const outputHandler = (message: string) => {
+      tempOutputBuffer.push(message);
+      // Update state *after* execution or use a more direct state update
+    };
+
+    const interpreter = new Interpreter(toolRegistry, outputHandler);
+    
+    let exampleTools: { schema: ToolSchema, execute: ToolFunction }[] = []; 
     
     if (example.id === 'basic') {
       exampleTools = basicTools;
@@ -76,28 +91,44 @@ function App() {
       exampleTools = weatherTools;
     }
     
-    // Register tools
-    exampleTools.forEach(tool => newInterpreter.registerTool(tool));
+    exampleTools.forEach(tool => {
+        toolRegistry.register(
+            tool.schema.name,
+            tool.schema, 
+            tool.execute
+        );
+    });
     
-    setInterpreter(newInterpreter);
+    setNuwaInterface({ 
+        interpreter, 
+        outputBuffer: [], // Start with empty buffer in state
+        toolRegistry 
+    }); 
+    setCurrentToolSchemas(toolRegistry.getAllSchemas());
   };
 
-  // Run script
+  // Run script - Updated
   const handleRun = async () => {
-    if (!interpreter) return;
+    if (!nuwaInterface) return; 
     
     setIsRunning(true);
     setOutput('');
     setError(undefined);
+    // Reset the temporary buffer used by the output handler if defined outside
+    // Or rely on state update from the handler
+    const executionOutputBuffer: string[] = [];
+    nuwaInterface.interpreter.setOutputHandler((message) => {
+        executionOutputBuffer.push(message);
+    });
     
     try {
-      const result = await interpreter.execute(script);
-      setOutput(result.output);
-      if (result.error) {
-        setError(result.error);
-      }
+      // Use the actual NuwaScript interpreter
+      const scope = await nuwaInterface.interpreter.execute(script); // Pass the script string
+      setOutput(executionOutputBuffer.join('\n')); // Update UI with collected output
+      console.log("Execution finished. Final scope:", scope);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setOutput(executionOutputBuffer.join('\n')); // Show buffered output even on error
     } finally {
       setIsRunning(false);
     }
@@ -132,20 +163,21 @@ function App() {
     
     setIsGenerating(true);
     try {
-      if (!selectedExample) {
-        throw new Error('Missing example');
+      if (!selectedExample || !nuwaInterface) {
+        throw new Error('Missing example or interpreter not initialized');
       }
       
       const aiService = new AIService({ apiKey });
+      const schemas = nuwaInterface.toolRegistry.getAllSchemas();
       const generatedCode = await aiService.generateNuwaScript(
         message,
-        selectedExample.tools
+        schemas
       );
       
       // Add AI response message
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'I generated the following code for you:\n\n```js\n' + generatedCode + '\n```' 
+        content: 'I generated the following code for you:\n\n```nuwascript\n' + generatedCode + '\n```'
       }]);
       
       setScript(generatedCode);
@@ -166,10 +198,12 @@ function App() {
   const handleClearOutput = () => {
     setOutput('');
     setError(undefined);
+    // No separate buffer state to clear here anymore
   };
 
   // Start resize operation for editor/output panels
-  const startResize = () => {
+  const startResize = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
     setIsDragging(true);
   };
 
@@ -177,19 +211,17 @@ function App() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        const container = document.querySelector('.flex-col') as HTMLDivElement;
+        const container = document.querySelector('.flex.flex-col.h-screen') as HTMLDivElement;
         if (container) {
           const containerRect = container.getBoundingClientRect();
           const y = e.clientY - containerRect.top;
           
-          // Calculate percentage
-          const percentage = (y / containerRect.height) * 100;
+          const height = containerRect.height || 1;
+          const percentage = (y / height) * 100;
           
-          // Set minimum panel height
-          const minHeight = 20;
-          const maxHeight = 80;
+          const minHeight = 15;
+          const maxHeight = 85;
           
-          // Limit range
           const clampedPercentage = Math.min(Math.max(percentage, minHeight), maxHeight);
           
           setScriptPanelHeight(`${clampedPercentage}%`);
@@ -198,54 +230,50 @@ function App() {
     };
     
     const handleMouseUp = () => {
-      setIsDragging(false);
+      if (isDragging) {
+        setIsDragging(false);
+      }
     };
     
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseup', handleMouseUp, { once: true });
     }
     
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging]);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
+    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900">
       {/* Header */}
-      <header className="nuwa-header flex items-center justify-between">
+      <header className="nuwa-header flex items-center justify-between px-4 py-2 shadow-md bg-white dark:bg-gray-800">
         <div className="flex items-center space-x-4">
-          <a href="/" className="flex items-center">
+          <a href="https://github.com/rooch-network/nuwa" target="_blank" rel="noopener noreferrer" className="flex items-center">
             <img src="/nuwa-icon.svg" alt="Nuwa Logo" className="logo h-8 w-8" />
           </a>
-          <div className="ml-2 text-base font-semibold text-gray-800">NuwaScript</div>
+          <div className="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-200">NuwaScript Playground</div>
         </div>
         <div className="flex items-center space-x-3">
           <button
             onClick={handleRun}
-            disabled={isRunning || !script.trim()}
+            disabled={isRunning || !script.trim() || !nuwaInterface}
             className="nuwa-button flex items-center"
           >
             {isRunning ? (
               <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Running...
               </>
             ) : (
-              <>Run</>
+              <>
+                <BoltIcon className="mr-1" /> Run
+              </>
             )}
-          </button>
-          <button
-            onClick={() => setShowScriptPanel(!showScriptPanel)}
-            className={`nuwa-button-secondary flex items-center ${showScriptPanel ? 'border-brand-primary text-brand-primary' : ''}`}
-          >
-            <CodeFileIcon size="small" className="mr-1" />
-            Toggle Script
           </button>
         </div>
       </header>
@@ -253,40 +281,31 @@ function App() {
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar with examples list (VS Code style) */}
-        <div className="w-64 bg-gray-800 text-white flex flex-col">
-          <div className="flex border-b border-gray-700">
+        <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
-              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
-                activeSidePanel === 'examples'
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
-              }`}
+              className={`flex-1 py-2 px-4 text-sm font-medium text-center ${activeSidePanel === 'examples' ? 'bg-gray-100 dark:bg-gray-700 text-brand-primary' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
               onClick={() => setActiveSidePanel('examples')}
             >
               Examples
             </button>
             <button
-              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
-                activeSidePanel === 'tools'
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
-              }`}
+              className={`flex-1 py-2 px-4 text-sm font-medium text-center ${activeSidePanel === 'tools' ? 'bg-gray-100 dark:bg-gray-700 text-brand-primary' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
               onClick={() => setActiveSidePanel('tools')}
             >
               Tools
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto p-4">
             {activeSidePanel === 'examples' ? (
               <Examples 
-                examples={examples.map(example => ({
-                  name: example.name,
-                  description: example.description,
-                  code: example.script
+                examples={examples.map(ex => ({
+                  name: ex.name,
+                  description: ex.description,
+                  code: ex.script
                 }))} 
                 onSelect={(code) => {
-                  // Find and select the matching example
                   const example = examples.find(e => e.script === code);
                   if (example) {
                     handleSelectExample(example);
@@ -294,15 +313,15 @@ function App() {
                 }} 
               />
             ) : (
-              <div className="h-full">
-                <ToolPanel tools={selectedExample?.tools || []} />
-              </div>
+              <ToolPanel 
+                tools={currentToolSchemas}
+              />
             )}
           </div>
-        </div>
+        </aside>
 
         {/* Middle and right content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden">
           {/* Main application panel and AI chat area */}
           <div className="flex flex-1 overflow-hidden">
             {/* Main application panel */}
@@ -370,11 +389,12 @@ function App() {
                   onSendMessage={handleAIChatMessage}
                   messages={messages}
                   isProcessing={isGenerating}
+                  apiKeySet={!!apiKey}
                 />
               </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

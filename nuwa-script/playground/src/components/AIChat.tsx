@@ -5,9 +5,15 @@ interface AIChatProps {
   onSendMessage: (message: string) => Promise<void>;
   messages: Array<{ role: string; content: string }>;
   isProcessing: boolean;
+  apiKeySet: boolean;
 }
 
-const AIChat: React.FC<AIChatProps> = ({ onSendMessage, messages, isProcessing }) => {
+const AIChat: React.FC<AIChatProps> = ({ 
+  onSendMessage, 
+  messages, 
+  isProcessing, 
+  apiKeySet,
+}) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -46,7 +52,7 @@ const AIChat: React.FC<AIChatProps> = ({ onSendMessage, messages, isProcessing }
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4" style={{ scrollBehavior: 'smooth' }}>
-        {messages.length === 0 ? (
+        {messages.length === 0 && !apiKeySet ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 dark:text-slate-400 animate-fadeIn">
             <div className="welcome-icon">
               <XIcon size="medium" className="text-slate-400 dark:text-slate-600 mb-4" />
@@ -86,6 +92,11 @@ const AIChat: React.FC<AIChatProps> = ({ onSendMessage, messages, isProcessing }
             </div>
           ))
         )}
+        {messages.length === 0 && apiKeySet && (
+            <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 dark:text-slate-400">
+                <p>Ask the AI to generate a script based on the available tools!</p>
+            </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -95,7 +106,7 @@ const AIChat: React.FC<AIChatProps> = ({ onSendMessage, messages, isProcessing }
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={messages.length === 0 ? "Enter OpenAI API key (sk-...)" : "Type your question..."}
+            placeholder={!apiKeySet ? "Enter OpenAI API key (sk-...)" : "Ask AI to generate script..."}
             disabled={isProcessing}
             className="w-full pl-4 pr-12 py-3 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 disabled:opacity-60 text-sm shadow-sm"
           />

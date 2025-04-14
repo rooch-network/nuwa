@@ -1,21 +1,8 @@
 import React, { useState } from 'react';
-
-interface ToolParameter {
-  type: string;
-  description?: string;
-}
+import type { ToolSchema, ToolParameter } from '../services/nuwaInterpreter';
 
 interface ToolPanelProps {
-  tools: {
-    name: string;
-    description: string;
-    parameters: {
-      type: string;
-      properties?: Record<string, ToolParameter>;
-      required?: string[];
-    };
-    returnType?: string;
-  }[];
+  tools: ToolSchema[];
 }
 
 const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
@@ -32,18 +19,18 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
   );
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-gray-700">
+    <div className="h-full flex flex-col dark:bg-gray-800 text-gray-300">
+      <div className="p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="relative">
           <input
             type="text"
-            className="w-full pl-9 pr-3 py-2 rounded-md bg-gray-700 border-0 text-gray-200 text-sm focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-9 pr-3 py-2 rounded-md bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-200 text-sm focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
             placeholder="Search tools..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
             </svg>
           </div>
@@ -51,9 +38,9 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
       </div>
 
       {filteredTools.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-gray-400 p-4 text-center">
+        <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400 p-4 text-center">
           <div>
-            <svg className="h-12 w-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="h-12 w-12 mx-auto mb-3 opacity-50 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z"></path>
             </svg>
             <p>No tools found matching "{searchQuery}"</p>
@@ -61,12 +48,12 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          <div className="divide-y divide-gray-700">
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredTools.map((tool) => (
               <div key={tool.name} className="overflow-hidden">
                 <button
-                  className={`w-full text-left p-3 flex justify-between items-center hover:bg-gray-700 transition-colors ${
-                    expandedTool === tool.name ? 'bg-gray-700' : ''
+                  className={`w-full text-left p-3 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                    expandedTool === tool.name ? 'bg-gray-100 dark:bg-gray-700' : ''
                   }`}
                   onClick={() => toggleTool(tool.name)}
                 >
@@ -77,18 +64,18 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
                         </svg>
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-medium text-gray-200 truncate">
+                      <div className="min-w-0 ml-3">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-200 truncate">
                           {tool.name}
                         </h3>
-                        <p className="text-xs text-gray-400 truncate mt-0.5">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                           {tool.description}
                         </p>
                       </div>
                     </div>
                   </div>
                   <svg 
-                    className={`ml-2 h-5 w-5 text-gray-400 transition-transform ${expandedTool === tool.name ? 'transform rotate-180' : ''}`}
+                    className={`ml-2 h-5 w-5 text-gray-400 dark:text-gray-500 transition-transform ${expandedTool === tool.name ? 'transform rotate-180' : ''}`}
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24" 
@@ -99,38 +86,37 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                 </button>
                 
                 {expandedTool === tool.name && (
-                  <div className="p-3 bg-gray-800/50 border-t border-gray-700 text-sm">
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 text-sm">
                     <div className="mb-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                         Description
                       </h4>
-                      <p className="text-gray-300">
+                      <p className="text-gray-700 dark:text-gray-300">
                         {tool.description}
                       </p>
                     </div>
                     
-                    {/* Parameters */}
                     <div className="mb-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                         Parameters
                       </h4>
-                      {tool.parameters.properties ? (
+                      {tool.parameters && tool.parameters.length > 0 ? (
                         <div className="space-y-2">
-                          {Object.entries(tool.parameters.properties).map(([paramName, paramConfig]) => (
-                            <div key={paramName} className="p-2 rounded-md bg-gray-700 border border-gray-600">
+                          {tool.parameters.map((param: ToolParameter) => (
+                            <div key={param.name} className="p-2 rounded-md bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
                               <div className="flex items-center justify-between">
-                                <span className="font-mono text-xs text-purple-400">{paramName}</span>
-                                <span className="text-xs bg-gray-800 rounded px-2 py-0.5 text-gray-400">
-                                  {paramConfig.type}
+                                <span className="font-mono text-xs text-purple-600 dark:text-purple-400">{param.name}</span>
+                                <span className="text-xs bg-gray-200 dark:bg-gray-800 rounded px-2 py-0.5 text-gray-600 dark:text-gray-400">
+                                  {param.type}
                                 </span>
                               </div>
-                              {paramConfig.description && (
-                                <p className="mt-1 text-xs text-gray-500">
-                                  {paramConfig.description}
+                              {param.description && (
+                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-500">
+                                  {param.description}
                                 </p>
                               )}
-                              {tool.parameters.required?.includes(paramName) && (
-                                <div className="mt-1 text-xs text-amber-400 flex items-center">
+                              {param.required && (
+                                <div className="mt-1 text-xs text-amber-500 dark:text-amber-400 flex items-center">
                                   <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                   </svg>
@@ -141,33 +127,29 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-500 italic">No parameters</p>
+                        <p className="text-gray-500 dark:text-gray-500 italic">No parameters</p>
                       )}
                     </div>
                     
-                    {/* Return Type */}
-                    {tool.returnType && (
+                    {tool.returns && (
                       <div>
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                           Return Type
                         </h4>
-                        <div className="inline-block bg-gray-800 rounded px-2 py-1 text-xs font-mono text-gray-300">
-                          {tool.returnType}
+                        <div className="inline-block bg-gray-200 dark:bg-gray-800 rounded px-2 py-1 text-xs font-mono text-gray-700 dark:text-gray-300">
+                          {tool.returns}
                         </div>
                       </div>
                     )}
                     
-                    {/* Usage Example */}
                     <div className="mt-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                         Example Usage
                       </h4>
-                      <pre className="p-2 bg-gray-800 text-gray-200 rounded-md text-xs overflow-x-auto">
+                      <pre className="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md text-xs overflow-x-auto">
                         {`CALL ${tool.name}(${
-                          tool.parameters.properties
-                            ? Object.keys(tool.parameters.properties)
-                                .map(param => `${param}=value`)
-                                .join(', ')
+                          tool.parameters && tool.parameters.length > 0
+                            ? tool.parameters.map(param => `${param.name}=value`).join(', ')
                             : ''
                         })`}
                       </pre>
