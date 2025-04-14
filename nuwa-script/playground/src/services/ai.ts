@@ -1,3 +1,6 @@
+import { ToolSchema, ToolRegistry } from 'nuwa-script';
+import { buildPrompt } from 'nuwa-script';
+
 export interface AIServiceOptions {
   apiKey: string;
   model?: string;
@@ -15,12 +18,14 @@ export class AIService {
     };
   }
 
-  async generateNuwaScript(prompt: string, tools: any[]): Promise<string> {
+  async generateNuwaScript(prompt: string, toolRegistry: ToolRegistry): Promise<string> {
     if (!this.options.apiKey) {
       throw new Error('API key is required');
     }
 
     try {
+      const fullPrompt = buildPrompt(toolRegistry, prompt);
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -30,16 +35,8 @@ export class AIService {
         body: JSON.stringify({
           model: this.options.model,
           messages: [
-            {
-              role: 'system',
-              content: `You are a helpful assistant that generates NuwaScript code. NuwaScript is a lightweight, structured language for AI agents with keywords like LET, CALL, IF, etc.
-              
-The available tools for this task are:
-${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
-
-Generate concise, valid NuwaScript code based on the user's request.`
-            },
-            { role: 'user', content: prompt }
+            { role: "system", content: "You are an AI assistant generating NuwaScript code based on the provided tools and user request." },
+            { role: "user", content: fullPrompt }
           ],
           max_tokens: this.options.maxTokens,
         }),
@@ -57,7 +54,6 @@ Generate concise, valid NuwaScript code based on the user's request.`
         throw new Error('No content returned from API');
       }
 
-      // Extract code from markdown code blocks if present
       const codeBlockRegex = /```(?:nuwa|nuwascript)?\n([\s\S]+?)```/;
       const match = content.match(codeBlockRegex);
       return match ? match[1].trim() : content.trim();

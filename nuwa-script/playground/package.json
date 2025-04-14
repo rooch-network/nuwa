@@ -30,7 +30,7 @@
     "postcss": "^8.5.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-konva": "^18.2.10",
+    "react-konva": "^19.0.0",
     "react-resizable-panels": "^2.0.20",
     "react-syntax-highlighter": "^15.5.0",
     "tailwindcss": "^4.1.3",

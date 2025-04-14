@@ -5,7 +5,7 @@ import Output from './components/Output';
 import ToolPanel from './components/ToolPanel';
 import AIChat from './components/AIChat';
 import { BoltIcon } from './components/AppIcons';
-import DrawingCanvas, { DrawableShape } from './components/DrawingCanvas';
+import DrawingCanvas from './components/DrawingCanvas';
 import { examples, examplesById } from './examples';
 import { 
   Interpreter, 
@@ -23,6 +23,7 @@ import { tradingTools } from './examples/trading';
 import { weatherTools } from './examples/weather';
 import { canvasTools, canvasShapes as initialCanvasShapes, subscribeToCanvasChanges } from './examples/canvas';
 import { ExampleConfig } from './types/Example';
+import type { DrawableShape } from './components/DrawingCanvas';
 
 import './App.css';
 
@@ -181,15 +182,14 @@ function App() {
     
     setIsGenerating(true);
     try {
-      if (!selectedExample || !nuwaInterface) {
-        throw new Error('Missing example or interpreter not initialized');
+      if (!selectedExample || !nuwaInterface || !nuwaInterface.toolRegistry) {
+        throw new Error('Missing example or interpreter/toolRegistry not initialized');
       }
       
       const aiService = new AIService({ apiKey });
-      const schemas = nuwaInterface.toolRegistry.getAllSchemas();
       const generatedCode = await aiService.generateNuwaScript(
         message,
-        schemas
+        nuwaInterface.toolRegistry 
       );
       
       // Add AI response message
@@ -345,33 +345,47 @@ function App() {
             {/* Main application panel */}
             <div className="flex-1 overflow-hidden flex flex-col main-panel">
               <div className="flex-1 overflow-hidden relative">
-                {/* Output panel */}
+                {/* Output panel container - content changes based on example */}
                 <div className="h-full overflow-hidden bg-white">
                   <div className="flex items-center px-4 py-2 bg-white border-b border-gray-200">
                     <BoltIcon size="small" className="text-gray-700 mr-2 w-4 h-4" />
-                    <span className="text-sm text-gray-700">Application Output</span>
+                    <span className="text-sm text-gray-700">
+                      {selectedExample?.id === 'canvas' ? 'Canvas' : 'Application Output'}
+                    </span>
                   </div>
                   <div className="h-[calc(100%-36px)] p-4 bg-white overflow-auto flex flex-col items-center justify-center">
-                    {!output && !error && !isRunning && (
-                      <div className="text-center text-gray-500">
-                        <div className="welcome-icon">
-                          <BoltIcon size="small" className="mx-auto mb-3 opacity-50" />
-                        </div>
-                        <p>Run your code to see output here</p>
-                        <p className="text-xs mt-2 max-w-sm">Press the "Run" button above to execute your NuwaScript code</p>
-                      </div>
+                    {selectedExample?.id === 'canvas' ? (
+                      // Render Canvas when canvas example is selected
+                      <DrawingCanvas 
+                        width={500} // Placeholder width
+                        height={400} // Placeholder height
+                        shapes={shapes} // Pass the shapes state
+                      />
+                    ) : (
+                      // Render standard output for other examples
+                      <>
+                        {!output && !error && !isRunning && (
+                          <div className="text-center text-gray-500">
+                            <div className="welcome-icon">
+                              <BoltIcon size="small" className="mx-auto mb-3 opacity-50" />
+                            </div>
+                            <p>Run your code to see output here</p>
+                            <p className="text-xs mt-2 max-w-sm">Press the "Run" button above to execute your NuwaScript code</p>
+                          </div>
+                        )}
+                        <Output 
+                          output={output} 
+                          error={error ?? null} 
+                          onClear={handleClearOutput} 
+                          loading={isRunning}
+                        />
+                      </>
                     )}
-                    <Output 
-                      output={output} 
-                      error={error ?? null} 
-                      onClear={handleClearOutput} 
-                      loading={isRunning}
-                    />
                   </div>
                 </div>
               </div>
               
-              {/* Script panel (collapsible) */}
+              {/* Script panel (collapsible, hidden for canvas example) */}
               {selectedExample?.id !== 'canvas' && (
                 <div className="border-t border-gray-200" style={{ height: scriptPanelHeight }}>
                   <div 

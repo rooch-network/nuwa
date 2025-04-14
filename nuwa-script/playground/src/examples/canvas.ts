@@ -71,7 +71,7 @@ const drawLineFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise
 
   canvasShapes.push({ type: 'line', points: [x1, y1, x2, y2], color: color, strokeWidth: width });
   notifyCanvasChange();
-  return null
+  return null;
 };
 
 // drawRect Tool
@@ -99,7 +99,7 @@ const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise
 
   canvasShapes.push({ type: 'rect', x, y, width, height, color, fill });
   notifyCanvasChange();
-  return null
+  return null;
 };
 
 // drawCircle Tool
@@ -125,7 +125,7 @@ const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments): Promi
 
   canvasShapes.push({ type: 'circle', x, y, radius, color, fill });
   notifyCanvasChange();
-  return null
+  return null;
 };
 
 // clearCanvas Tool
@@ -139,7 +139,7 @@ const clearCanvasSchema: ToolSchema = {
 const clearCanvasFunc: ToolFunction = async (): Promise<any> => {
   canvasShapes = []; // Clear the global array
   notifyCanvasChange();
-  return null
+  return null;
 };
 
 // Export tools

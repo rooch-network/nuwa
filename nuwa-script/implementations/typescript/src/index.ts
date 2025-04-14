@@ -18,5 +18,8 @@ export type { NuwaValue, NuwaObject } from './values';
 export { parse } from './parser'; // Corrected function name
 export * as AST from './ast'; // Export all AST node types under the AST namespace
 
+// Explicitly re-export prompt builder
+export { buildPrompt } from './prompts'; // Added export for buildPrompt
+
 // Export errors if needed
 export * from './errors';
