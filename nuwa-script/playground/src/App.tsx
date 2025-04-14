@@ -4,6 +4,7 @@ import Examples from './components/Examples';
 import Output from './components/Output';
 import ToolPanel from './components/ToolPanel';
 import AIChat from './components/AIChat';
+import { BoltIcon, CodeFileIcon } from './components/AppIcons';
 import { examples, examplesById } from './examples';
 import { createInterpreter, Interpreter, Tool } from './services/interpreter';
 import { AIService } from './services/ai';
@@ -31,10 +32,9 @@ function App() {
   const [apiKey, setApiKey] = useState(storageService.getApiKey());
   const [isRunning, setIsRunning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [showScriptPanel, setShowScriptPanel] = useState(false);
   const [activeSidePanel, setActiveSidePanel] = useState<'examples' | 'tools'>('examples');
-  const [editorHeight, setEditorHeight] = useState<string>('70%');
-  const [outputHeight, setOutputHeight] = useState<string>('30%');
+  const [scriptPanelHeight, setScriptPanelHeight] = useState<string>('40%');
   const [isDragging, setIsDragging] = useState(false);
   const [messages, setMessages] = useState<CustomMessage[]>([]);
 
@@ -173,32 +173,11 @@ function App() {
     setIsDragging(true);
   };
 
-  // Handle mouse events for window resize
-  const resize = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    
-    const container = e.currentTarget;
-    const containerRect = container.getBoundingClientRect();
-    const y = e.clientY - containerRect.top;
-    
-    // Calculate percentage
-    const percentage = (y / containerRect.height) * 100;
-    
-    // Set minimum panel height
-    const minHeight = 20;
-    const maxHeight = 80;
-    
-    // Limit range
-    const clampedPercentage = Math.min(Math.max(percentage, minHeight), maxHeight);
-    
-    setEditorHeight(`${clampedPercentage}%`);
-    setOutputHeight(`${100 - clampedPercentage}%`);
-  };
-
+  // Handle resize on drag 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        const container = document.querySelector('.editor-container') as HTMLDivElement;
+        const container = document.querySelector('.flex-col') as HTMLDivElement;
         if (container) {
           const containerRect = container.getBoundingClientRect();
           const y = e.clientY - containerRect.top;
@@ -213,8 +192,7 @@ function App() {
           // Limit range
           const clampedPercentage = Math.min(Math.max(percentage, minHeight), maxHeight);
           
-          setEditorHeight(`${clampedPercentage}%`);
-          setOutputHeight(`${100 - clampedPercentage}%`);
+          setScriptPanelHeight(`${clampedPercentage}%`);
         }
       }
     };
@@ -263,27 +241,25 @@ function App() {
             )}
           </button>
           <button
-            onClick={() => setShowAIPanel(!showAIPanel)}
-            className={`nuwa-button-secondary flex items-center ${showAIPanel ? 'border-brand-primary text-brand-primary' : ''}`}
+            onClick={() => setShowScriptPanel(!showScriptPanel)}
+            className={`nuwa-button-secondary flex items-center ${showScriptPanel ? 'border-brand-primary text-brand-primary' : ''}`}
           >
-            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
-            </svg>
-            AI Assistant
+            <CodeFileIcon size="small" className="mr-1" />
+            Toggle Script
           </button>
         </div>
       </header>
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar with examples list and tools */}
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-          <div className="flex border-b border-gray-200">
+        {/* Left sidebar with examples list (VS Code style) */}
+        <div className="w-64 bg-gray-800 text-white flex flex-col">
+          <div className="flex border-b border-gray-700">
             <button
               className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
                 activeSidePanel === 'examples'
-                  ? 'tab-active'
-                  : 'text-gray-500 hover:text-gray-800'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
               }`}
               onClick={() => setActiveSidePanel('examples')}
             >
@@ -292,8 +268,8 @@ function App() {
             <button
               className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
                 activeSidePanel === 'tools'
-                  ? 'tab-active'
-                  : 'text-gray-500 hover:text-gray-800'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
               }`}
               onClick={() => setActiveSidePanel('tools')}
             >
@@ -325,69 +301,80 @@ function App() {
           </div>
         </div>
 
-        {/* Middle code editor and output */}
-        <div 
-          className="flex-1 flex flex-col overflow-hidden relative editor-container" 
-          onMouseMove={isDragging ? resize : undefined}
-        >
-          {/* Code editor */}
-          <div 
-            className="overflow-hidden" 
-            style={{ height: editorHeight }}
-          >
-            <div className="h-full">
-              <div className="px-4 py-1 bg-white border-b border-gray-200 text-sm text-gray-700">
-                NuwaScript
+        {/* Middle and right content area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Main application panel and AI chat area */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Main application panel */}
+            <div className="flex-1 overflow-hidden flex flex-col main-panel">
+              <div className="flex-1 overflow-hidden relative">
+                {/* Output panel */}
+                <div className="h-full overflow-hidden bg-white">
+                  <div className="flex items-center px-4 py-2 bg-white border-b border-gray-200">
+                    <BoltIcon size="small" className="text-gray-700 mr-2 w-4 h-4" />
+                    <span className="text-sm text-gray-700">Application Output</span>
+                  </div>
+                  <div className="h-[calc(100%-36px)] p-4 bg-white overflow-auto flex flex-col items-center justify-center">
+                    {!output && !error && !isRunning && (
+                      <div className="text-center text-gray-500">
+                        <div className="welcome-icon">
+                          <BoltIcon size="small" className="mx-auto mb-3 opacity-50" />
+                        </div>
+                        <p>Run your code to see output here</p>
+                        <p className="text-xs mt-2 max-w-sm">Press the "Run" button above to execute your NuwaScript code</p>
+                      </div>
+                    )}
+                    <Output 
+                      output={output} 
+                      error={error || null} 
+                      loading={isRunning}
+                      onClear={handleClearOutput}
+                    />
+                  </div>
+                </div>
               </div>
-              <Editor 
-                defaultValue={script} 
-                onChange={setScript} 
-                language="javascript" 
-              />
+              
+              {/* Script panel (collapsible) */}
+              {showScriptPanel && (
+                <div className="border-t border-gray-200" style={{ height: scriptPanelHeight }}>
+                  <div 
+                    className="resize-handle cursor-ns-resize w-full h-1 bg-gray-200 hover:bg-blue-300"
+                    onMouseDown={startResize}
+                  ></div>
+                  <div className="px-4 py-1 bg-white border-b border-gray-200 text-sm text-gray-700 flex justify-between items-center">
+                    <div>NuwaScript</div>
+                    <button 
+                      onClick={() => setShowScriptPanel(false)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="h-[calc(100%-32px)] overflow-hidden">
+                    <Editor 
+                      defaultValue={script} 
+                      onChange={setScript} 
+                      language="javascript" 
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-          
-          {/* Resizer handle */}
-          <div 
-            className="resize-handle"
-            onMouseDown={startResize}
-          >
-          </div>
-          
-          {/* Output panel */}
-          <div 
-            className="overflow-hidden bg-white border-t border-gray-200" 
-            style={{ height: outputHeight }}
-          >
-            <div className="flex items-center px-4 py-1 bg-white border-b border-gray-200">
-              <svg className="h-4 w-4 text-gray-700 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
-              </svg>
-              <span className="text-sm text-gray-700">Execution Output</span>
-            </div>
-            <div className="h-[calc(100%-28px)] p-4 bg-white overflow-auto">
-              <Output 
-                output={output} 
-                error={error || null} 
-                loading={isRunning}
-                onClear={handleClearOutput}
-              />
+
+            {/* AI Chat panel (always visible) */}
+            <div className="w-96 border-l border-gray-200 bg-white overflow-hidden flex flex-col">
+              <div className="p-4 h-full">
+                <AIChat 
+                  onSendMessage={handleAIChatMessage}
+                  messages={messages}
+                  isProcessing={isGenerating}
+                />
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Right sidebar with AI assistant */}
-        {showAIPanel && (
-          <div className="w-80 border-l border-gray-200 bg-white overflow-y-auto flex flex-col">
-            <div className="p-4 h-full">
-              <AIChat 
-                onSendMessage={handleAIChatMessage}
-                messages={messages}
-                isProcessing={isGenerating}
-              />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

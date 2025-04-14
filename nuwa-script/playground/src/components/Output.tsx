@@ -7,7 +7,7 @@ interface OutputProps {
   onClear?: () => void;
 }
 
-const Output: React.FC<OutputProps> = ({ output, error, loading }) => {
+const Output: React.FC<OutputProps> = ({ output, error, loading, onClear }) => {
   if (loading) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-500 output-section">
@@ -19,7 +19,7 @@ const Output: React.FC<OutputProps> = ({ output, error, loading }) => {
   
   if (error) {
     return (
-      <div className="p-3 output-section">
+      <div className="p-3 output-section w-full">
         <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm">
           <div className="flex items-center mb-2">
             <svg className="h-5 w-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -31,29 +31,48 @@ const Output: React.FC<OutputProps> = ({ output, error, loading }) => {
             {error}
           </pre>
         </div>
+        {onClear && (
+          <div className="mt-3 flex justify-end">
+            <button 
+              onClick={onClear}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              Clear
+            </button>
+          </div>
+        )}
       </div>
     );
   }
   
   if (output) {
     return (
-      <div className="p-3 output-section">
+      <div className="p-3 output-section w-full">
         <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 bg-white p-3 rounded-md border border-gray-200 overflow-auto">
           {output}
         </pre>
+        {onClear && (
+          <div className="mt-3 flex justify-end">
+            <button 
+              onClick={onClear}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              Clear
+            </button>
+          </div>
+        )}
       </div>
     );
   }
   
-  return (
-    <div className="h-full flex flex-col items-center justify-center text-gray-500 p-4 text-center output-section">
-      <svg className="h-12 w-12 mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-      </svg>
-      <p>Run your code to see output here</p>
-      <p className="text-xs mt-2 max-w-sm">Press the "Run" button above to execute your NuwaScript code</p>
-    </div>
-  );
+  // 空状态直接返回null，不渲染任何内容，因为在父组件中已经处理了
+  return null;
 };
 
 export default Output;

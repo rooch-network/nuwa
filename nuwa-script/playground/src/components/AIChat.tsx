@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { BoltIcon, XIcon } from './AppIcons';
 
 interface AIChatProps {
   onSendMessage: (message: string) => Promise<void>;
@@ -25,13 +26,11 @@ const AIChat: React.FC<AIChatProps> = ({ onSendMessage, messages, isProcessing }
   }, [messages]);
 
   return (
-    <div className="h-full flex flex-col rounded-md border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+    <div className="h-full flex flex-col rounded-md shadow-sm bg-white dark:bg-slate-800 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
         <div className="flex items-center">
-          <svg className="h-5 w-5 text-purple-500 dark:text-purple-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          <h3 className="text-base font-medium text-slate-700 dark:text-slate-200">AI Assistant</h3>
+          <BoltIcon size="small" className="text-purple-500 dark:text-purple-400 w-5 h-5 mr-2" />
+          <h3 className="text-base font-medium text-gray-700 dark:text-slate-200">AI Assistant</h3>
         </div>
         <div className="flex items-center">
           {isProcessing && (
@@ -49,9 +48,9 @@ const AIChat: React.FC<AIChatProps> = ({ onSendMessage, messages, isProcessing }
       <div className="flex-1 overflow-auto p-4 space-y-4" style={{ scrollBehavior: 'smooth' }}>
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 dark:text-slate-400 animate-fadeIn">
-            <svg className="h-16 w-16 mb-4 opacity-70 text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-            </svg>
+            <div className="welcome-icon">
+              <XIcon size="medium" className="text-slate-400 dark:text-slate-600 mb-4" />
+            </div>
             <h4 className="font-medium text-lg mb-2 text-slate-700 dark:text-slate-300">Welcome to NuwaScript AI Assistant</h4>
             <p className="mb-2">Enter your OpenAI API key to get started</p>
             <p className="text-xs max-w-sm opacity-75">If you don't have an API key, you can get one from the <a href="https://platform.openai.com/" target="_blank" rel="noopener noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">OpenAI platform</a></p>

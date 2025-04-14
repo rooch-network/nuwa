@@ -22,10 +22,10 @@ const Examples: React.FC<ExamplesProps> = ({ examples, onSelect }) => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-gray-200">
+      <div className="p-3 border-b border-gray-700">
         <input
           type="text"
-          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-brand-primary focus:border-brand-primary"
+          className="w-full px-3 py-2 rounded-lg border border-gray-600 bg-gray-700 text-gray-200 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 placeholder-gray-400"
           placeholder="Search examples..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -40,25 +40,25 @@ const Examples: React.FC<ExamplesProps> = ({ examples, onSelect }) => {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          <div className="space-y-2 p-2">
+          <div className="pt-2">
             {filteredExamples.map((example) => (
               <div
                 key={example.name}
-                className="p-3 hover:bg-gray-50 border border-gray-200 hover:border-brand-primary rounded-lg cursor-pointer transition-all duration-200"
+                className="px-3 py-2 hover:bg-gray-700 cursor-pointer transition-all duration-200 group"
                 onClick={() => onSelect(example.code)}
               >
-                <h3 className="font-medium text-sm text-gray-800 mb-1">
-                  {example.name}
-                </h3>
-                <p className="text-xs text-gray-600 mb-2">
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-blue-400" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <h3 className="font-medium text-sm text-gray-200 truncate">
+                    {example.name}
+                  </h3>
+                </div>
+                <p className="text-xs text-gray-400 mt-1 pl-6 pb-1 border-b border-gray-700">
                   {example.description}
                 </p>
-                <div className="text-xs text-brand-primary font-medium flex items-center">
-                  <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
-                  </svg>
-                  Load example
-                </div>
               </div>
             ))}
           </div>

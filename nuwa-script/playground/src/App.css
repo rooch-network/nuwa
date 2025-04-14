@@ -8,6 +8,8 @@
   --background-dark: #242424;
   --text-light: #213547;
   --text-dark: rgba(255, 255, 255, 0.87);
+  --sidebar-bg: #1e293b;
+  --sidebar-hover: #334155;
 }
 
 #root {
@@ -18,6 +20,23 @@
   text-align: left;
   background-color: var(--background-light);
   color: var(--text-light);
+}
+
+/* 控制所有SVG图标大小 - 确保没有图标变得过大 */
+svg {
+  max-width: 64px;
+  max-height: 64px;
+}
+
+.main-panel svg {
+  max-width: 36px;
+  max-height: 36px;
+}
+
+/* 特别限制X图标大小 */
+.welcome-icon svg {
+  max-width: 32px !important;
+  max-height: 32px !important;
 }
 
 /* Custom scrollbar styles */
@@ -141,8 +160,69 @@
 
 /* Tab highlight - using primary brand color */
 .tab-active {
-  border-bottom: 2px solid var(--brand-primary);
   color: var(--brand-primary);
+  font-weight: 500;
+}
+
+/* New Dark Theme Sidebar Styles */
+.vscode-sidebar {
+  background-color: var(--sidebar-bg);
+  color: #e2e8f0;
+}
+
+.vscode-sidebar-item {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  border-radius: 0.25rem;
+  margin-bottom: 0.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.vscode-sidebar-item:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.vscode-sidebar-item.active {
+  background-color: var(--sidebar-hover);
+}
+
+.vscode-sidebar-item-icon {
+  margin-right: 0.5rem;
+  color: #94a3b8;
+}
+
+/* Improved Script Panel Styling */
+.script-panel {
+  border-top: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  transition: height 0.3s ease-in-out;
+}
+
+.script-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.script-panel-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.script-panel-close {
+  cursor: pointer;
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.script-panel-close:hover {
+  color: #475569;
 }
 
 /* Ensure that the editor container fills the available space */
@@ -155,17 +235,20 @@
 
 /* Style for the resize handle */
 .resize-handle {
-  height: 4px;
+  height: 1px;
   background-color: #e5e7eb;
   cursor: ns-resize;
   position: relative;
+  transition: background-color 0.2s;
 }
 
 .resize-handle:hover {
-  background-color: #d1d5db;
+  height: 2px;
+  background-color: var(--brand-primary);
 }
 
 .resize-handle:active {
+  height: 3px;
   background-color: var(--brand-primary);
 }
 
@@ -211,4 +294,32 @@
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+/* Control application icon sizes */
+.app-icon-large {
+  max-width: 80px;
+  max-height: 80px;
+  margin: 0 auto;
+}
+
+.app-icon-medium {
+  max-width: 50px;
+  max-height: 50px;
+  margin: 0 auto;
+}
+
+.app-icon-small {
+  max-width: 24px;
+  max-height: 24px;
+}
+
+/* Center content in application panels */
+.app-panel-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
 }
