@@ -5,7 +5,7 @@ import type {
   NuwaValue, 
   EvaluatedToolArguments 
 } from '../services/nuwaInterpreter';
-import type { DrawableShape } from '../components/DrawingCanvas'; // Import shape type
+import type { DrawableShape } from '../components/DrawingCanvas.tsx'; // Import shape type, added .tsx
 
 // --- Shared State for Canvas --- 
 // NOTE: This is a simple global state for demonstration.
@@ -27,7 +27,25 @@ const notifyCanvasChange = () => {
 // --- End Shared State ---\
 
 
-// --- Canvas Tool Definitions ---\n
+// --- Canvas Tool Definitions ---
+
+// Helper to get value from EvaluatedToolArguments (object format)
+const getArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: string, defaultVal: T): T => {
+    const arg = args[name];
+    // Basic check, consider more robust validation
+    if (arg && arg.type === expectedType) { 
+        return arg.value as T;
+    }
+    return defaultVal;
+};
+const getOptArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: string): T | undefined => {
+    const arg = args[name];
+    if (arg && arg.type === expectedType) {
+        return arg.value as T;
+    }
+    return undefined;
+};
+
 // drawLine Tool
 const drawLineSchema: ToolSchema = {
   name: 'drawLine',
@@ -40,25 +58,20 @@ const drawLineSchema: ToolSchema = {
     { name: 'color', type: 'string', description: 'Line color (e.g., \'red\', \'#00ff00\')', required: false },
     { name: 'width', type: 'number', description: 'Line width', required: false }
   ],
-  returns: 'null' // This tool modifies state, doesn't return a value
+  returns: 'null'
 };
 
-const drawLineFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
-  // Helper to get number or default
-  const getNum = (name: string, defaultVal: number): number => args[name]?.value as number ?? defaultVal;
-  // Helper to get string or default
-  const getStr = (name: string, defaultVal: string): string => args[name]?.value as string ?? defaultVal;
-  
-  const x1 = getNum('x1', 0);
-  const y1 = getNum('y1', 0);
-  const x2 = getNum('x2', 0);
-  const y2 = getNum('y2', 0);
-  const color = getStr('color', 'black');
-  const width = getNum('width', 2);
+const drawLineFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<any> => {
+  const x1 = getArgValue<number>(args, 'x1', 'number', 0);
+  const y1 = getArgValue<number>(args, 'y1', 'number', 0);
+  const x2 = getArgValue<number>(args, 'x2', 'number', 0);
+  const y2 = getArgValue<number>(args, 'y2', 'number', 0);
+  const color = getArgValue<string>(args, 'color', 'string', 'black');
+  const width = getArgValue<number>(args, 'width', 'number', 2);
 
   canvasShapes.push({ type: 'line', points: [x1, y1, x2, y2], color: color, strokeWidth: width });
-  notifyCanvasChange(); // Notify listeners about the change
-  return { type: 'null', value: null };
+  notifyCanvasChange();
+  return null
 };
 
 // drawRect Tool
@@ -76,21 +89,17 @@ const drawRectSchema: ToolSchema = {
   returns: 'null'
 };
 
-const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
-  const getNum = (name: string, defaultVal: number): number => args[name]?.value as number ?? defaultVal;
-  const getStr = (name: string, defaultVal: string): string => args[name]?.value as string ?? defaultVal;
-  const getStrOpt = (name: string): string | undefined => args[name]?.value as string | undefined;
-
-  const x = getNum('x', 10);
-  const y = getNum('y', 10);
-  const width = getNum('width', 50);
-  const height = getNum('height', 30);
-  const color = getStr('color', 'black');
-  const fill = getStrOpt('fill');
+const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<any> => {
+  const x = getArgValue<number>(args, 'x', 'number', 10);
+  const y = getArgValue<number>(args, 'y', 'number', 10);
+  const width = getArgValue<number>(args, 'width', 'number', 50);
+  const height = getArgValue<number>(args, 'height', 'number', 30);
+  const color = getArgValue<string>(args, 'color', 'string', 'black');
+  const fill = getOptArgValue<string>(args, 'fill', 'string');
 
   canvasShapes.push({ type: 'rect', x, y, width, height, color, fill });
   notifyCanvasChange();
-  return { type: 'null', value: null };
+  return null
 };
 
 // drawCircle Tool
@@ -107,20 +116,16 @@ const drawCircleSchema: ToolSchema = {
   returns: 'null'
 };
 
-const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
-  const getNum = (name: string, defaultVal: number): number => args[name]?.value as number ?? defaultVal;
-  const getStr = (name: string, defaultVal: string): string => args[name]?.value as string ?? defaultVal;
-  const getStrOpt = (name: string): string | undefined => args[name]?.value as string | undefined;
-
-  const x = getNum('x', 50);
-  const y = getNum('y', 50);
-  const radius = getNum('radius', 25);
-  const color = getStr('color', 'black');
-  const fill = getStrOpt('fill');
+const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<any> => {
+  const x = getArgValue<number>(args, 'x', 'number', 50);
+  const y = getArgValue<number>(args, 'y', 'number', 50);
+  const radius = getArgValue<number>(args, 'radius', 'number', 25);
+  const color = getArgValue<string>(args, 'color', 'string', 'black');
+  const fill = getOptArgValue<string>(args, 'fill', 'string');
 
   canvasShapes.push({ type: 'circle', x, y, radius, color, fill });
   notifyCanvasChange();
-  return { type: 'null', value: null };
+  return null
 };
 
 // clearCanvas Tool
@@ -131,10 +136,10 @@ const clearCanvasSchema: ToolSchema = {
   returns: 'null'
 };
 
-const clearCanvasFunc: ToolFunction = async (): Promise<NuwaValue> => {
+const clearCanvasFunc: ToolFunction = async (): Promise<any> => {
   canvasShapes = []; // Clear the global array
   notifyCanvasChange();
-  return { type: 'null', value: null };
+  return null
 };
 
 // Export tools

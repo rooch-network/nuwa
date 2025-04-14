@@ -363,9 +363,9 @@ function App() {
                     )}
                     <Output 
                       output={output} 
-                      error={error || null} 
+                      error={error ?? null} 
+                      onClear={handleClearOutput} 
                       loading={isRunning}
-                      onClear={handleClearOutput}
                     />
                   </div>
                 </div>
