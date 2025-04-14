@@ -27,7 +27,7 @@
     "lib": ["es2022"],
     "module": "NodeNext", // Use NodeNext for modern Node.js module resolution
     "outDir": "./dist", // Output directory for compiled JS
-    "rootDir": "./src", // Root directory of source files
+    // "rootDir": "./src", // REMOVED: Allow compiling files outside src
 
     /* Declaration Files */
     "declaration": true, // Generate .d.ts files
@@ -42,6 +42,9 @@
       // "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts"], // Which files TS should check
+  "include": [
+    "src/**/*.ts",
+    "examples/**/*.ts" // ADDED: Include examples for compilation
+  ],
   "exclude": ["node_modules", "dist"] // Which folders to ignore
 }
