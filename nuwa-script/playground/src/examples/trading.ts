@@ -178,30 +178,40 @@ const tradingExample: ExampleConfig = {
   script: `// Auto-trading decision script
 LET INVESTMENT = 1000  // USDC investment amount
 
-// Get BTC and ETH prices
-LET btcPrice = CALL getPrice(symbol="BTC")
-LET ethPrice = CALL getPrice(symbol="ETH")
+// Get BTC and ETH prices using tool call expression
+LET btcPrice = getPrice {symbol: "BTC"}
+LET ethPrice = getPrice {symbol: "ETH"}
+PRINT("BTC Price: " + btcPrice)
+PRINT("ETH Price: " + ethPrice)
 
 // Get market sentiment
-LET btcSentiment = CALL getMarketSentiment(symbol="BTC")
-LET ethSentiment = CALL getMarketSentiment(symbol="ETH")
+LET btcSentiment = getMarketSentiment {symbol: "BTC"}
+LET ethSentiment = getMarketSentiment {symbol: "ETH"}
+PRINT("BTC Sentiment: " + btcSentiment)
+PRINT("ETH Sentiment: " + ethSentiment)
 
 // Get current balance
-LET usdcBalance = CALL getBalance(symbol="USDC")
+LET usdcBalance = getBalance {symbol: "USDC"}
+PRINT("USDC Balance: " + usdcBalance)
 
 // Check if we have enough balance
 IF usdcBalance >= INVESTMENT THEN
+  PRINT("Sufficient balance. Evaluating trade...")
   // Decide which asset to invest in based on market sentiment
   IF btcSentiment > ethSentiment THEN
-    // Better sentiment, choose BTC
-    CALL swap(fromSymbol="USDC", toSymbol="BTC", amount=INVESTMENT)
+    PRINT("BTC sentiment is higher. Swapping USDC for BTC...")
+    // Use CALL statement as we don't need the return value immediately
+    CALL swap {fromSymbol: "USDC", toSymbol: "BTC", amount: INVESTMENT}
+    PRINT("Swap requested for BTC.")
   ELSE
-    // Otherwise choose ETH
-    CALL swap(fromSymbol="USDC", toSymbol="ETH", amount=INVESTMENT)
+    PRINT("ETH sentiment is higher or equal. Swapping USDC for ETH...")
+    CALL swap {fromSymbol: "USDC", toSymbol: "ETH", amount: INVESTMENT}
+    PRINT("Swap requested for ETH.")
   END
 ELSE
   // Insufficient balance
   LET message = "Insufficient balance, need " + INVESTMENT + " USDC but only have " + usdcBalance
+  PRINT(message)
 END
 `,
   // Keep the old tools structure for ExampleConfig compatibility if UI needs it

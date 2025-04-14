@@ -9,7 +9,8 @@ import {
     EvaluatedToolArguments,
     OutputHandler,
     Scope,
-    // Import other needed types/values if necessary
+    parse, // Added import for parse function
+    AST // Added import for AST namespace
 } from 'nuwa-script';
 
 // Define the Interpreter instance type - Removed as not needed
@@ -46,8 +47,8 @@ export function createInterpreter(): NuwaInterface {
 // Re-export classes/values
 export { 
     Interpreter, 
-    ToolRegistry 
-    // Add other values/classes if needed
+    ToolRegistry, 
+    parse // Re-export the parse function
 }; 
 
 // Re-export types
@@ -59,9 +60,9 @@ export type {
     EvaluatedToolArguments, 
     OutputHandler, 
     Scope,
-    // Also export Interpreter and ToolRegistry as types if needed for type annotations elsewhere
     Interpreter as InterpreterType, 
-    ToolRegistry as ToolRegistryType 
+    ToolRegistry as ToolRegistryType,
+    AST // Re-export the AST namespace type
 }; 
 
 // Remove debug logs

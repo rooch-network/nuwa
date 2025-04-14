@@ -2,7 +2,7 @@ import { ExampleConfig } from '../types/Example';
 // Import necessary types from nuwa-script (re-exported via services)
 import type { 
   ToolSchema, 
-  ToolParameter, 
+  // ToolParameter, // Removed unused import
   ToolFunction, 
   NuwaValue, 
   EvaluatedToolArguments 
@@ -20,16 +20,16 @@ const greetSchema: ToolSchema = {
   returns: 'string' // Specify the return type
 };
 
-const greetFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
+const greetFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<string> => {
   const nameArg = args['name'];
   // Basic type checking (can be more robust)
   if (nameArg && nameArg.type === 'string') {
     const name = nameArg.value as string;
     const result = `Hello, ${name}! Welcome to NuwaScript.`;
-    return { type: 'string', value: result };
+    return result;
   }
   // Handle error or unexpected type
-  return { type: 'null', value: null }; // Or throw an error
+  return ''; // Or throw an error
 };
 
 // Add Tool
@@ -43,17 +43,17 @@ const addSchema: ToolSchema = {
   returns: 'number' // Specify the return type
 };
 
-const addFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
+const addFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<number> => {
   const aArg = args['a'];
   const bArg = args['b'];
   // Basic type checking
   if (aArg && aArg.type === 'number' && bArg && bArg.type === 'number') {
     const a = aArg.value as number;
     const b = bArg.value as number;
-    return { type: 'number', value: a + b };
+    return a + b;
   }
   // Handle error or unexpected type
-  return { type: 'null', value: null }; // Or throw an error
+  return 0; // Or throw an error
 };
 
 // CurrentTime Tool
@@ -64,9 +64,9 @@ const currentTimeSchema: ToolSchema = {
   returns: 'string' // Specify the return type
 };
 
-const currentTimeFunc: ToolFunction = async (): Promise<NuwaValue> => {
+const currentTimeFunc: ToolFunction = async (): Promise<string> => {
   const result = new Date().toLocaleString();
-  return { type: 'string', value: result };
+  return result;
 };
 
 // Export tools in a structured way for registration
@@ -84,19 +84,24 @@ const basicExample: ExampleConfig = {
   description: 'Simple NuwaScript basics including variables, expressions, and tool calls',
   category: 'Getting Started',
   script: `// This is a simple NuwaScript example
+
 // Declare variables
 LET name = "NuwaScript"
 LET x = 10
 LET y = 20
 
-// Call a tool
-CALL greet(name=name)
+// Call a tool using the correct argument syntax {}
+CALL greet {name: name}
 
-// Call a tool with parameters
-CALL add(a=x, b=y)
+// Call a tool with parameters and store the result
+LET sumResult = CALL add {a: x, b: y} // Use tool call as expression
+PRINT("The sum is: ")
+PRINT(sumResult)
 
 // Get the current time
-CALL currentTime()
+LET currentTimeResult = CALL currentTime {} // Call tool with empty args as expression
+PRINT("Current time: ")
+PRINT(currentTimeResult)
 `,
   // Update the tools description within the example config to match ToolSchema structure
   // Note: This part might be used by UI elements like ToolPanel.

@@ -1,4 +1,4 @@
-import { Token, TokenType } from './lexer';
+import { Token, TokenType, tokenize } from './lexer';
 import * as AST from './ast';
 import { NuwaValue } from './values'; // For literal parsing
 
@@ -358,7 +358,6 @@ export class Parser {
  * @throws LexerError or ParserError on failure.
  */
 export function parse(sourceCode: string): AST.Script {
-    const { tokenize } = require('./lexer'); // Use require for potential dynamic import/testing ease
     const tokens = tokenize(sourceCode);
     const parser = new Parser(tokens);
     return parser.parse();

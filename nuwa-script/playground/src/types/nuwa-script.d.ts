@@ -22,7 +22,7 @@ declare module 'nuwa-script' {
   
   export type EvaluatedToolArguments = Record<string, NuwaValue>;
   
-  export type ToolFunction = (args: EvaluatedToolArguments) => NuwaValue | Promise<NuwaValue>;
+  export type ToolFunction = (args: EvaluatedToolArguments) => any | Promise<any>;
   
   export interface RegisteredTool {
     schema: ToolSchema;

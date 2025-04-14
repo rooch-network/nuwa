@@ -13,3 +13,10 @@ export type { ToolSchema, ToolParameter, ToolFunction, EvaluatedToolArguments, R
 export { isNuwaObject, isNuwaList, isNuwaString, isNuwaNumber, isNuwaBoolean, isNuwaNull, nuwaValuesAreEqual, nuwaValueToString } from './values';
 // Re-export types from values.ts
 export type { NuwaValue, NuwaObject } from './values';
+
+// Explicitly re-export parser and AST
+export { parse } from './parser'; // Corrected function name
+export * as AST from './ast'; // Export all AST node types under the AST namespace
+
+// Export errors if needed
+export * from './errors';

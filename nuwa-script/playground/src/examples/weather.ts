@@ -168,39 +168,48 @@ const weatherExample: ExampleConfig = {
   description: 'Create a smart weather assistant that provides weather info and clothing advice',
   category: 'Daily Applications',
   script: `// Smart Weather Assistant
+
 // User's location
 LET city = "Beijing"
 
-// Get current weather
-LET weather = CALL getWeather(city=city)
-LET temperature = weather.temperature
+// Get current weather using tool call expression
+LET weather = getWeather {city: city}
+LET temperature = weather.temperature // Access object property
 LET condition = weather.condition
 LET humidity = weather.humidity
+PRINT("Current weather fetched.")
 
 // Get clothing advice
-LET clothingAdvice = CALL getClothingRecommendation(
-  temperature=temperature,
-  condition=condition
-)
+LET clothingAdvice = getClothingRecommendation {
+  temperature: temperature,
+  condition: condition
+}
+PRINT("Clothing advice generated.")
 
 // Get air quality
-LET airQuality = CALL getAirQuality(city=city)
+LET airQuality = getAirQuality {city: city}
+PRINT("Air quality fetched.")
 
 // Get 3-day forecast
-LET forecast = CALL getForecast(city=city, days=3)
+LET forecast = getForecast {city: city, days: 3}
+PRINT("Forecast fetched (list).")
 
-// Generate weather report
+// Generate weather report string
 LET report = "Today's weather in " + city + ": " + temperature + "°C, " + condition
-LET report = report + "\\nHumidity: " + humidity + "%"
-LET report = report + "\\nAir Quality: " + airQuality.quality + " (AQI: " + airQuality.aqi + ")"
-LET report = report + "\\nClothing Recommendation: " + clothingAdvice.recommendation
+LET report = report + "\nHumidity: " + humidity + "%"
+LET report = report + "\nAir Quality: " + airQuality.quality + " (AQI: " + airQuality.aqi + ")"
+LET report = report + "\nClothing Recommendation: " + clothingAdvice.recommendation
 
-// Output results
-LET report = report + "\\n\\nForecast for upcoming days:"
-// Loop through forecast array - assuming interpreter supports loops or similar
-// For now, just output the report summary.
-PRINT report
-// PRINT forecast // Interpreter might need explicit list printing support
+// Output the main report
+PRINT("--- Weather Report for " + city + " ---")
+PRINT(report)
+
+// Output forecast (Loop through forecast list)
+PRINT("\n--- 3-Day Forecast ---")
+FOR dayForecast IN forecast DO
+  LET forecastText = dayForecast.date + ": " + dayForecast.temperature + "°C, " + dayForecast.condition + ", Humidity: " + dayForecast.humidity + "%"
+  PRINT(forecastText)
+END
 `,
   // Keep the old tools structure for ExampleConfig compatibility if UI needs it
   tools: [

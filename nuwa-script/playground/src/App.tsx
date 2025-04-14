@@ -5,19 +5,23 @@ import Output from './components/Output';
 import ToolPanel from './components/ToolPanel';
 import AIChat from './components/AIChat';
 import { BoltIcon } from './components/AppIcons';
+import DrawingCanvas, { DrawableShape } from './components/DrawingCanvas';
 import { examples, examplesById } from './examples';
 import { 
   Interpreter, 
   ToolRegistry,
   ToolSchema,
   ToolFunction,
-  NuwaInterface
+  NuwaInterface,
+  OutputHandler
 } from './services/nuwaInterpreter';
+import { parse } from 'nuwa-script';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
 import { basicTools } from './examples/basic';
 import { tradingTools } from './examples/trading';
 import { weatherTools } from './examples/weather';
+import { canvasTools, canvasShapes as initialCanvasShapes, subscribeToCanvasChanges } from './examples/canvas';
 import { ExampleConfig } from './types/Example';
 
 import './App.css';
@@ -38,22 +42,32 @@ function App() {
   const [apiKey, setApiKey] = useState(storageService.getApiKey());
   const [isRunning, setIsRunning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showScriptPanel, setShowScriptPanel] = useState(false);
   const [activeSidePanel, setActiveSidePanel] = useState<'examples' | 'tools'>('examples');
   const [scriptPanelHeight, setScriptPanelHeight] = useState<string>('40%');
   const [isDragging, setIsDragging] = useState(false);
   const [messages, setMessages] = useState<CustomMessage[]>([]);
   const [currentToolSchemas, setCurrentToolSchemas] = useState<ToolSchema[]>([]);
+  const [shapes, setShapes] = useState<DrawableShape[]>(initialCanvasShapes);
 
   // Initialization
   useEffect(() => {
-    // Load previously selected example or default example
     const lastExampleId = storageService.getLastSelectedExample() || examples[0]?.id;
     if (lastExampleId && examplesById[lastExampleId]) {
       handleSelectExample(examplesById[lastExampleId]);
     } else if (examples.length > 0) {
       handleSelectExample(examples[0]);
     }
+
+    // Subscribe to canvas shape changes from the canvas tools module
+    const unsubscribe = subscribeToCanvasChanges(() => {
+      // Update React state when the global state changes
+      // Create a new array to trigger re-render
+      setShapes([...initialCanvasShapes]); 
+    });
+
+    // Cleanup subscription on component unmount
+    return () => unsubscribe();
+
   }, []);
 
   // Select example
@@ -63,72 +77,76 @@ function App() {
     setOutput('');
     setError(undefined);
     storageService.saveLastSelectedExample(example.id);
-    
-    // Create new interpreter and register tools
     setupInterpreter(example);
+    // Reset canvas state when switching examples (optional)
+    if (example.id !== 'canvas') {
+         initialCanvasShapes.length = 0; // Clear the global array
+         setShapes([]); // Clear the react state
+    } else {
+         setShapes([...initialCanvasShapes]); // Ensure canvas example starts fresh or with its initial state
+    }
   };
 
-  // Setup interpreter and tools - Updated
+  // Setup interpreter and tools
   const setupInterpreter = (example: ExampleConfig) => {
     const toolRegistry = new ToolRegistry();
     
-    // Define output handler inline or ensure it updates state correctly
-    const tempOutputBuffer: string[] = [];
-    const outputHandler = (message: string) => {
-      tempOutputBuffer.push(message);
-      // Update state *after* execution or use a more direct state update
+    // Define the output handler passed to the Interpreter constructor.
+    // This handler will be used for PRINT statements during execution.
+    const outputHandler: OutputHandler = (message) => {
+      // Update the output state directly when PRINT is called.
+      setOutput(prev => (prev ? prev + '\n' + message : message));
     };
 
     const interpreter = new Interpreter(toolRegistry, outputHandler);
     
     let exampleTools: { schema: ToolSchema, execute: ToolFunction }[] = []; 
     
-    if (example.id === 'basic') {
-      exampleTools = basicTools;
-    } else if (example.id === 'trading') {
-      exampleTools = tradingTools;
-    } else if (example.id === 'weather') {
-      exampleTools = weatherTools;
-    }
+    if (example.id === 'basic') exampleTools = basicTools;
+    else if (example.id === 'trading') exampleTools = tradingTools;
+    else if (example.id === 'weather') exampleTools = weatherTools;
+    else if (example.id === 'canvas') exampleTools = canvasTools; 
     
     exampleTools.forEach(tool => {
-        toolRegistry.register(
-            tool.schema.name,
-            tool.schema, 
-            tool.execute
-        );
+        toolRegistry.register(tool.schema.name, tool.schema, tool.execute);
     });
     
+    // Set the interpreter and registry in state.
+    // outputBuffer in state might be redundant now if handler updates output directly.
     setNuwaInterface({ 
         interpreter, 
-        outputBuffer: [], // Start with empty buffer in state
+        outputBuffer: [], // Keep for potential future use or remove
         toolRegistry 
     }); 
     setCurrentToolSchemas(toolRegistry.getAllSchemas());
   };
 
-  // Run script - Updated
+  // Run script
   const handleRun = async () => {
     if (!nuwaInterface) return; 
     
     setIsRunning(true);
-    setOutput('');
+    setOutput(''); 
     setError(undefined);
-    // Reset the temporary buffer used by the output handler if defined outside
-    // Or rely on state update from the handler
-    const executionOutputBuffer: string[] = [];
-    nuwaInterface.interpreter.setOutputHandler((message) => {
-        executionOutputBuffer.push(message);
-    });
     
     try {
-      // Use the actual NuwaScript interpreter
-      const scope = await nuwaInterface.interpreter.execute(script); // Pass the script string
-      setOutput(executionOutputBuffer.join('\n')); // Update UI with collected output
+      console.log("Parsing script:", script);
+      const scriptAST = parse(script);
+      console.log("Parsed AST:", scriptAST); 
+
+      // Perform runtime check if needed, AST type might not be available
+      if (!scriptAST || typeof scriptAST !== 'object' || scriptAST.kind !== 'Script') { 
+         throw new Error("Parsing did not return a valid Script AST node.");
+      }
+
+      console.log("Executing AST...");
+      const scope = await nuwaInterface.interpreter.execute(scriptAST);
       console.log("Execution finished. Final scope:", scope);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setOutput(executionOutputBuffer.join('\n')); // Show buffered output even on error
+      console.error("Execution or Parsing error:", err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setError(errorMsg);
+      setOutput(prev => prev ? prev + '\nERROR: ' + errorMsg : 'ERROR: ' + errorMsg); 
     } finally {
       setIsRunning(false);
     }
@@ -354,7 +372,7 @@ function App() {
               </div>
               
               {/* Script panel (collapsible) */}
-              {showScriptPanel && (
+              {selectedExample?.id !== 'canvas' && (
                 <div className="border-t border-gray-200" style={{ height: scriptPanelHeight }}>
                   <div 
                     className="resize-handle cursor-ns-resize w-full h-1 bg-gray-200 hover:bg-blue-300"
@@ -363,7 +381,7 @@ function App() {
                   <div className="px-4 py-1 bg-white border-b border-gray-200 text-sm text-gray-700 flex justify-between items-center">
                     <div>NuwaScript</div>
                     <button 
-                      onClick={() => setShowScriptPanel(false)}
+                      onClick={() => setScriptPanelHeight('40%')}
                       className="text-gray-500 hover:text-gray-700"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
