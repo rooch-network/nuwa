@@ -7,7 +7,7 @@ import type {
   ToolContext,
   StateValueWithMetadata,
   ToolRegistry
-} from '../services/nuwaInterpreter';
+} from '../services/interpreter';
 import type { DrawableShape } from '../components/DrawingCanvas'; // Keep this import
 
 // --- Command Object Interface ---

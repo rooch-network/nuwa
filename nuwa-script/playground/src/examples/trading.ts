@@ -8,7 +8,7 @@ import type {
   StateValueWithMetadata,
   ToolRegistry,
   ToolContext
-} from '../services/nuwaInterpreter';
+} from '../services/interpreter';
 
 // --- Trading State Management ---
 

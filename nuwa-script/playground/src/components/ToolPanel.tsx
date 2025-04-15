@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ToolSchema, ToolParameter } from '../services/nuwaInterpreter';
+import type { ToolSchema, ToolParameter } from '../services/interpreter';
 
 interface ToolPanelProps {
   tools: ToolSchema[];

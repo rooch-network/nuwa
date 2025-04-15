@@ -1,4 +1,4 @@
-import { ToolSchema } from '../services/nuwaInterpreter';
+import { ToolSchema } from '../services/interpreter';
 
 // Component state management interfaces
 export interface ComponentStateManager<T = any> {

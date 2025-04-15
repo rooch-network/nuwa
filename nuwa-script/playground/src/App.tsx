@@ -16,7 +16,7 @@ import {
   ToolFunction,
   NuwaInterface,
   OutputHandler
-} from './services/nuwaInterpreter';
+} from './services/interpreter';
 import { parse } from 'nuwa-script';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
