@@ -1,11 +1,12 @@
 import React from 'react';
-import { Stage, Layer, Line, Rect, Circle } from 'react-konva'; // Removed Shape as it wasn't used
+import { Stage, Layer, Line, Rect, Circle, Path } from 'react-konva'; // Removed Shape as it wasn't used
 
 // Define the possible shapes AI can draw
 export type DrawableShape = 
   | { type: 'line', points: number[], color: string, strokeWidth: number }
   | { type: 'rect', x: number, y: number, width: number, height: number, color: string, fill?: string } // Added optional fill
-  | { type: 'circle', x: number, y: number, radius: number, color: string, fill?: string }; // Added optional fill
+  | { type: 'circle', x: number, y: number, radius: number, color: string, fill?: string } // Added optional fill
+  | { type: 'path', d: string, color: string, fill?: string, strokeWidth: number }; // Added path type
 
 interface DrawingCanvasProps {
   width: number;
@@ -53,6 +54,16 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ width, height, shapes }) 
                   stroke={shape.color}
                   fill={shape.fill} // Use fill color if provided
                   strokeWidth={1} // Default stroke width for circle
+                />
+              );
+            case 'path':
+              return (
+                <Path
+                  key={index}
+                  data={shape.d} // Use the 'd' property for path data
+                  stroke={shape.color}
+                  strokeWidth={shape.strokeWidth}
+                  fill={shape.fill}
                 />
               );
             default:

@@ -59,14 +59,16 @@ function App() {
       handleSelectExample(examples[0]);
     }
 
-    // Subscribe to canvas shape changes from the canvas tools module
+    // Subscribe to canvas shape changes
     const unsubscribe = subscribeToCanvasChanges(() => {
-      // Update React state when the global state changes
-      // Create a new array to trigger re-render
-      setShapes([...initialCanvasShapes]); 
+      console.log('[App.tsx] Canvas shapes updated in canvas.ts. Global state:', JSON.stringify(initialCanvasShapes)); // Log global state
+      // Update React state with a new array copy
+      const newShapes = [...initialCanvasShapes];
+      setShapes(newShapes); 
+      console.log('[App.tsx] React state set with new shapes:', JSON.stringify(newShapes)); // Log state being set
     });
 
-    // Cleanup subscription on component unmount
+    // Cleanup subscription
     return () => unsubscribe();
 
   }, []);
@@ -78,14 +80,20 @@ function App() {
     setOutput('');
     setError(undefined);
     storageService.saveLastSelectedExample(example.id);
-    setupInterpreter(example);
-    // Reset canvas state when switching examples (optional)
-    if (example.id !== 'canvas') {
-         initialCanvasShapes.length = 0; // Clear the global array
-         setShapes([]); // Clear the react state
+    
+    // Ensure canvas state is explicitly cleared or initialized for the canvas example
+    if (example.id === 'canvas') {
+        console.log('[App.tsx] Canvas example selected. Clearing shapes.');
+        initialCanvasShapes.length = 0; // Clear the global array
+        setShapes([]); // Clear the React state
     } else {
-         setShapes([...initialCanvasShapes]); // Ensure canvas example starts fresh or with its initial state
+        // Optional: Clear shapes if switching away from canvas?
+        // initialCanvasShapes.length = 0;
+        // setShapes([]);
     }
+
+    // Setup interpreter *after* potentially clearing state
+    setupInterpreter(example);
   };
 
   // Setup interpreter and tools
@@ -355,12 +363,18 @@ function App() {
                   </div>
                   <div className="h-[calc(100%-36px)] p-4 bg-white overflow-auto flex flex-col items-center justify-center">
                     {selectedExample?.id === 'canvas' ? (
-                      // Render Canvas when canvas example is selected
-                      <DrawingCanvas 
-                        width={500} // Placeholder width
-                        height={400} // Placeholder height
-                        shapes={shapes} // Pass the shapes state
-                      />
+                      <>
+                        {/* Log shapes prop passed to DrawingCanvas - Return null to be valid JSX */} 
+                        {(() => { 
+                            console.log('[App.tsx] Rendering DrawingCanvas with shapes:', JSON.stringify(shapes)); 
+                            return null; 
+                        })()}
+                        <DrawingCanvas 
+                          width={500}
+                          height={400}
+                          shapes={shapes}
+                        />
+                      </>
                     ) : (
                       // Render standard output for other examples
                       <>
@@ -385,33 +399,31 @@ function App() {
                 </div>
               </div>
               
-              {/* Script panel (collapsible, hidden for canvas example) */}
-              {selectedExample?.id !== 'canvas' && (
-                <div className="border-t border-gray-200" style={{ height: scriptPanelHeight }}>
-                  <div 
-                    className="resize-handle cursor-ns-resize w-full h-1 bg-gray-200 hover:bg-blue-300"
-                    onMouseDown={startResize}
-                  ></div>
-                  <div className="px-4 py-1 bg-white border-b border-gray-200 text-sm text-gray-700 flex justify-between items-center">
-                    <div>NuwaScript</div>
-                    <button 
-                      onClick={() => setScriptPanelHeight('40%')}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="h-[calc(100%-32px)] overflow-hidden">
-                    <Editor 
-                      defaultValue={script} 
-                      onChange={setScript} 
-                      language="javascript" 
-                    />
-                  </div>
+              {/* Script panel (collapsible, always visible now) */}
+              <div className="border-t border-gray-200" style={{ height: scriptPanelHeight }}>
+                <div 
+                  className="resize-handle cursor-ns-resize w-full h-1 bg-gray-200 hover:bg-blue-300"
+                  onMouseDown={startResize}
+                ></div>
+                <div className="px-4 py-1 bg-white border-b border-gray-200 text-sm text-gray-700 flex justify-between items-center">
+                  <div>NuwaScript</div>
+                  <button 
+                    onClick={() => setScriptPanelHeight('40%')}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
                 </div>
-              )}
+                <div className="h-[calc(100%-32px)] overflow-hidden">
+                  <Editor 
+                    defaultValue={script} 
+                    onChange={setScript} 
+                    language="javascript" 
+                  />
+                </div>
+              </div>
             </div>
 
             {/* AI Chat panel (always visible) */}
