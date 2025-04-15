@@ -10,7 +10,11 @@ import {
     OutputHandler,
     Scope,
     parse, // Added import for parse function
-    AST // Added import for AST namespace
+    AST, // Added import for AST namespace
+    StateMetadata, // Import from nuwa-script instead of defining locally
+    StateValueWithMetadata, // Import from nuwa-script
+    StateStore, // Import from nuwa-script
+    ToolContext // Import from nuwa-script
 } from 'nuwa-script';
 
 // Define the Interpreter instance type - Removed as not needed
@@ -62,7 +66,11 @@ export type {
     Scope,
     Interpreter as InterpreterType, 
     ToolRegistry as ToolRegistryType,
-    AST // Re-export the AST namespace type
+    AST, // Re-export the AST namespace type
+    StateMetadata,
+    StateValueWithMetadata,
+    StateStore,
+    ToolContext
 }; 
 
 // Remove debug logs

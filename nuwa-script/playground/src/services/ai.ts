@@ -1,4 +1,4 @@
-import { ToolSchema, ToolRegistry } from 'nuwa-script';
+import { ToolRegistry } from 'nuwa-script';
 import { buildPrompt } from 'nuwa-script';
 
 export interface AIServiceOptions {
@@ -24,7 +24,7 @@ export class AIService {
     }
 
     try {
-      const fullPrompt = buildPrompt(toolRegistry, prompt);
+      const fullPrompt = buildPrompt(toolRegistry, prompt, true);
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -35,7 +35,7 @@ export class AIService {
         body: JSON.stringify({
           model: this.options.model,
           messages: [
-            { role: "system", content: "You are an AI assistant generating NuwaScript code based on the provided tools and user request." },
+            { role: "system", content: "You are an AI assistant generating NuwaScript code based on the provided tools and current system state." },
             { role: "user", content: fullPrompt }
           ],
           max_tokens: this.options.maxTokens,

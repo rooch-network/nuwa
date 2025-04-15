@@ -100,6 +100,10 @@ function App() {
   const setupInterpreter = (example: ExampleConfig) => {
     const toolRegistry = new ToolRegistry();
     
+    // Store registry in global object (browser-compatible way)
+    const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
+    (globalObj as any).__toolRegistry = toolRegistry;
+    
     // Define the output handler passed to the Interpreter constructor.
     // This handler will be used for PRINT statements during execution.
     const outputHandler: OutputHandler = (message) => {
@@ -114,7 +118,26 @@ function App() {
     if (example.id === 'basic') exampleTools = basicTools;
     else if (example.id === 'trading') exampleTools = tradingTools;
     else if (example.id === 'weather') exampleTools = weatherTools;
-    else if (example.id === 'canvas') exampleTools = canvasTools; 
+    else if (example.id === 'canvas') {
+      exampleTools = canvasTools;
+      
+      // Initialize canvas state with metadata
+      toolRegistry.setState('canvas_shape_count', 0);
+      toolRegistry.registerStateMetadata('canvas_shape_count', {
+        description: "Number of shapes currently on the canvas"
+      });
+      
+      // Initialize timestamp
+      const now = Date.now();
+      toolRegistry.setState('canvas_initialized', now);
+      toolRegistry.registerStateMetadata('canvas_initialized', {
+        description: "Time when the canvas was initialized",
+        formatter: (value) => {
+          const date = new Date(value as number);
+          return `${value} (${date.toLocaleString()})`;
+        }
+      });
+    }
     
     exampleTools.forEach(tool => {
         toolRegistry.register(tool.schema.name, tool.schema, tool.execute);

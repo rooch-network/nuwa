@@ -2,8 +2,10 @@ import { ExampleConfig } from '../types/Example';
 import type { 
   ToolSchema, 
   ToolFunction, 
-  // NuwaValue, // Removed unused import
-  EvaluatedToolArguments 
+  NuwaValue,
+  EvaluatedToolArguments,
+  ToolContext,
+  StateValueWithMetadata
 } from '../services/nuwaInterpreter';
 import type { DrawableShape } from '../components/DrawingCanvas'; // Keep this import
 
@@ -26,6 +28,110 @@ const notifyCanvasChange = () => {
 };
 // --- End Shared State ---\
 
+// --- Helper for State Management ---
+// Helper function to create state with metadata
+function createState<T>(value: T, description: string, formatter?: (value: unknown) => string): StateValueWithMetadata {
+  return {
+    value: value as unknown as NuwaValue, // Type cast with more safety
+    metadata: {
+      description,
+      formatter: formatter as unknown as ((value: NuwaValue) => string) | undefined
+    }
+  };
+}
+
+// Update state with canvas information
+function updateCanvasState(context?: ToolContext): void {
+  if (!context || !context.state) return;
+  
+  // Set canvas state with metadata - get global object in a browser-compatible way
+  const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
+  const registry = (globalObj as any).__toolRegistry;
+  
+  // Store basic canvas information
+  const shapeCount = canvasShapes.length;
+  if (registry) {
+    // Set canvas dimensions
+    registry.setState('canvas_width', createState(
+      500,
+      "Width of the canvas in pixels"
+    ));
+    
+    registry.setState('canvas_height', createState(
+      400,
+      "Height of the canvas in pixels"
+    ));
+    
+    registry.setState('canvas_shape_count', createState(
+      shapeCount,
+      "Number of shapes currently on the canvas"
+    ));
+    
+    // Store shape type breakdown
+    const shapeTypes: Record<string, number> = {};
+    canvasShapes.forEach(shape => {
+      shapeTypes[shape.type] = (shapeTypes[shape.type] || 0) + 1;
+    });
+    
+    registry.setState('canvas_shape_types', createState(
+      shapeTypes,
+      "Breakdown of shape types on the canvas",
+      (value) => {
+        const types = value as Record<string, number>;
+        return Object.entries(types)
+          .map(([type, count]) => `${type}: ${count}`)
+          .join(', ');
+      }
+    ));
+    
+    // Store latest shape information if available
+    const latestShape = canvasShapes.length > 0 
+      ? canvasShapes[canvasShapes.length - 1] 
+      : null;
+      
+    if (latestShape) {
+      registry.setState('canvas_last_shape', createState(
+        latestShape.type,
+        "Type of the most recently added shape"
+      ));
+
+      // Store description of the latest shape
+      let lastShapeDesc = "";
+      switch (latestShape.type) {
+        case 'line':
+          lastShapeDesc = `Line from (${latestShape.points[0]},${latestShape.points[1]}) to (${latestShape.points[2]},${latestShape.points[3]}), color: ${latestShape.color}`;
+          break;
+        case 'rect':
+          lastShapeDesc = `Rectangle at (${latestShape.x},${latestShape.y}) of size ${latestShape.width}x${latestShape.height}, color: ${latestShape.color}`;
+          break;
+        case 'circle':
+          lastShapeDesc = `Circle at (${latestShape.x},${latestShape.y}) with radius ${latestShape.radius}, color: ${latestShape.color}`;
+          break;
+        case 'path':
+          lastShapeDesc = `Path with SVG data (shortened), color: ${latestShape.color}`;
+          break;
+      }
+      
+      registry.setState('canvas_last_shape_details', createState(
+        lastShapeDesc,
+        "Description of the most recently added shape"
+      ));
+    }
+    
+    // Store canvas modification time
+    registry.setState('canvas_last_modified', createState(
+      Date.now(),
+      "Timestamp of the last canvas modification",
+      (value) => {
+        const timestamp = value as number;
+        const date = new Date(timestamp);
+        return `${timestamp} (${date.toLocaleString()})`;
+      }
+    ));
+  }
+}
+
+// --- End State Management ---
 
 // --- Canvas Tool Definitions ---
 
@@ -111,7 +217,7 @@ const drawLineSchema: ToolSchema = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawLineFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<any> => {
+const drawLineFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
   const x1 = getArgValue<number>(args, 'x1', 'number', 0);
   const y1 = getArgValue<number>(args, 'y1', 'number', 0);
   const x2 = getArgValue<number>(args, 'x2', 'number', 0);
@@ -123,6 +229,10 @@ const drawLineFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise
   console.log('[canvas.ts] Adding Line:', JSON.stringify(newShape)); // Log added shape
   canvasShapes.push(newShape);
   notifyCanvasChange();
+  
+  // Update canvas state
+  updateCanvasState(context);
+  
   return null;
 };
 
@@ -142,7 +252,7 @@ const drawRectSchema: ToolSchema = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<any> => {
+const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
   const x = getArgValue<number>(args, 'x', 'number', 10);
   const y = getArgValue<number>(args, 'y', 'number', 10);
   const width = getArgValue<number>(args, 'width', 'number', 50);
@@ -154,6 +264,10 @@ const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise
   console.log('[canvas.ts] Adding Rect:', JSON.stringify(newShape)); // Log added shape
   canvasShapes.push(newShape);
   notifyCanvasChange();
+  
+  // Update canvas state
+  updateCanvasState(context);
+  
   return null;
 };
 
@@ -172,7 +286,7 @@ const drawCircleSchema: ToolSchema = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<any> => {
+const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
   const x = getArgValue<number>(args, 'x', 'number', 50);
   const y = getArgValue<number>(args, 'y', 'number', 50);
   const radius = getArgValue<number>(args, 'radius', 'number', 25);
@@ -183,6 +297,10 @@ const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments): Promi
   console.log('[canvas.ts] Adding Circle:', JSON.stringify(newShape)); // Log added shape
   canvasShapes.push(newShape);
   notifyCanvasChange();
+  
+  // Update canvas state
+  updateCanvasState(context);
+  
   return null;
 };
 
@@ -200,7 +318,7 @@ const drawPathSchema: ToolSchema = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawPathFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<any> => {
+const drawPathFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
   const d = getArgValue<string>(args, 'd', 'string', '');
   if (!d) {
     console.warn("drawPath called with empty path data.");
@@ -214,6 +332,10 @@ const drawPathFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise
   console.log('[canvas.ts] Adding Path:', JSON.stringify(newShape)); // Log added shape
   canvasShapes.push(newShape);
   notifyCanvasChange();
+  
+  // Update canvas state
+  updateCanvasState(context);
+  
   return null;
 };
 // *** END NEW TOOL ***
@@ -227,10 +349,14 @@ const clearCanvasSchema: ToolSchema = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const clearCanvasFunc: ToolFunction = async (): Promise<any> => {
+const clearCanvasFunc: ToolFunction = async (_args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
   console.log('[canvas.ts] Clearing canvas shapes.'); // Log clear action
   canvasShapes.length = 0; // Clear the global array more explicitly
   notifyCanvasChange();
+  
+  // Update canvas state
+  updateCanvasState(context);
+  
   return null;
 };
 

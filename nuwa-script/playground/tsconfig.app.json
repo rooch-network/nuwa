@@ -22,5 +22,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/examples/basic.ts",
+    "src/examples/trading.ts",
+    "src/examples/weather.ts"
+  ]
 }
