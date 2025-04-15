@@ -1,15 +1,11 @@
 import { ExampleConfig } from '../types/Example';
 
-import basicExample from './basic';
 import tradingExample from './trading';
-import weatherExample from './weather';
 import canvasExample from './canvas';
 
-// Export all example configurations
+// Export only the DeFi and AI Drawing examples
 export const examples: ExampleConfig[] = [
-  basicExample,
   tradingExample,
-  weatherExample,
   canvasExample,
 ];
 

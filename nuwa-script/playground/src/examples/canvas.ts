@@ -475,8 +475,8 @@ export const canvasTools: { schema: ToolSchema, execute: ToolFunction }[] = [
 const canvasExample: ExampleConfig = {
   id: 'canvas',
   name: 'AI Drawing Assistant',
-  description: 'Use NuwaScript tools to instruct an AI to draw on a canvas.',
-  category: 'Creative',
+  description: 'Create beautiful drawings with AI-guided instructions through NuwaScript tools',
+  category: 'AI Drawing',
   script: `// Ask the AI to draw something!
 // Example: Draw a simple house
 

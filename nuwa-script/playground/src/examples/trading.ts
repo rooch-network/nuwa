@@ -3,9 +3,43 @@ import { ExampleConfig } from '../types/Example';
 import type { 
   ToolSchema, 
   ToolFunction, 
-  NuwaValue, 
+  NuwaValue,
   EvaluatedToolArguments 
 } from '../services/nuwaInterpreter';
+
+// --- Helper Functions ---
+
+// Helper function to determine the Nuwa type string from a JavaScript value
+const getActualNuwaType = (value: unknown): string => {
+  if (value === null) return 'null';
+  const jsType = typeof value;
+  if (jsType === 'object') {
+      return Array.isArray(value) ? 'list' : 'object';
+  }
+  return jsType; 
+};
+
+// Helper to get value from EvaluatedToolArguments
+const getArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: string, defaultVal: T): T => {
+  const value = args[name];
+
+  if (value === undefined) {
+      return defaultVal;
+  }
+  
+  const actualType = getActualNuwaType(value);
+
+  if (actualType === expectedType || expectedType === 'any') {
+       if (actualType === 'null' && expectedType !== 'null' && expectedType !== 'any') {
+           // Fall through to mismatch warning/default value
+       } else {
+          return value as T;
+       }
+  }
+
+  console.warn(`Type mismatch for argument '${name}': Expected ${expectedType}, got ${actualType}. Using default.`);
+  return defaultVal;
+};
 
 // --- Tool Definitions ---
 
@@ -20,25 +54,25 @@ const getPriceSchema: ToolSchema = {
 };
 
 const getPriceFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
-  const symbolArg = args['symbol'];
-  if (symbolArg && symbolArg.type === 'string') {
-    const symbol = symbolArg.value as string;
-    // Mock price data
-    const prices: Record<string, number> = {
-      BTC: 67500.42,
-      ETH: 3250.18,
-      SOL: 142.87,
-      AVAX: 35.62,
-      DOT: 7.81
-    };
-    
-    if (prices[symbol]) {
-      return { type: 'number', value: prices[symbol] };
-    }
-    // Throw error for unavailable price, caught by interpreter
-    throw new Error(`Price unavailable for symbol: ${symbol}`);
+  const symbol = getArgValue<string>(args, 'symbol', 'string', '');
+  if (!symbol) {
+    throw new Error('Symbol is required');
   }
-  return { type: 'null', value: null }; // Invalid arguments
+  
+  // Mock price data
+  const prices: Record<string, number> = {
+    BTC: 67500.42,
+    ETH: 3250.18,
+    SOL: 142.87,
+    AVAX: 35.62,
+    DOT: 7.81
+  };
+  
+  if (prices[symbol]) {
+    return prices[symbol];
+  }
+  // Throw error for unavailable price, caught by interpreter
+  throw new Error(`Price unavailable for symbol: ${symbol}`);
 };
 
 // getBalance Tool
@@ -52,20 +86,20 @@ const getBalanceSchema: ToolSchema = {
 };
 
 const getBalanceFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
-  const symbolArg = args['symbol'];
-  if (symbolArg && symbolArg.type === 'string') {
-    const symbol = symbolArg.value as string;
-    // Mock balance data
-    const balances: Record<string, number> = {
-      USDC: 10000,
-      BTC: 0.5,
-      ETH: 5.0,
-      SOL: 100.0,
-      AVAX: 50.0
-    };
-    return { type: 'number', value: balances[symbol] || 0 };
+  const symbol = getArgValue<string>(args, 'symbol', 'string', '');
+  if (!symbol) {
+    return 0;
   }
-  return { type: 'null', value: null }; // Invalid arguments
+  
+  // Mock balance data
+  const balances: Record<string, number> = {
+    USDC: 10000,
+    BTC: 0.5,
+    ETH: 5.0,
+    SOL: 100.0,
+    AVAX: 50.0
+  };
+  return balances[symbol] || 0;
 };
 
 // swap Tool
@@ -81,56 +115,47 @@ const swapSchema: ToolSchema = {
 };
 
 const swapFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
-  const fromSymbolArg = args['fromSymbol'];
-  const toSymbolArg = args['toSymbol'];
-  const amountArg = args['amount'];
+  const fromSymbol = getArgValue<string>(args, 'fromSymbol', 'string', '');
+  const toSymbol = getArgValue<string>(args, 'toSymbol', 'string', '');
+  const amount = getArgValue<number>(args, 'amount', 'number', 0);
 
-  if (fromSymbolArg && fromSymbolArg.type === 'string' &&
-      toSymbolArg && toSymbolArg.type === 'string' &&
-      amountArg && amountArg.type === 'number') {
-
-    const fromSymbol = fromSymbolArg.value as string;
-    const toSymbol = toSymbolArg.value as string;
-    const amount = amountArg.value as number;
-
-    // Mock swap logic
-    if (amount <= 0) {
-      throw new Error('Amount must be positive');
-    }
-    
-    // Mock prices
-    const prices: Record<string, number> = {
-      BTC: 67500.42,
-      ETH: 3250.18,
-      SOL: 142.87,
-      AVAX: 35.62,
-      DOT: 7.81,
-      USDC: 1.0
-    };
-    
-    if (!prices[fromSymbol] || !prices[toSymbol]) {
-      throw new Error(`Unsupported assets: ${fromSymbol} or ${toSymbol}`);
-    }
-    
-    const fromValue = amount * prices[fromSymbol];
-    const toAmount = fromValue / prices[toSymbol];
-    
-    // Apply 1% trading fee
-    const finalAmount = toAmount * 0.99;
-    const fee = toAmount * 0.01;
-    
-    const result = {
-      fromAmount: amount,
-      fromSymbol,
-      toAmount: finalAmount,
-      toSymbol,
-      fee: fee,
-      rate: prices[fromSymbol] / prices[toSymbol]
-    };
-
-    return { type: 'object', value: result };
+  // Mock swap logic
+  if (amount <= 0) {
+    throw new Error('Amount must be positive');
   }
-  return { type: 'null', value: null }; // Invalid arguments
+  
+  // Mock prices
+  const prices: Record<string, number> = {
+    BTC: 67500.42,
+    ETH: 3250.18,
+    SOL: 142.87,
+    AVAX: 35.62,
+    DOT: 7.81,
+    USDC: 1.0
+  };
+  
+  if (!prices[fromSymbol] || !prices[toSymbol]) {
+    throw new Error(`Unsupported assets: ${fromSymbol} or ${toSymbol}`);
+  }
+  
+  const fromValue = amount * prices[fromSymbol];
+  const toAmount = fromValue / prices[toSymbol];
+  
+  // Apply 1% trading fee
+  const finalAmount = toAmount * 0.99;
+  const fee = toAmount * 0.01;
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result: any = {
+    fromAmount: amount,
+    fromSymbol,
+    toAmount: finalAmount,
+    toSymbol,
+    fee: fee,
+    rate: prices[fromSymbol] / prices[toSymbol]
+  };
+  
+  return result;
 };
 
 // getMarketSentiment Tool
@@ -144,20 +169,20 @@ const getMarketSentimentSchema: ToolSchema = {
 };
 
 const getMarketSentimentFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<NuwaValue> => {
-  const symbolArg = args['symbol'];
-  if (symbolArg && symbolArg.type === 'string') {
-    const symbol = symbolArg.value as string;
-    // Mock market sentiment data
-    const sentiments: Record<string, number> = {
-      BTC: 65,
-      ETH: 48,
-      SOL: 72,
-      AVAX: 30,
-      DOT: -12
-    };
-    return { type: 'number', value: sentiments[symbol] || 0 };
+  const symbol = getArgValue<string>(args, 'symbol', 'string', '');
+  if (!symbol) {
+    return 0;
   }
-  return { type: 'null', value: null }; // Invalid arguments
+  
+  // Mock market sentiment data
+  const sentiments: Record<string, number> = {
+    BTC: 65,
+    ETH: 48,
+    SOL: 72,
+    AVAX: 30,
+    DOT: -12
+  };
+  return sentiments[symbol] || 0;
 };
 
 // Export tools in the required structure
@@ -172,27 +197,32 @@ export const tradingTools: { schema: ToolSchema, execute: ToolFunction }[] = [
 // --- Trading Example Configuration (Keep for now) ---
 const tradingExample: ExampleConfig = {
   id: 'trading',
-  name: 'Crypto Trading Assistant',
-  description: 'Create a simple trading decision assistant with NuwaScript',
-  category: 'Finance Applications',
+  name: 'DeFi Trading',
+  description: 'Cryptocurrency trading and DeFi operations with NuwaScript',
+  category: 'DeFi',
   script: `// Auto-trading decision script
 LET INVESTMENT = 1000  // USDC investment amount
 
 // Get BTC and ETH prices using tool call expression
-LET btcPrice = getPrice {symbol: "BTC"}
-LET ethPrice = getPrice {symbol: "ETH"}
-PRINT("BTC Price: " + btcPrice)
-PRINT("ETH Price: " + ethPrice)
+LET btcPrice = CALL getPrice {symbol: "BTC"}
+LET ethPrice = CALL getPrice {symbol: "ETH"}
+PRINT("BTC Price:")
+PRINT(btcPrice)
+PRINT("ETH Price:")
+PRINT(ethPrice)
 
 // Get market sentiment
-LET btcSentiment = getMarketSentiment {symbol: "BTC"}
-LET ethSentiment = getMarketSentiment {symbol: "ETH"}
-PRINT("BTC Sentiment: " + btcSentiment)
-PRINT("ETH Sentiment: " + ethSentiment)
+LET btcSentiment = CALL getMarketSentiment {symbol: "BTC"}
+LET ethSentiment = CALL getMarketSentiment {symbol: "ETH"}
+PRINT("BTC Sentiment:")
+PRINT(btcSentiment)
+PRINT("ETH Sentiment:")
+PRINT(ethSentiment)
 
 // Get current balance
-LET usdcBalance = getBalance {symbol: "USDC"}
-PRINT("USDC Balance: " + usdcBalance)
+LET usdcBalance = CALL getBalance {symbol: "USDC"}
+PRINT("USDC Balance:")
+PRINT(usdcBalance)
 
 // Check if we have enough balance
 IF usdcBalance >= INVESTMENT THEN
@@ -210,8 +240,10 @@ IF usdcBalance >= INVESTMENT THEN
   END
 ELSE
   // Insufficient balance
-  LET message = "Insufficient balance, need " + INVESTMENT + " USDC but only have " + usdcBalance
-  PRINT(message)
+  PRINT("Insufficient balance, need")
+  PRINT(INVESTMENT)
+  PRINT("USDC but only have")
+  PRINT(usdcBalance)
 END
 `,
   // Keep the old tools structure for ExampleConfig compatibility if UI needs it

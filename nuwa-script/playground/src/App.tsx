@@ -19,9 +19,7 @@ import {
 import { parse } from 'nuwa-script';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
-import { basicTools } from './examples/basic';
 import { tradingTools } from './examples/trading';
-import { weatherTools } from './examples/weather';
 import { canvasTools, canvasShapes as initialCanvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas';
 import { ExampleConfig } from './types/Example';
 import type { DrawableShape } from './components/DrawingCanvas';
