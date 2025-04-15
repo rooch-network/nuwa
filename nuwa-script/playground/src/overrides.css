@@ -1,0 +1,82 @@
+/* CSS overrides to fix layout issues - 增强选择器特异性以解决冲突 */
+
+/* Force fixed sidebar width */
+html body #root aside.fixed-sidebar-width {
+  width: 18rem !important;
+  min-width: 18rem !important;
+  max-width: 18rem !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Prevent tool panel container content from overflowing */
+html body #root .tool-panel-container {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Force tool detail content to wrap and not overflow */
+html body #root .tool-detail-content {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  word-break: break-all !important;
+  white-space: normal !important;
+}
+
+/* Enhance sidebar styling */
+html body #root .sidebar-item {
+  border-radius: 0.375rem !important;
+  margin-bottom: 0.5rem !important;
+  transition: all 0.2s ease !important;
+  padding: 0.75rem 1rem !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+html body #root .sidebar-item:hover {
+  background-color: rgba(243, 244, 246, 1) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+html body #root .sidebar-item-description {
+  opacity: 0.85 !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+  padding-top: 0.25rem !important;
+}
+
+/* Override any media queries that might affect the sidebar width */
+@media (max-width: 1280px) {
+  html body #root aside.fixed-sidebar-width {
+    min-width: 18rem !important;
+    width: 18rem !important;
+    max-width: 18rem !important;
+  }
+  
+  html body #root .main-panel {
+    min-width: 600px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  html body #root aside.fixed-sidebar-width {
+    min-width: 18rem !important;
+    width: 18rem !important;
+    max-width: 18rem !important;
+  }
+  
+  html body #root .main-panel {
+    min-width: 550px !important;
+  }
+} 
+
+/* 确保SVG图标大小不被App.css中的全局样式覆盖 */
+html body #root .sidebar-item svg {
+  max-width: 24px !important;
+  max-height: 24px !important;
+}
+
+/* 确保侧边栏内容不被挤压 */
+html body #root aside.fixed-sidebar-width .flex-1 {
+  overflow-y: auto !important;
+} 
