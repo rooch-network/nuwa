@@ -60,6 +60,7 @@ This represents the current state of the system. You can use this information to
 - Output *only* raw code. Do not include explanations, markdown formatting, or code blocks (like \`\`\`).
 - Ensure all keywords (LET, CALL, IF, etc.) and literals (TRUE, FALSE, NULL) are UPPERCASE. **Pay close attention to the CALL syntax using {}.**
 - **Strictly use only the tools listed under "# Available Tools:". Do not invent or call unlisted tools.**
+- **The '+' operator is ONLY for number addition. DO NOT use '+' for string concatenation, not even inside PRINT(). To print complex messages with variables, use multiple PRINT statements.**
 - **Use PRINT(<expression>) statements freely to output intermediate values, confirmations, or helpful information directly to the user.**
 - Consider the "# Current System State:" information when generating the code.
 # NuwaScript Code (provide raw code with no markdown formatting or code blocks):

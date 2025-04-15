@@ -20,7 +20,7 @@ export type OutputHandler = (output: string) => void;
 
 export class Interpreter {
     private toolRegistry: ToolRegistry;
-    private outputHandler: OutputHandler;
+    private readonly outputHandler: OutputHandler;
 
     constructor(toolRegistry?: ToolRegistry, outputHandler?: OutputHandler) {
         this.toolRegistry = toolRegistry ?? new ToolRegistry();
