@@ -39,7 +39,7 @@
   },
   "include": [
     "src/**/*.ts", // Include all ts files in src
-    // "examples/**/*.ts" // Optional: Keep if examples need building
+    "examples/**/*.ts" // Optional: Keep if examples need building
   ],
   "exclude": ["node_modules", "dist", "tests"] // Exclude tests from primary build
 }

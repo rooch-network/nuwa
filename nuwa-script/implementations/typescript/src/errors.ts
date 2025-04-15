@@ -84,10 +84,16 @@ export class MemberAccessError extends InterpreterError {
 export class ToolNotFoundError extends InterpreterError {
     public toolName: string;
 
-    constructor(toolName: string, node?: BaseNode) {
-        super(`Tool '${toolName}' not found.`, node);
+    constructor(
+      message: string, 
+      details?: { 
+        toolName: string; 
+        node?: BaseNode 
+      }
+    ) {
+        super(message, details?.node);
         this.name = 'ToolNotFoundError';
-        this.toolName = toolName;
+        this.toolName = details?.toolName || '';
         Object.setPrototypeOf(this, ToolNotFoundError.prototype);
     }
 }
@@ -97,11 +103,20 @@ export class ToolNotFoundError extends InterpreterError {
  */
 export class ToolArgumentError extends InterpreterError {
     public toolName: string;
+    public parameter?: string;
 
-    constructor(toolName: string, message: string, node?: BaseNode) {
-        super(`Argument error in tool '${toolName}': ${message}`, node);
+    constructor(
+      message: string, 
+      details?: { 
+        toolName: string; 
+        parameter?: string; 
+        node?: BaseNode 
+      }
+    ) {
+        super(message, details?.node);
         this.name = 'ToolArgumentError';
-        this.toolName = toolName;
+        this.toolName = details?.toolName || '';
+        this.parameter = details?.parameter;
         Object.setPrototypeOf(this, ToolArgumentError.prototype);
     }
 }
@@ -113,15 +128,23 @@ export class ToolExecutionError extends InterpreterError {
     public toolName: string;
     public originalError?: Error; // Keep the original error if available
 
-    constructor(toolName: string, originalError: Error | unknown, node?: BaseNode) {
-        const message = originalError instanceof Error ? originalError.message : String(originalError);
-        super(`Error executing tool '${toolName}': ${message}`, node);
+    constructor(
+      message: string, 
+      details?: { 
+        toolName: string; 
+        error?: Error | unknown; 
+        node?: BaseNode 
+      }
+    ) {
+        super(message, details?.node);
         this.name = 'ToolExecutionError';
-        this.toolName = toolName;
-        if (originalError instanceof Error) {
-            this.originalError = originalError;
-            this.stack = originalError.stack; // Preserve original stack if possible
+        this.toolName = details?.toolName || '';
+        
+        if (details?.error instanceof Error) {
+            this.originalError = details.error;
+            this.stack = details.error.stack; // Preserve original stack if possible
         }
+        
         Object.setPrototypeOf(this, ToolExecutionError.prototype);
     }
 }

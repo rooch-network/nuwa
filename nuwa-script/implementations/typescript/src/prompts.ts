@@ -36,11 +36,19 @@ You have access to the following tools. Only use these registered tools with the
 {tools_schema}
 --- END TOOL SCHEMAS ---
 
+# Current System State:
+This represents the current state of the system. You can use this information to inform your response:
+--- START STATE ---
+{state_info}
+--- END STATE ---
+
 # User Task:
 {user_task}
 
 # Instructions:
 Generate *only* the NuwaScript code required to complete the user task using the available tools and syntax. Do not include explanations or markdown formatting. Ensure all keywords and boolean/null literals are uppercase. Use available tools where appropriate. Use PRINT for intermediate thoughts or values if helpful, and use a reporting tool (like 'report_analysis_result') for the final answer if available.
+
+Consider the current system state when generating your code. If the state contains relevant information for the task, use it to inform your response.
 
 # NuwaScript Code:
 `;
@@ -67,12 +75,19 @@ function formatToolSchemasForPrompt(registry: ToolRegistry): string {
  * Builds the complete prompt string for the LLM.
  * @param registry The ToolRegistry containing available tools.
  * @param userTask The user's request.
+ * @param includeState Whether to include state information in the prompt (default: true).
  * @returns The formatted prompt string.
  */
-export function buildPrompt(registry: ToolRegistry, userTask: string): string {
+export function buildPrompt(registry: ToolRegistry, userTask: string, includeState: boolean = true): string {
     const toolSchemasString = formatToolSchemasForPrompt(registry);
+    
+    // Get state information if requested
+    const stateInfo = includeState ? registry.formatStateForPrompt() : "No state information available.";
+    
     const prompt = GENERATION_PROMPT_TEMPLATE
         .replace('{tools_schema}', toolSchemasString)
+        .replace('{state_info}', stateInfo)
         .replace('{user_task}', userTask);
+    
     return prompt;
 }

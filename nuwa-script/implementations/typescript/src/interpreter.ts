@@ -1,5 +1,5 @@
 import * as AST from './ast';
-import { ToolRegistry, RegisteredTool, EvaluatedToolArguments } from './tools';
+import { ToolRegistry, RegisteredTool, EvaluatedToolArguments, ToolContext } from './tools';
 import {
     NuwaValue, NuwaObject, nuwaValuesAreEqual, isNuwaBoolean, isNuwaList,
     isNuwaNumber, isNuwaObject, nuwaValueToString
@@ -40,6 +40,56 @@ export class Interpreter {
         const scope: Scope = initialScope ? new Map(initialScope) : new Map();
         await this.executeStatements(script.statements, scope);
         return scope;
+    }
+
+    /**
+     * Gets the tool registry used by this interpreter.
+     * @returns The tool registry.
+     */
+    getToolRegistry(): ToolRegistry {
+        return this.toolRegistry;
+    }
+
+    /**
+     * Sets a state value in the tool registry.
+     * @param key - The state key.
+     * @param value - The state value.
+     */
+    setState(key: string, value: NuwaValue): void {
+        this.toolRegistry.setState(key, value);
+    }
+
+    /**
+     * Gets a state value from the tool registry.
+     * @param key - The state key.
+     * @returns The state value or undefined if not found.
+     */
+    getStateValue(key: string): NuwaValue | undefined {
+        return this.toolRegistry.getStateValue(key);
+    }
+
+    /**
+     * Checks if a state value exists in the tool registry.
+     * @param key - The state key.
+     * @returns True if the state value exists, false otherwise.
+     */
+    hasState(key: string): boolean {
+        return this.toolRegistry.hasState(key);
+    }
+
+    /**
+     * Gets all state values from the tool registry.
+     * @returns The state store.
+     */
+    getAllState(): Map<string, NuwaValue> {
+        return this.toolRegistry.getState();
+    }
+
+    /**
+     * Clears all state values in the tool registry.
+     */
+    clearState(): void {
+        this.toolRegistry.clearState();
     }
 
     // --- Statement Execution ---
@@ -297,99 +347,71 @@ export class Interpreter {
     }
 
     private async evaluateToolCallExpr(expr: AST.ToolCallExpr, scope: Scope): Promise<NuwaValue> {
-        // Evaluate arguments and execute tool call, returning the result
-        return await this.executeToolCall(expr.toolName, expr.arguments, scope);
+        return this.executeToolCall(expr.toolName, expr.arguments, scope);
     }
 
     // --- Tool Execution Helper ---
 
+    /**
+     * Executes a tool call with provided arguments and creates a tool context.
+     * @param toolName The name of the tool to call.
+     * @param argsExpr The arguments to pass to the tool as expressions.
+     * @param scope The current variable scope.
+     * @returns The result of the tool execution.
+     * @throws ToolNotFoundError if the tool is not registered.
+     * @throws ToolArgumentError if there's an issue with the arguments.
+     * @throws ToolExecutionError if the tool execution fails.
+     */
     private async executeToolCall(
         toolName: string,
         argsExpr: Record<string, AST.Expression>,
         scope: Scope
     ): Promise<NuwaValue> {
         const tool = this.toolRegistry.lookup(toolName);
-        const callNode = undefined; // TODO: Need a way to pass the AST node here for error reporting
-
         if (!tool) {
-            throw new ToolNotFoundError(toolName, callNode);
+            throw new ToolNotFoundError(`Tool '${toolName}' not found.`, {toolName});
         }
-
+            
         const { schema, execute } = tool;
-
-        // 1. Evaluate arguments
+        const parameterDefs = schema.parameters;
         const evaluatedArgs: EvaluatedToolArguments = {};
-        // Use Promise.all for potentially parallel evaluation if safe
-        // Or evaluate sequentially if order matters or for simplicity
-        for (const paramName in argsExpr) {
-            const argExpr = argsExpr[paramName];
-            if (argExpr) { // Check if expression exists
-                 evaluatedArgs[paramName] = await this.evaluateExpression(argExpr, scope);
-            }
+        
+        // Evaluate each argument expression
+        for (const [argName, argExpr] of Object.entries(argsExpr)) {
+            evaluatedArgs[argName] = await this.evaluateExpression(argExpr, scope);
         }
-
-        // 2. Validate arguments against tool.schema
-        for (const paramSchema of schema.parameters) {
-            const argValue = evaluatedArgs[paramSchema.name];
-            const isRequired = paramSchema.required ?? true; // Default to required
-
-            if (argValue === undefined || argValue === null) {
-                if (isRequired) {
-                    throw new ToolArgumentError(toolName, `Missing required argument '${paramSchema.name}'.`, callNode);
-                }
-                // If optional and not provided, continue (or maybe set a default?)
-                continue;
+        
+        // Validate required parameters are provided
+        for (const param of parameterDefs) {
+            if (param.required !== false && !(param.name in evaluatedArgs)) {
+                // Required parameter is missing
+                throw new ToolArgumentError(
+                    `Missing required parameter '${param.name}' for tool '${toolName}'.`,
+                    {toolName, parameter: param.name}
+                );
             }
-
-            // Check type based on schema
-            let typeMatch = false;
-            switch (paramSchema.type) {
-                case 'string': typeMatch = typeof argValue === 'string'; break;
-                case 'number': typeMatch = typeof argValue === 'number'; break;
-                case 'boolean': typeMatch = typeof argValue === 'boolean'; break;
-                case 'null': typeMatch = argValue === null; break;
-                case 'list': typeMatch = isNuwaList(argValue); break;
-                case 'object': typeMatch = isNuwaObject(argValue); break;
-                case 'any': typeMatch = true; break; // Allow any type
-                default: typeMatch = false; // Unknown schema type
-            }
-
-            if (!typeMatch) {
-                 throw new ToolArgumentError(toolName, `Type mismatch for argument '${paramSchema.name}'. Expected ${paramSchema.type}, got ${typeof argValue}.`, callNode);
-            }
+            // Could add type checking here too
         }
-        // Optional: Check for extraneous arguments not defined in schema?
-
-        // 3. Execute the tool function
+        
+        // Create a tool context with current state
+        const context = this.toolRegistry.createToolContext();
+        
         try {
-            const result = await execute(evaluatedArgs); // Pass evaluatedArgs
-
-            // 4. Validate return type against tool.schema.returns
-            let returnTypeMatch = false;
-            switch (schema.returns) {
-                 case 'string': returnTypeMatch = typeof result === 'string'; break;
-                 case 'number': returnTypeMatch = typeof result === 'number'; break;
-                 case 'boolean': returnTypeMatch = typeof result === 'boolean'; break;
-                 case 'null': returnTypeMatch = result === null; break;
-                 case 'list': returnTypeMatch = isNuwaList(result); break;
-                 case 'object': returnTypeMatch = isNuwaObject(result); break;
-                 case 'any': returnTypeMatch = true;
-                 default: returnTypeMatch = false;
-            }
-
-            if (!returnTypeMatch) {
-                 // Use ToolExecutionError for return type mismatch
-                 throw new ToolExecutionError(toolName, new Error(`Tool returned type ${typeof result}, but schema expected ${schema.returns}.`), callNode);
-            }
-
+            // Pass both evaluated arguments and the context to the tool function
+            const result = await execute(evaluatedArgs, context);
             return result;
         } catch (error) {
-            // Wrap the error if it's not already one of our specific types
-            if (error instanceof ToolArgumentError || error instanceof ToolExecutionError || error instanceof InterpreterError) {
-                throw error; // Re-throw known error types
+            // Convert any error to a ToolExecutionError
+            if (error instanceof Error) {
+                throw new ToolExecutionError(
+                    `Error executing tool '${toolName}': ${error.message}`,
+                    {toolName, error}
+                );
             }
-            // Wrap unknown errors from tool.execute
-            throw new ToolExecutionError(toolName, error, callNode);
+            throw new ToolExecutionError(
+                `Unknown error executing tool '${toolName}'.`,
+                {toolName}
+            );
         }
     }
 }
