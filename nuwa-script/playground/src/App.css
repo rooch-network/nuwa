@@ -323,3 +323,47 @@ svg {
   padding: 2rem;
   text-align: center;
 }
+
+/* 确保Canvas区域和内容区域显示正常 */
+.canvas-container {
+  min-height: 400px;
+}
+
+@media (max-width: 1280px) {
+  aside {
+    width: 200px !important;
+  }
+  
+  .main-panel {
+    min-width: 500px !important;
+  }
+  
+  .w-80 {
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  aside {
+    width: 180px !important;
+  }
+  
+  .main-panel {
+    min-width: 450px !important;
+  }
+  
+  .w-80 {
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+  }
+}
+
+/* 确保AI对话区域内容不会影响宽度 */
+.w-80 * {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}

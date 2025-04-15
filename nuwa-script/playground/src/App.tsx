@@ -330,7 +330,7 @@ function App() {
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar with examples list (VS Code style) */}
-        <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+        <aside className="w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
           <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
               className={`flex-1 py-2 px-4 text-sm font-medium text-center ${activeSidePanel === 'examples' ? 'bg-gray-100 dark:bg-gray-700 text-brand-primary' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
@@ -374,7 +374,7 @@ function App() {
           {/* Main application panel and AI chat area */}
           <div className="flex flex-1 overflow-hidden">
             {/* Main application panel */}
-            <div className="flex-1 overflow-hidden flex flex-col main-panel">
+            <div className="flex-1 overflow-hidden flex flex-col main-panel min-w-[600px]">
               <div className="flex-1 overflow-hidden relative">
                 {/* Output panel container - content changes based on example */}
                 <div className="h-full overflow-hidden bg-white">
@@ -392,11 +392,13 @@ function App() {
                             console.log('[App.tsx] Rendering DrawingCanvas with shapes:', JSON.stringify(shapes)); 
                             return null; 
                         })()}
-                        <DrawingCanvas 
-                          width={500}
-                          height={400}
-                          shapes={shapes}
-                        />
+                        <div className="canvas-container w-full h-full flex items-center justify-center overflow-auto">
+                          <DrawingCanvas 
+                            width={500}
+                            height={400}
+                            shapes={shapes}
+                          />
+                        </div>
                       </>
                     ) : (
                       // Render standard output for other examples
@@ -450,7 +452,7 @@ function App() {
             </div>
 
             {/* AI Chat panel (always visible) */}
-            <div className="w-96 border-l border-gray-200 bg-white overflow-hidden flex flex-col">
+            <div className="w-80 min-w-80 max-w-80 border-l border-gray-200 bg-white overflow-hidden flex flex-col">
               <div className="p-4 h-full">
                 <AIChat 
                   onSendMessage={handleAIChatMessage}

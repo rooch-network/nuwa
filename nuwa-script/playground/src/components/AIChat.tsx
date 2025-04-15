@@ -63,31 +63,19 @@ const AIChat: React.FC<AIChatProps> = ({
           </div>
         ) : (
           messages.map((message, index) => (
-            <div 
-              key={index} 
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} ${index === messages.length - 1 ? 'animate-fadeIn' : ''}`}
-            >
-              <div 
-                className={`max-w-[85%] rounded-2xl px-4 py-3 message-bubble shadow-sm ${
-                  message.role === 'user' 
-                    ? 'bg-purple-600 text-white' 
+            <div key={index} className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+              <div
+                className={`inline-block max-w-full rounded-lg px-4 py-2 text-sm ${
+                  message.role === 'user'
+                    ? 'bg-blue-500 text-white'
                     : message.role === 'system'
-                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
-                }`}
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                } whitespace-pre-wrap break-words`}
               >
-                <div className="text-xs opacity-70 mb-1">
-                  {message.role === 'user' 
-                    ? 'You' 
-                    : message.role === 'system' 
-                      ? 'System' 
-                      : 'AI Assistant'}
-                </div>
-                <div className="text-sm whitespace-pre-wrap prose dark:prose-invert max-w-none">
-                  {message.content.includes('```') 
-                    ? formatWithCodeBlocks(message.content)
-                    : message.content}
-                </div>
+                {message.content.includes('```') 
+                  ? formatWithCodeBlocks(message.content)
+                  : message.content}
               </div>
             </div>
           ))
