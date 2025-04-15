@@ -25,7 +25,9 @@ export type Expression =
   | BinaryOpExpr
   | UnaryOpExpr
   | FunctionCallExpr
-  | ToolCallExpr;
+  | ToolCallExpr
+  | ArrayIndexExpression
+  | MemberAccessExpr;
   // | CalcExpr; // Removed CALC
 
 export interface LiteralExpr extends BaseNode {
@@ -71,6 +73,20 @@ export interface ToolCallExpr extends BaseNode {
   kind: 'ToolCallExpr';
   toolName: string;
   arguments: Record<string, Expression>; // Map arg name to its expression
+}
+
+// Add the new ArrayIndexExpression interface
+export interface ArrayIndexExpression extends BaseNode {
+  kind: 'ArrayIndexExpression';
+  object: Expression; // The expression being indexed (e.g., the variable name)
+  index: Expression; // The expression within the brackets
+}
+
+// Add the new MemberAccessExpr interface
+export interface MemberAccessExpr extends BaseNode {
+  kind: 'MemberAccessExpr';
+  object: Expression; // The expression whose member is accessed (e.g., variable or result of another expr)
+  property: string;   // The name of the property being accessed
 }
 
 // Represents CALC { formula: "...", vars: {...} } - REMOVED
@@ -143,7 +159,16 @@ export function isVariableExpr(node: BaseNode): node is VariableExpr {
 export function isBinaryOpExpr(node: BaseNode): node is BinaryOpExpr {
     return (node as any)?.kind === 'BinaryOpExpr';
 }
-// ... add type guards for all other node types as needed ...
+
+// Add the type guard for ArrayIndexExpression
+export function isArrayIndexExpression(node: BaseNode): node is ArrayIndexExpression {
+    return (node as any)?.kind === 'ArrayIndexExpression';
+}
+
+// Add the type guard for MemberAccessExpr
+export function isMemberAccessExpression(node: BaseNode): node is MemberAccessExpr {
+    return (node as any)?.kind === 'MemberAccessExpr';
+}
 
 export function isLetStatement(node: BaseNode): node is LetStatement {
      return (node as any)?.kind === 'LetStatement';

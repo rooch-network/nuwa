@@ -8,8 +8,10 @@ import {
     InterpreterError, RuntimeError, TypeError, UndefinedVariableError,
     MemberAccessError, ToolNotFoundError, ToolArgumentError, ToolExecutionError,
     UnsupportedOperationError, DivisionByZeroError, InvalidConditionError,
-    InvalidIterableError
+    InvalidIterableError,
+    IndexOutOfBoundsError
 } from './errors';
+import { isArrayIndexExpression, isMemberAccessExpression } from './ast';
 
 // Type for the variable scope
 export type Scope = Map<string, NuwaValue>;
@@ -199,9 +201,23 @@ export class Interpreter {
                 return this.evaluateFunctionCallExpr(expression); // NOW() is sync
              case 'ToolCallExpr':
                 return await this.evaluateToolCallExpr(expression, scope);
-            // case 'CalcExpr': // Removed
-            //     throw new UnsupportedOperationError("CALC expressions are not supported.", expression);
+
+            // Add case for ArrayIndexExpression
+            case 'ArrayIndexExpression':
+                return await this.evaluateArrayIndexExpression(expression, scope);
+
+            // Add case for MemberAccessExpression
+            case 'MemberAccessExpr':
+                return await this.evaluateMemberAccessExpression(expression, scope);
+
             default:
+                 // Update exhaustiveness check (though TS switch should handle it)
+                if (isArrayIndexExpression(expression)) {
+                    return await this.evaluateArrayIndexExpression(expression, scope);
+                }
+                 if (isMemberAccessExpression(expression)) {
+                     return await this.evaluateMemberAccessExpression(expression, scope);
+                 }
                 const exhaustiveCheck: never = expression;
                 throw new RuntimeError(`Unsupported expression kind: ${(exhaustiveCheck as any)?.kind}`, expression);
         }
@@ -209,48 +225,17 @@ export class Interpreter {
 
     private evaluateVariableExpr(expr: AST.VariableExpr, scope: Scope): NuwaValue {
         const name = expr.name;
-        // Handle member access (e.g., obj.prop.sub)
-        if (name.includes('.')) {
-            const parts = name.split('.');
-            const baseVarName = parts[0]!;
-            let currentVal: NuwaValue | undefined = scope.get(baseVarName);
-
-            if (currentVal === undefined) {
-                throw new UndefinedVariableError(baseVarName, expr);
-            }
-
-            for (let i = 1; i < parts.length; i++) {
-                const member = parts[i]!;
-                // Ensure currentVal is checked for undefined before proceeding
-                if (currentVal === undefined) {
-                    // This case should ideally not be reached due to prior checks,
-                    // but belts and suspenders approach.
-                     throw new MemberAccessError(`Cannot access property '${member}' on undefined value during access of '${name}'.`, expr);
-                }
-                if (!isNuwaObject(currentVal)) {
-                    throw new MemberAccessError(`Cannot access property '${member}' on non-object value (type: ${typeof currentVal}) for '${name}'.`, expr);
-                }
-                // Check property existence explicitly
-                if (!(member in currentVal)) {
-                     throw new MemberAccessError(`Property '${member}' does not exist on object for '${name}'.`, expr);
-                }
-                // Access the property, it might be undefined but that's a valid NuwaValue (null)
-                currentVal = currentVal[member];
-            }
-
-            // After loop, currentVal holds the final value or could be undefined if a property held it
-            // We treat undefined from property access as null in NuwaScript runtime?
-            // Or should we error if intermediate is undefined? Let's treat undefined property as null.
-            return currentVal === undefined ? null : currentVal;
-
-        } else {
-            // Simple variable lookup
-            const value = scope.get(name);
-            if (value === undefined) {
-                throw new UndefinedVariableError(name, expr);
-            }
-            return value;
+        // --- IMPORTANT ---
+        // The logic for dotted names (e.g., obj.prop.sub) is now handled by
+        // the combination of VariableExpr (for the base 'obj') and successive
+        // MemberAccessExpr evaluations triggered by the parser recognizing '.'
+        // So, VariableExpr evaluation *only* needs to handle simple lookups.
+        // Remove the old dotted name logic from here.
+        const value = scope.get(name);
+        if (value === undefined) {
+            throw new UndefinedVariableError(name, expr);
         }
+        return value;
     }
 
     private async evaluateBinaryOpExpr(expr: AST.BinaryOpExpr, scope: Scope): Promise<NuwaValue> {
@@ -348,6 +333,61 @@ export class Interpreter {
 
     private async evaluateToolCallExpr(expr: AST.ToolCallExpr, scope: Scope): Promise<NuwaValue> {
         return this.executeToolCall(expr.toolName, expr.arguments, scope);
+    }
+
+    // NEW METHOD: Evaluates a MemberAccessExpression (e.g., expr.property)
+    private async evaluateMemberAccessExpression(expr: AST.MemberAccessExpr, scope: Scope): Promise<NuwaValue> {
+        // 1. Evaluate the object part of the expression
+        const objectValue = await this.evaluateExpression(expr.object, scope);
+        const propertyName = expr.property;
+
+        // 2. Check if the result is actually an object
+        if (!isNuwaObject(objectValue)) {
+            // Provide context in the error message
+             const objectExprString = expr.object.kind; // Basic representation
+            throw new MemberAccessError(`Cannot access property '${propertyName}' on non-object value resulting from '${objectExprString}' (type: ${typeof objectValue}).`, expr);
+        }
+
+        // 3. Check if the property exists
+        if (!(propertyName in objectValue)) {
+             const objectExprString = expr.object.kind;
+             // Consider allowing access to non-existent properties, returning null?
+             // Let's be strict for now and require existence.
+            throw new MemberAccessError(`Property '${propertyName}' does not exist on object resulting from '${objectExprString}'.`, expr);
+             // Alternatively, return null:
+             // return null;
+        }
+
+        // 4. Access the property
+        const propertyValue = objectValue[propertyName];
+
+        // 5. Handle potential undefined values from access (convert to null)
+        return propertyValue === undefined ? null : propertyValue;
+    }
+
+    // NEW METHOD: Evaluates an ArrayIndexExpression
+    private async evaluateArrayIndexExpression(expr: AST.ArrayIndexExpression, scope: Scope): Promise<NuwaValue> {
+        const objectValue = await this.evaluateExpression(expr.object, scope);
+        const indexValue = await this.evaluateExpression(expr.index, scope);
+
+        // Type checking
+        if (!isNuwaList(objectValue)) {
+            throw new TypeError(`Cannot access index on non-list value (type: ${typeof objectValue}).`, { node: expr.object });
+        }
+        if (!isNuwaNumber(indexValue) || !Number.isInteger(indexValue)) {
+            throw new TypeError(`List index must be an integer, got ${typeof indexValue} (${indexValue}).`, { node: expr.index });
+        }
+
+        // Bounds checking
+        const index = indexValue as number; // Safe cast after checks
+        const array = objectValue as NuwaValue[]; // Safe cast after checks
+        if (index < 0 || index >= array.length) {
+            throw new IndexOutOfBoundsError(index, array.length, expr);
+        }
+
+        // Perform access, converting undefined to null
+        const result = array[index];
+        return result === undefined ? null : result;
     }
 
     // --- Tool Execution Helper ---

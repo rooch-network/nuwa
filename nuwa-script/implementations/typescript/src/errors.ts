@@ -166,9 +166,9 @@ export class UnsupportedOperationError extends InterpreterError {
 /**
  * Error for division by zero.
  */
-export class DivisionByZeroError extends InterpreterError {
+export class DivisionByZeroError extends RuntimeError {
     constructor(node?: BaseNode) {
-        super('Division by zero.', node);
+        super("Division by zero.", node);
         this.name = 'DivisionByZeroError';
         Object.setPrototypeOf(this, DivisionByZeroError.prototype);
     }
@@ -177,7 +177,7 @@ export class DivisionByZeroError extends InterpreterError {
 /**
  * Error when an IF statement condition does not evaluate to a boolean.
  */
-export class InvalidConditionError extends InterpreterError {
+export class InvalidConditionError extends TypeError {
     constructor(message: string = 'IF condition did not evaluate to a boolean.', node?: BaseNode) {
         super(message, node);
         this.name = 'InvalidConditionError';
@@ -193,6 +193,15 @@ export class InvalidIterableError extends InterpreterError {
         super(message, node);
         this.name = 'InvalidIterableError';
         Object.setPrototypeOf(this, InvalidIterableError.prototype);
+    }
+}
+
+// Add IndexOutOfBoundsError
+export class IndexOutOfBoundsError extends RuntimeError {
+    constructor(index: number, length: number, node?: BaseNode) {
+        super(`Index ${index} is out of bounds for array of length ${length}.`, node);
+        this.name = 'IndexOutOfBoundsError';
+        Object.setPrototypeOf(this, IndexOutOfBoundsError.prototype);
     }
 }
 

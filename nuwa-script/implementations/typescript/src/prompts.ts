@@ -11,8 +11,11 @@ NuwaScript is a simple, safe scripting language.
 - Identifiers (variable names, tool names) are CASE-SENSITIVE and can be lower/mixed case.
 - String literals use DOUBLE QUOTES: "hello".
 - Comments start with //
-- Basic operators are supported: +, -, *, /, ==, !=, >, <, >=, <=, AND, OR, NOT. Operator precedence follows standard rules.
+- Basic arithmetic and comparison operators are supported: +, -, *, /, ==, !=, >, <, >=, <=.
+- The '+' operator is ONLY for number addition, NOT string concatenation.
+- Logical operators: AND, OR, NOT. Operator precedence follows standard rules.
 - Member access uses dot notation: object.property.
+- Array element access uses bracket notation: list[index]. Index MUST be an integer.
 
 # Core Statements:
 LET varName = <expression>
@@ -43,15 +46,17 @@ This represents the current state of the system. You can use this information to
 {state_info}
 --- END STATE ---
 
+{app_specific_guidance}
+
 # User Task:
 {user_task}
 
 # Instructions:
-Generate *only* the NuwaScript code required to complete the user task using the available tools and syntax. Do not include explanations or markdown formatting. Ensure all keywords and boolean/null literals are uppercase. Use available tools where appropriate. Use PRINT for intermediate thoughts or values if helpful, and use a reporting tool (like 'report_analysis_result') for the final answer if available.
+Generate *only* the NuwaScript code required to complete the user task using the available tools and syntax. Do not include explanations or markdown formatting. DO NOT wrap your code in markdown code blocks like \`\`\`NuwaScript\`\`\` or \`\`\`. Ensure all keywords and boolean/null literals are uppercase. Use available tools where appropriate. Use PRINT for intermediate thoughts or values if helpful, and use a reporting tool (like 'report_analysis_result') for the final answer if available.
 
 Consider the current system state when generating your code. If the state contains relevant information for the task, use it to inform your response.
 
-# NuwaScript Code:
+# NuwaScript Code (provide raw code with no markdown formatting or code blocks):
 `;
 
 
@@ -76,10 +81,18 @@ function formatToolSchemasForPrompt(registry: ToolRegistry): string {
  * Builds the complete prompt string for the LLM.
  * @param registry The ToolRegistry containing available tools.
  * @param userTask The user's request.
- * @param includeState Whether to include state information in the prompt (default: true).
+ * @param options Optional parameters including application-specific guidance and state inclusion.
  * @returns The formatted prompt string.
  */
-export function buildPrompt(registry: ToolRegistry, userTask: string, includeState: boolean = true): string {
+export function buildPrompt(
+    registry: ToolRegistry, 
+    userTask: string, 
+    options: {
+        includeState?: boolean;
+        appSpecificGuidance?: string;
+    } = {}
+): string {
+    const { includeState = true, appSpecificGuidance = "" } = options;
     const toolSchemasString = formatToolSchemasForPrompt(registry);
     
     // Get state information if requested
@@ -88,6 +101,7 @@ export function buildPrompt(registry: ToolRegistry, userTask: string, includeSta
     const prompt = GENERATION_PROMPT_TEMPLATE
         .replace('{tools_schema}', toolSchemasString)
         .replace('{state_info}', stateInfo)
+        .replace('{app_specific_guidance}', appSpecificGuidance)
         .replace('{user_task}', userTask);
     
     return prompt;

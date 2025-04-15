@@ -194,9 +194,11 @@ export class Parser {
 
     // Factor handles Multiplication (*) and Division (/)
     private parseFactor(): AST.Expression {
-        let expr = this.parseUnary(); // Parse higher precedence first
+        // Factor now calls parseUnary, which handles postfix operations
+        let expr = this.parseUnary();
         while (this.match(TokenType.STAR, TokenType.SLASH)) {
             const operator = this.previous().type as AST.BinaryOperator; // '*' or '/'
+            // Note: The right operand should also potentially handle postfix ops
             const right = this.parseUnary();
             expr = { kind: 'BinaryOpExpr', operator, left: expr, right };
         }
@@ -215,7 +217,40 @@ export class Parser {
             return { kind: 'UnaryOpExpr', operator, operand };
         }
         // If no unary operator, parse the next level down
-        return this.parsePrimary();
+        // Instead of primary, call postfix which handles primary AND subsequent [] . ()
+        return this.parsePostfix(); // CHANGED: Call parsePostfix here
+    }
+
+    // NEW METHOD: Handles postfix operations like array indexing [], member access ., and function calls ()
+    private parsePostfix(): AST.Expression {
+        // First, parse the primary expression (the base)
+        let expr = this.parsePrimary();
+
+        // Then, loop to check for postfix operators
+        while (true) {
+            if (this.match(TokenType.LBRACKET)) {
+                // Array index operator '['
+                const index = this.parseExpression(); // Parse the index expression
+                this.consume(TokenType.RBRACKET, "Expected ']' after array index expression.");
+                // Create the ArrayIndexExpression node, using the current expression as the object
+                expr = { kind: 'ArrayIndexExpression', object: expr, index };
+            } else if (this.match(TokenType.DOT)) { // Enable DOT handling
+                // Member Access operator '.'
+                const propertyToken = this.consume(TokenType.IDENTIFIER, "Expected property name after '.'.");
+                expr = { kind: 'MemberAccessExpr', object: expr, property: propertyToken.value };
+            }
+            /* // Future Extension: Function Call () - Needs more sophisticated argument parsing integration
+             else if (this.match(TokenType.LPAREN)) {
+                 // Parse arguments...
+                 this.consume(TokenType.RPAREN, "Expected ')' after arguments.");
+             */
+            else {
+                // No more postfix operators, break the loop
+                break;
+            }
+        }
+
+        return expr;
     }
 
     private parsePrimary(): AST.Expression {
@@ -231,42 +266,54 @@ export class Parser {
             return { kind: 'LiteralExpr', value: this.previous().value };
         }
 
-        // List Literal
+        // List Literal [ ... ]
         if (this.match(TokenType.LBRACKET)) {
             const elements: AST.Expression[] = [];
+            // To handle potential ambiguity with index operator, we must *not* consume LBRACKET here
+            // if it's followed by an expression and RBRACKET in the context of parsePostfix.
+            // However, parsePrimary is called first. Let's assume list literals are distinct.
+            // The `match` call above already consumed LBRACKET for the list literal case.
             if (!this.check(TokenType.RBRACKET)) { // Handle non-empty list
                 do {
-                    // Prevent leading/trailing comma by checking right after LBRACKET/COMMA
-                    if (this.check(TokenType.RBRACKET)) break; // Allow trailing comma like [1,] but stop
+                    if (this.check(TokenType.RBRACKET)) break;
                     elements.push(this.parseExpression());
                 } while (this.match(TokenType.COMMA));
             }
             this.consume(TokenType.RBRACKET, "Expected ']' after list elements.");
-            // The interpreter will evaluate the expressions in the list later if needed,
-            // but for a literal list, all elements should ideally be literals themselves.
-            // For simplicity now, we parse them as Expressions.
-            // A stricter parser might enforce literal-only elements here.
-            // We will construct a literal array node.
-            // The value needs to be created by evaluating the expressions, which
-            // cannot be done reliably at parse time. We'll represent it structurally.
-            // This deviates slightly - maybe need a ListExpr node?
-            // Let's stick to LiteralExpr but mark it clearly.
-            // Issue: LiteralExpr expects NuwaValue, not Expression[].
-            // SOLUTION: Introduce ListExpr node type.
-            throw new Error("List literal parsing needs ListExpr AST node - not implemented yet.");
-            // Correct approach requires adding ListExpr to ast.ts and returning that:
-            // return { kind: 'ListExpr', elements };
+
+             // !!! Important Correction for List Literals !!!
+            // The interpreter needs the evaluated values, not expressions, for a literal.
+            // We need a specific AST node for List Literals, or handle evaluation here.
+            // Let's introduce ListLiteralExpr to AST first.
+            // For now, let's keep parsing elements as Expressions and create a generic
+            // structure that the interpreter will handle. This is complex.
+
+            // **Temporary simplification**: Create a LiteralExpr with a placeholder or
+            // leave elements as expressions for the interpreter to resolve.
+            // Let's create a dedicated ListLiteralExpr node in AST later if needed.
+            // For now, let's assume the interpreter can handle evaluating expressions
+            // inside a structure representing the list.
+            // How to represent this in AST? Maybe just use LiteralExpr with an array value?
+            // This is tricky because the *elements* are expressions, not values yet.
+            //
+            // Let's stick to the original plan of having elements as Expression[] and
+            // create a dedicated node type if issues arise. The interpreter will evaluate them.
+            // Let's define ListLiteralExpr in ast.ts NEXT.
+            // *** TEMPORARY HACK for now: Return a LiteralExpr that the interpreter won't handle correctly ***
+            // We need to add ListLiteralExpr to ast.ts and modify this code block.
+            // For the current goal of ARRAY INDEXING, let's just throw an error for list literals for now.
+             throw new ParserError("List literals [ ... ] are not fully implemented yet.", this.previous());
+
+             /* // Ideal future code after adding ListLiteralExpr to ast.ts:
+              return { kind: 'ListLiteralExpr', elements };
+             */
         }
 
-        // Variable
+        // Variable (single identifier only now)
         if (this.match(TokenType.IDENTIFIER)) {
-            // Handle member access like obj.prop.prop2
-            let name = this.previous().value;
-            while(this.match(TokenType.DOT)) {
-                const memberToken = this.consume(TokenType.IDENTIFIER, "Expected property name after '.'.");
-                name += '.' + memberToken.value;
-            }
-            return { kind: 'VariableExpr', name };
+            // Now only handles simple 'variable', not 'variable.dotted.name'
+            // Dotted names are handled by parsePostfix recognizing the DOT token.
+            return { kind: 'VariableExpr', name: this.previous().value };
         }
 
         // Function Calls (NOW())
@@ -291,15 +338,15 @@ export class Parser {
         }
 
         // Error
-        throw new ParserError(`Expected expression, got ${this.peek().type}`, this.peek());
+        throw new ParserError(`Unexpected token type '${this.peek().type}' in expression`, this.peek());
     }
 
-     // Parses CALL tool { ... } when used as an expression
+     // NEW HELPER for CALL used as an expression
     private parseToolCallExpression(): AST.ToolCallExpr {
-        this.consume(TokenType.CALL, "Expected 'CALL'."); // Re-consume
-        const nameToken = this.consume(TokenType.IDENTIFIER, "Expected tool name after 'CALL'.");
-        const args = this.parseArguments(); // Reuse argument parsing logic
-        return { kind: 'ToolCallExpr', toolName: nameToken.value, arguments: args };
+         this.consume(TokenType.CALL, "Expected 'CALL' keyword."); // Already checked, but good practice
+         const nameToken = this.consume(TokenType.IDENTIFIER, "Expected tool name after 'CALL'.");
+         const args = this.parseArguments(); // Reuse argument parsing
+         return { kind: 'ToolCallExpr', toolName: nameToken.value, arguments: args };
     }
 
     // --- Parser Helpers ---
