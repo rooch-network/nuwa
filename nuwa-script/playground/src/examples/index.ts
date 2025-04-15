@@ -5,8 +5,8 @@ import canvasExample from './canvas';
 
 // Export only the DeFi and AI Drawing examples
 export const examples: ExampleConfig[] = [
-  tradingExample,
   canvasExample,
+  tradingExample,
 ];
 
 // Index examples by ID

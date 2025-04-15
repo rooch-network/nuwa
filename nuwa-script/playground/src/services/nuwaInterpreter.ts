@@ -14,7 +14,8 @@ import {
     StateMetadata, // Import from nuwa-script instead of defining locally
     StateValueWithMetadata, // Import from nuwa-script
     StateStore, // Import from nuwa-script
-    ToolContext // Import from nuwa-script
+    ToolContext, // Import from nuwa-script
+    NuwaType // Import NuwaType
 } from 'nuwa-script';
 
 // Define the Interpreter instance type - Removed as not needed
@@ -70,7 +71,8 @@ export type {
     StateMetadata,
     StateValueWithMetadata,
     StateStore,
-    ToolContext
+    ToolContext,
+    NuwaType // Re-export NuwaType
 }; 
 
 // Remove debug logs

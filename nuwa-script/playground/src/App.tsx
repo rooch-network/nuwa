@@ -8,6 +8,7 @@ import { BoltIcon } from './components/AppIcons';
 import DrawingCanvas from './components/DrawingCanvas';
 import Layout from './components/Layout';
 import { examples, examplesById } from './examples';
+import { renderExampleComponent } from './components/ExampleComponents';
 import { 
   Interpreter, 
   ToolRegistry,
@@ -20,7 +21,7 @@ import { parse } from 'nuwa-script';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
 import { tradingTools } from './examples/trading';
-import { canvasTools, canvasShapes as initialCanvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas';
+import { canvasTools, canvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas';
 import { ExampleConfig } from './types/Example';
 import type { DrawableShape } from './components/DrawingCanvas';
 import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
@@ -90,7 +91,7 @@ function App() {
   const [activeSidePanel, setActiveSidePanel] = useState<ActiveSidePanel>('examples'); // Keep state here, pass down initial value and handler
   const [messages, setMessages] = useState<CustomMessage[]>([]);
   const [currentToolSchemas, setCurrentToolSchemas] = useState<ToolSchema[]>([]);
-  const [shapes, setShapes] = useState<DrawableShape[]>(initialCanvasShapes);
+  const [shapes, setShapes] = useState<DrawableShape[]>(canvasShapes);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null); // Keep ref if Editor needs it
 
   // Initialization
@@ -104,8 +105,8 @@ function App() {
 
     // Subscribe to canvas shape changes
     const unsubscribe = subscribeToCanvasChanges(() => {
-      console.log('[App.tsx] Canvas shapes updated in canvas.ts. Global state:', JSON.stringify(initialCanvasShapes)); // Log global state
-      const newShapes = [...initialCanvasShapes];
+      console.log('[App.tsx] Canvas shapes updated in canvas.ts. Global state:', JSON.stringify(canvasShapes)); // Log global state
+      const newShapes = [...canvasShapes];
       setShapes(newShapes);
       console.log('[App.tsx] React state set with new shapes:', JSON.stringify(newShapes)); // Log state being set
     });
@@ -126,7 +127,7 @@ function App() {
     // Reset canvas state for canvas example
     if (example.id === 'canvas') {
         console.log('[App.tsx] Canvas example selected. Clearing shapes.');
-        initialCanvasShapes.length = 0;
+        canvasShapes.length = 0;
         setShapes([]);
     }
 
@@ -156,33 +157,20 @@ function App() {
     
     let exampleTools: { schema: ToolSchema, execute: ToolFunction }[] = []; 
     
-    if (example.id === 'basic') exampleTools = basicTools;
-    else if (example.id === 'trading') exampleTools = tradingTools;
-    else if (example.id === 'weather') exampleTools = weatherTools;
+    if (example.id === 'trading') exampleTools = tradingTools;
     else if (example.id === 'canvas') {
       exampleTools = canvasTools;
-      
-      // Initialize canvas state with metadata
-      toolRegistry.setState('canvas_shape_count', 0);
-      toolRegistry.registerStateMetadata('canvas_shape_count', {
-        description: "Number of shapes currently on the canvas"
-      });
-      
-      // Initialize timestamp
-      const now = Date.now();
-      toolRegistry.setState('canvas_initialized', now);
-      toolRegistry.registerStateMetadata('canvas_initialized', {
-        description: "Time when the canvas was initialized",
-        formatter: (value) => {
-          const date = new Date(value as number);
-          return `${value} (${date.toLocaleString()})`;
-        }
-      });
     }
     
     exampleTools.forEach(tool => {
         toolRegistry.register(tool.schema.name, tool.schema, tool.execute);
     });
+    
+    // If example has a state manager, use it to initialize the state
+    if (example.stateManager) {
+      console.log(`[App.tsx] Initializing state for ${example.id} using state manager`);
+      example.stateManager.updateStateInRegistry();
+    }
     
     // Set the interpreter and registry in state.
     // Store the buffering handler instance
@@ -280,32 +268,8 @@ function App() {
         throw new Error('Missing example or interpreter/toolRegistry not initialized');
       }
       
-      // Define application-specific guidance for canvas example
-      let appSpecificGuidance = "";
-      if (selectedExample.id === 'canvas') {
-        appSpecificGuidance = `
-# Canvas-Specific Guidelines:
-- DO NOT automatically call clearCanvas {} at the beginning unless explicitly requested.
-- Build upon the existing canvas content unless the user asks to start fresh.
-- Use the current state variable 'canvas_json' to understand what's already drawn before adding new elements. It contains a JSON string representing all shapes.
-
-# Spatial Positioning Guidelines:
-- The canvas is 500x400 pixels. Coordinate system: (0,0) is top-left; x increases right, y increases down. Center is roughly (250, 200).
-- Before placing new shapes, carefully examine the 'canvas_json' state variable to check existing shapes (coordinates, size).
-- When placing objects relative to others (e.g., "next to", "above"), calculate positions thoughtfully based on the 'canvas_json' data to avoid unwanted overlaps and maintain reasonable spacing (e.g., 20-50 pixels generally looks good).
-- Ensure new shapes fit within canvas bounds (x: 0-500, y: 0-400).
-
-# Layout and Aesthetics Guidelines:
-- Consider the overall composition and visual appeal of the entire canvas when placing elements.
-- Arrange elements thoughtfully on the canvas, leaving appropriate space between them.
-- Consider the relative positions requested (e.g., 'sun in the sky', 'tree next to the house').
-- Avoid placing elements directly overlapping unless specifically instructed.
-- Try to create a visually balanced composition.
-
-# Thinking Process:
-- Use PRINT statements to explain your reasoning, especially for coordinate calculations and layout decisions. For example: PRINT("Placing the sun at x=400, y=80 to be in the top-right sky.")
-`;
-      }
+      // Use example's aiPrompt field as appSpecificGuidance
+      const appSpecificGuidance = selectedExample.aiPrompt || "";
       
       const aiService = new AIService({ 
         apiKey,
@@ -378,6 +342,7 @@ function App() {
     />
   );
 
+  // Render main panel content based on selected example
   const mainPanelContent = (
     <>
       {/* Display Execution Error */}
@@ -388,27 +353,25 @@ function App() {
         </div>
       )}
 
-      {selectedExample?.id === 'canvas' ? (
-        <>
-          {/* Log shapes prop passed to DrawingCanvas - Return null to be valid JSX */} 
-          {(() => { 
-              console.log('[App.tsx] Rendering DrawingCanvas with shapes:', JSON.stringify(shapes)); 
-              return null; 
-          })()}
-          <div className="canvas-container w-full h-full flex items-center justify-center overflow-auto">
-            <DrawingCanvas 
-              width={500}
-              height={400}
-              shapes={shapes}
-              onCanvasChange={(json) => {
+      {selectedExample?.componentId ? (
+        // Render custom component based on componentId
+        <div className="component-container w-full h-full">
+          {renderExampleComponent(
+            selectedExample.componentId,
+            // Pass component-specific props if needed
+            selectedExample.id === 'canvas' ? {
+              width: 500,
+              height: 400,
+              shapes: shapes,
+              onCanvasChange: (json: object) => {
                 console.log('[App.tsx] Canvas JSON updated:', json);
                 updateCanvasJSON(json);
-              }}
-            />
-          </div>
-        </>
+              }
+            } : undefined
+          )}
+        </div>
       ) : (
-        // Render standard output for other examples
+        // Render standard output for examples without custom component
         <>
           {!output && !executionError && !isRunning && (
             <div className="text-center text-gray-500 flex-1 flex flex-col justify-center items-center">
@@ -450,12 +413,22 @@ function App() {
     />
   );
 
+  // Build dynamic title for main panel based on selected example
+  const getMainPanelTitle = () => {
+    if (!selectedExample) return 'Application Output';
+    
+    if (selectedExample.id === 'canvas') return 'Canvas';
+    if (selectedExample.id === 'trading') return 'Trading Dashboard';
+    
+    return 'Application Output';
+  };
+
   // Render using the Layout component
   return (
     <Layout
       headerProps={headerProps}
       sidebarContent={sidebarContent}
-      mainPanelTitle={selectedExample?.id === 'canvas' ? 'Canvas' : 'Application Output'}
+      mainPanelTitle={getMainPanelTitle()}
       mainPanelContent={mainPanelContent}
       scriptPanelTitle="NuwaScript"
       scriptPanelContent={scriptPanelContent}

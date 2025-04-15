@@ -1,4 +1,4 @@
-import { ExampleConfig } from '../types/Example';
+import { ExampleConfig, ComponentStateManager } from '../types/Example';
 import type { 
   ToolSchema, 
   ToolFunction, 
@@ -21,12 +21,30 @@ interface PathCommandObject {
     cy2?: number;
 }
 
+// --- Canvas State Interface ---
+export interface CanvasState {
+  shapes: DrawableShape[];
+  canvasJSON: object | null;
+  width: number;
+  height: number;
+  lastModified: number;
+}
+
 // --- Shared State for Canvas --- 
 // NOTE: This is a simple global state for demonstration.
 // In a real app, consider Zustand, Context API, or other state management.
 export const canvasShapes: DrawableShape[] = [];
 // Store canvas JSON representation
 export let canvasJSON: object | null = null;
+
+// Initialize canvas state
+export const canvasState: CanvasState = {
+  shapes: canvasShapes,
+  canvasJSON: canvasJSON,
+  width: 500,
+  height: 400,
+  lastModified: Date.now()
+};
 
 // Function for React components to subscribe to changes (simple approach)
 let changeListeners: (() => void)[] = [];
@@ -38,12 +56,16 @@ export const subscribeToCanvasChanges = (listener: () => void): (() => void) => 
   };
 };
 const notifyCanvasChange = () => {
+  // Update lastModified timestamp
+  canvasState.lastModified = Date.now();
+  // Notify all listeners
   changeListeners.forEach(listener => listener());
 };
 
 // Update canvas JSON representation
 export const updateCanvasJSON = (json: object) => {
   canvasJSON = json;
+  canvasState.canvasJSON = json;
   
   // Get tool registry
   const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
@@ -54,6 +76,9 @@ export const updateCanvasJSON = (json: object) => {
       `JSON representation of the canvas for better spatial understanding.\nThis contains detailed information about all shapes and their positions on the canvas.\nFormat:\n- canvas dimensions (width: 500, height: 400)\n- shapes array containing all objects with their precise coordinates\n- each shape has properties like:\n  * x, y: position coordinates (origin is top-left)\n  * width, height: dimensions of rectangles\n  * radius: size of circles\n  * points: coordinates for lines [x1,y1,x2,y2]\n  * color: stroke color\n  * fill: fill color if present\n\nSpatial Guidelines:\n- x increases from left to right (0 at left edge, 500 at right edge)\n- y increases from top to bottom (0 at top edge, 400 at bottom edge)\n- shapes may overlap if their coordinates and dimensions intersect\n- to place objects "next to" others, ensure their boundaries don't overlap\n- typically, maintain at least 20-50 pixels spacing between objects\n- center of canvas is approximately at x: 250, y: 200`
     ));
   }
+  
+  // Notify change
+  notifyCanvasChange();
 };
 // --- End Shared State ---
 
@@ -70,27 +95,40 @@ function createState<T>(value: T, description: string, formatter?: (value: unkno
 }
 
 // Update state with canvas information
-function updateCanvasState(context?: ToolContext): void {
-  if (!context || !context.state) return;
+export function updateCanvasState(context?: ToolContext): void {
+  // If no context or state, try to get registry from global object
+  let registry: ToolRegistry | undefined;
   
-  // Set canvas state with metadata - get global object in a browser-compatible way
-  const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
-  const registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
+  if (context?.state) {
+    registry = (context as unknown as { registry?: ToolRegistry }).registry;
+  }
+  
+  if (!registry) {
+    // Get global registry if not from context
+    const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
+    registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
+  }
   
   // Return if registry not found
   if (!registry) return;
   
+  // Update canvas state values
+  updateCanvasStateWithRegistry(registry);
+}
+
+// Helper function to update state with registry
+function updateCanvasStateWithRegistry(registry: ToolRegistry): void {
   // Store basic canvas information
   const shapeCount = canvasShapes.length;
   
   // Set canvas dimensions
   registry.setState('canvas_width', createState(
-    500,
+    canvasState.width,
     "Width of the canvas in pixels"
   ));
   
   registry.setState('canvas_height', createState(
-    400,
+    canvasState.height,
     "Height of the canvas in pixels"
   ));
   
@@ -160,7 +198,7 @@ function updateCanvasState(context?: ToolContext): void {
   
   // Store canvas modification time
   registry.setState('canvas_last_modified', createState(
-    Date.now(),
+    canvasState.lastModified,
     "Timestamp of the last canvas modification",
     (value) => {
       const timestamp = value as number;
@@ -169,6 +207,19 @@ function updateCanvasState(context?: ToolContext): void {
     }
   ));
 }
+
+// Canvas state manager that implements ComponentStateManager interface
+export const canvasStateManager: ComponentStateManager<CanvasState> = {
+  getState: () => ({ 
+    shapes: [...canvasShapes], 
+    canvasJSON, 
+    width: canvasState.width, 
+    height: canvasState.height,
+    lastModified: canvasState.lastModified
+  }),
+  subscribe: subscribeToCanvasChanges,
+  updateStateInRegistry: updateCanvasState
+};
 
 // --- End State Management ---
 
@@ -465,20 +516,18 @@ export const canvasTools: { schema: ToolSchema, execute: ToolFunction }[] = [
   { schema: drawLineSchema, execute: drawLineFunc },
   { schema: drawRectSchema, execute: drawRectFunc },
   { schema: drawCircleSchema, execute: drawCircleFunc },
-  { schema: drawPathSchema_New, execute: drawPathFunc_New }, // Use the new versions
-  { schema: clearCanvasSchema, execute: clearCanvasFunc },
-  // { schema: getCanvasJsonSchema, execute: getCanvasJsonFunc } // Removed
+  { schema: drawPathSchema_New, execute: drawPathFunc_New },
+  { schema: clearCanvasSchema, execute: clearCanvasFunc }
 ];
 
-
-// --- Canvas Example Configuration ---
-const canvasExample: ExampleConfig = {
+// Canvas Example Config
+export const canvasExample: ExampleConfig = {
   id: 'canvas',
-  name: 'AI Drawing Assistant',
-  description: 'Create beautiful drawings with AI-guided instructions through NuwaScript tools',
-  category: 'AI Drawing',
-  script: `// Ask the AI to draw something!
-// Example: Draw a simple house
+  name: 'Canvas Drawing',
+  description: 'Interactive canvas drawing API with tools to create shapes and paths.',
+  category: 'Intermediate',
+  script: `// Canvas Drawing Example
+// Try running this code to see what happens!
 
 // Use CALL for actions that modify state
 CALL clearCanvas {}
@@ -497,27 +546,33 @@ CALL drawRect {x: 175, y: 220, width: 50, height: 80, color: "saddlebrown", fill
 // Draw a window
 CALL drawCircle {x: 250, y: 200, radius: 20, color: "blue", fill: "lightblue"}
 
-// Draw the sun
-CALL drawCircle {x: 400, y: 80, radius: 40, color: "orange", fill: "yellow"}
-
 PRINT("House drawing complete!")
 `,
   // Provide tool schemas for the example config (used by AI prompt generation etc.)
   // Map ToolSchema back to the format ExampleConfig expects for UI/AI interaction
-  tools: canvasTools.map(t => ({ 
-      name: t.schema.name, 
-      description: t.schema.description, 
-      parameters: { 
-          type: 'object', 
-          properties: t.schema.parameters.reduce((acc, param) => { 
-              acc[param.name] = { type: param.type, description: param.description || '' }; 
-              return acc; 
-          }, {} as Record<string, {type: string, description: string}>),
-          required: t.schema.parameters.filter(p => p.required !== false).map(p => p.name) // Corrected filter logic
-      },
-      returnType: t.schema.returns
-  })),
-  aiPrompt: 'Draw a simple landscape with a blue sky, green ground, a yellow sun, and a red flower.'
+  tools: canvasTools.map(t => t.schema),
+  aiPrompt: `# Canvas-Specific Guidelines:
+- DO NOT automatically call clearCanvas {} at the beginning unless explicitly requested.
+- Build upon the existing canvas content unless the user asks to start fresh.
+- Use the current state variable 'canvas_json' to understand what's already drawn before adding new elements. It contains a JSON string representing all shapes.
+
+# Spatial Positioning Guidelines:
+- The canvas is 500x400 pixels. Coordinate system: (0,0) is top-left; x increases right, y increases down. Center is roughly (250, 200).
+- Before placing new shapes, carefully examine the 'canvas_json' state variable to check existing shapes (coordinates, size).
+- When placing objects relative to others (e.g., "next to", "above"), calculate positions thoughtfully based on the 'canvas_json' data to avoid unwanted overlaps and maintain reasonable spacing (e.g., 20-50 pixels generally looks good).
+- Ensure new shapes fit within canvas bounds (x: 0-500, y: 0-400).
+
+# Layout and Aesthetics Guidelines:
+- Consider the overall composition and visual appeal of the entire canvas when placing elements.
+- Arrange elements thoughtfully on the canvas, leaving appropriate space between them.
+- Consider the relative positions requested (e.g., 'sun in the sky', 'tree next to the house').
+- Avoid placing elements directly overlapping unless specifically instructed.
+- Try to create a visually balanced composition.
+
+# Thinking Process:
+- Use PRINT statements to explain your reasoning, especially for coordinate calculations and layout decisions. For example: PRINT("Placing the sun at x=400, y=80 to be in the top-right sky.")`,
+  componentId: 'canvas',
+  stateManager: canvasStateManager
 };
 
 export default canvasExample;
