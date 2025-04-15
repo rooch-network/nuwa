@@ -5,14 +5,28 @@ import type {
   NuwaValue,
   EvaluatedToolArguments,
   ToolContext,
-  StateValueWithMetadata
+  StateValueWithMetadata,
+  ToolRegistry
 } from '../services/nuwaInterpreter';
 import type { DrawableShape } from '../components/DrawingCanvas'; // Keep this import
+
+// --- Command Object Interface ---
+interface PathCommandObject {
+    command: string;
+    x?: number;
+    y?: number;
+    cx1?: number;
+    cy1?: number;
+    cx2?: number;
+    cy2?: number;
+}
 
 // --- Shared State for Canvas --- 
 // NOTE: This is a simple global state for demonstration.
 // In a real app, consider Zustand, Context API, or other state management.
 export const canvasShapes: DrawableShape[] = [];
+// Store canvas JSON representation
+export let canvasJSON: object | null = null;
 
 // Function for React components to subscribe to changes (simple approach)
 let changeListeners: (() => void)[] = [];
@@ -26,7 +40,22 @@ export const subscribeToCanvasChanges = (listener: () => void): (() => void) => 
 const notifyCanvasChange = () => {
   changeListeners.forEach(listener => listener());
 };
-// --- End Shared State ---\
+
+// Update canvas JSON representation
+export const updateCanvasJSON = (json: object) => {
+  canvasJSON = json;
+  
+  // Get tool registry
+  const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
+  const registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
+  if (registry) {
+    registry.setState('canvas_json', createState(
+      JSON.stringify(json),
+      `JSON representation of the canvas for better spatial understanding.\nThis contains detailed information about all shapes and their positions on the canvas.\nFormat:\n- canvas dimensions (width: 500, height: 400)\n- shapes array containing all objects with their precise coordinates\n- each shape has properties like:\n  * x, y: position coordinates (origin is top-left)\n  * width, height: dimensions of rectangles\n  * radius: size of circles\n  * points: coordinates for lines [x1,y1,x2,y2]\n  * color: stroke color\n  * fill: fill color if present\n\nSpatial Guidelines:\n- x increases from left to right (0 at left edge, 500 at right edge)\n- y increases from top to bottom (0 at top edge, 400 at bottom edge)\n- shapes may overlap if their coordinates and dimensions intersect\n- to place objects "next to" others, ensure their boundaries don't overlap\n- typically, maintain at least 20-50 pixels spacing between objects\n- center of canvas is approximately at x: 250, y: 200`
+    ));
+  }
+};
+// --- End Shared State ---
 
 // --- Helper for State Management ---
 // Helper function to create state with metadata
@@ -46,92 +75,103 @@ function updateCanvasState(context?: ToolContext): void {
   
   // Set canvas state with metadata - get global object in a browser-compatible way
   const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
-  const registry = (globalObj as any).__toolRegistry;
+  const registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
+  
+  // Return if registry not found
+  if (!registry) return;
   
   // Store basic canvas information
   const shapeCount = canvasShapes.length;
-  if (registry) {
-    // Set canvas dimensions
-    registry.setState('canvas_width', createState(
-      500,
-      "Width of the canvas in pixels"
-    ));
-    
-    registry.setState('canvas_height', createState(
-      400,
-      "Height of the canvas in pixels"
-    ));
-    
-    registry.setState('canvas_shape_count', createState(
-      shapeCount,
-      "Number of shapes currently on the canvas"
-    ));
-    
-    // Store shape type breakdown
-    const shapeTypes: Record<string, number> = {};
-    canvasShapes.forEach(shape => {
-      shapeTypes[shape.type] = (shapeTypes[shape.type] || 0) + 1;
-    });
-    
-    registry.setState('canvas_shape_types', createState(
-      shapeTypes,
-      "Breakdown of shape types on the canvas",
-      (value) => {
-        const types = value as Record<string, number>;
-        return Object.entries(types)
-          .map(([type, count]) => `${type}: ${count}`)
-          .join(', ');
-      }
-    ));
-    
-    // Store latest shape information if available
-    const latestShape = canvasShapes.length > 0 
-      ? canvasShapes[canvasShapes.length - 1] 
-      : null;
-      
-    if (latestShape) {
-      registry.setState('canvas_last_shape', createState(
-        latestShape.type,
-        "Type of the most recently added shape"
-      ));
-
-      // Store description of the latest shape
-      let lastShapeDesc = "";
-      switch (latestShape.type) {
-        case 'line':
-          lastShapeDesc = `Line from (${latestShape.points[0]},${latestShape.points[1]}) to (${latestShape.points[2]},${latestShape.points[3]}), color: ${latestShape.color}`;
-          break;
-        case 'rect':
-          lastShapeDesc = `Rectangle at (${latestShape.x},${latestShape.y}) of size ${latestShape.width}x${latestShape.height}, color: ${latestShape.color}`;
-          break;
-        case 'circle':
-          lastShapeDesc = `Circle at (${latestShape.x},${latestShape.y}) with radius ${latestShape.radius}, color: ${latestShape.color}`;
-          break;
-        case 'path':
-          lastShapeDesc = `Path with SVG data (shortened), color: ${latestShape.color}`;
-          break;
-      }
-      
-      registry.setState('canvas_last_shape_details', createState(
-        lastShapeDesc,
-        "Description of the most recently added shape"
-      ));
+  
+  // Set canvas dimensions
+  registry.setState('canvas_width', createState(
+    500,
+    "Width of the canvas in pixels"
+  ));
+  
+  registry.setState('canvas_height', createState(
+    400,
+    "Height of the canvas in pixels"
+  ));
+  
+  registry.setState('canvas_shape_count', createState(
+    shapeCount,
+    "Number of shapes currently on the canvas"
+  ));
+  
+  // Store shape type breakdown
+  const shapeTypes: Record<string, number> = {};
+  canvasShapes.forEach(shape => {
+    shapeTypes[shape.type] = (shapeTypes[shape.type] || 0) + 1;
+  });
+  
+  registry.setState('canvas_shape_types', createState(
+    shapeTypes,
+    "Breakdown of shape types on the canvas",
+    (value) => {
+      const types = value as Record<string, number>;
+      return Object.entries(types)
+        .map(([type, count]) => `${type}: ${count}`)
+        .join(', ');
     }
-    
-    // Store canvas modification time
-    registry.setState('canvas_last_modified', createState(
-      Date.now(),
-      "Timestamp of the last canvas modification",
-      (value) => {
-        const timestamp = value as number;
-        const date = new Date(timestamp);
-        return `${timestamp} (${date.toLocaleString()})`;
-      }
+  ));
+  
+  // If there's a JSON representation, store it in state
+  if (canvasJSON) {
+    registry.setState('canvas_json', createState(
+      JSON.stringify(canvasJSON),
+      `JSON representation of the canvas for better spatial understanding.\nThis contains detailed information about all shapes and their positions on the canvas.\nFormat:\n- canvas dimensions (width: 500, height: 400)\n- shapes array containing all objects with their precise coordinates\n- each shape has properties like:\n  * x, y: position coordinates (origin is top-left)\n  * width, height: dimensions of rectangles\n  * radius: size of circles\n  * points: coordinates for lines [x1,y1,x2,y2]\n  * color: stroke color\n  * fill: fill color if present\n\nSpatial Guidelines:\n- x increases from left to right (0 at left edge, 500 at right edge)\n- y increases from top to bottom (0 at top edge, 400 at bottom edge)\n- shapes may overlap if their coordinates and dimensions intersect\n- to place objects "next to" others, ensure their boundaries don't overlap\n- typically, maintain at least 20-50 pixels spacing between objects\n- center of canvas is approximately at x: 250, y: 200`
     ));
   }
+  
+  // Store latest shape information if available
+  const latestShape = canvasShapes.length > 0 
+    ? canvasShapes[canvasShapes.length - 1] 
+    : null;
+    
+  if (latestShape) {
+    registry.setState('canvas_last_shape', createState(
+      latestShape.type,
+      "Type of the most recently added shape"
+    ));
+
+    // Store description of the latest shape
+    let lastShapeDesc = "";
+    switch (latestShape.type) {
+      case 'line':
+        lastShapeDesc = `Line from (${latestShape.points[0]},${latestShape.points[1]}) to (${latestShape.points[2]},${latestShape.points[3]}), color: ${latestShape.color}`;
+        break;
+      case 'rect':
+        lastShapeDesc = `Rectangle at (${latestShape.x},${latestShape.y}) of size ${latestShape.width}x${latestShape.height}, color: ${latestShape.color}`;
+        break;
+      case 'circle':
+        lastShapeDesc = `Circle at (${latestShape.x},${latestShape.y}) with radius ${latestShape.radius}, color: ${latestShape.color}`;
+        break;
+      case 'path':
+        lastShapeDesc = `Path with SVG data (shortened), color: ${latestShape.color}`;
+        break;
+    }
+    
+    registry.setState('canvas_last_shape_details', createState(
+      lastShapeDesc,
+      "Description of the most recently added shape"
+    ));
+  }
+  
+  // Store canvas modification time
+  registry.setState('canvas_last_modified', createState(
+    Date.now(),
+    "Timestamp of the last canvas modification",
+    (value) => {
+      const timestamp = value as number;
+      const date = new Date(timestamp);
+      return `${timestamp} (${date.toLocaleString()})`;
+    }
+  ));
 }
 
 // --- End State Management ---
+
 
 // --- Canvas Tool Definitions ---
 
@@ -304,12 +344,17 @@ const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments, contex
   return null;
 };
 
-// *** NEW: drawPath Tool ***
-const drawPathSchema: ToolSchema = {
+// *** MODIFIED: drawPath Tool ***
+const drawPathSchema_New: ToolSchema = { // Renamed schema variable
   name: 'drawPath',
-  description: 'Draws a complex path on the canvas using SVG path data format.',
+  description: 'Draws a complex path from a list of commands (e.g., [{ command: "M", x: 10, y: 10 }, { command: "L", x: 50, y: 50 }, { command: "Z" }]). Valid commands: M, L, C, Z.',
   parameters: [
-    { name: 'd', type: 'string', description: 'SVG path data string (e.g., "M10 10 L 100 100 C 150 0, 200 200, 250 100 Z")', required: true },
+    {
+      name: 'commands',
+      type: 'list', // Expect a list
+      required: true,
+      description: 'An array of path command objects. Each object needs a "command" (string: M, L, C, or Z) and coordinate properties (x, y, x1, y1, x2, y2, cx1, cy1, cx2, cy2) as needed by the command.'
+    },
     { name: 'color', type: 'string', description: 'Stroke color', required: false },
     { name: 'fill', type: 'string', description: 'Fill color (optional)', required: false },
     { name: 'width', type: 'number', description: 'Stroke width', required: false }
@@ -317,28 +362,83 @@ const drawPathSchema: ToolSchema = {
   returns: 'null'
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawPathFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
-  const d = getArgValue<string>(args, 'd', 'string', '');
-  if (!d) {
-    console.warn("drawPath called with empty path data.");
-    return null; 
-  }
+// Fix: Use the interface and add blocks to switch cases
+const drawPathFunc_New: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<null> => { // Return null explicitly
+  // Get commands, assert type for better checking later
+  const commandsInput = getArgValue<(PathCommandObject | Record<string, unknown>)[]>(args, 'commands', 'list', []); // Type hint for array elements, avoid 'any'
   const color = getArgValue<string>(args, 'color', 'string', 'black');
   const fill = getOptArgValue<string>(args, 'fill', 'string');
   const width = getArgValue<number>(args, 'width', 'number', 2);
 
-  const newShape = { type: 'path' as const, d, color, fill, strokeWidth: width };
-  console.log('[canvas.ts] Adding Path:', JSON.stringify(newShape)); // Log added shape
+  if (!Array.isArray(commandsInput) || commandsInput.length === 0) {
+    console.warn("drawPath called with empty or invalid commands list.");
+    return null;
+  }
+
+  let d = "";
+  for (const cmdObj of commandsInput) {
+    // Basic validation
+    if (typeof cmdObj !== 'object' || cmdObj === null || !cmdObj.command || typeof cmdObj.command !== 'string') {
+      console.warn("Skipping invalid command object:", cmdObj);
+      continue;
+    }
+    const command = cmdObj.command.toUpperCase();
+    d += command;
+
+    // Use block scope for each case
+    switch (command) {
+      case 'M':
+      case 'L': { // Add block scope
+        // Type assertion after validation improves safety somewhat
+        const typedCmd = cmdObj as PathCommandObject;
+        const x = Number(typedCmd.x);
+        const y = Number(typedCmd.y);
+        if (!isNaN(x) && !isNaN(y)) {
+           d += ` ${x} ${y}`;
+        } else {
+           console.warn(`Invalid coordinates for ${command}:`, cmdObj);
+        }
+        break;
+      } // Close block scope
+      case 'C': { // Add block scope
+        const typedCmd = cmdObj as PathCommandObject;
+        const cx1 = Number(typedCmd.cx1); const cy1 = Number(typedCmd.cy1);
+        const cx2 = Number(typedCmd.cx2); const cy2 = Number(typedCmd.cy2);
+        const endX = Number(typedCmd.x); const endY = Number(typedCmd.y);
+        if (!isNaN(cx1) && !isNaN(cy1) && !isNaN(cx2) && !isNaN(cy2) && !isNaN(endX) && !isNaN(endY)) {
+            d += ` ${cx1} ${cy1}, ${cx2} ${cy2}, ${endX} ${endY}`;
+        } else {
+             console.warn(`Invalid coordinates for ${command}:`, cmdObj);
+        }
+        break;
+      } // Close block scope
+      case 'Z': { // Add block scope (good practice even if empty)
+        // No coordinates needed
+        break;
+      } // Close block scope
+      default: { // Add block scope
+        console.warn(`Unsupported path command: ${command}`);
+        break;
+      } // Close block scope
+    }
+    d += " ";
+  }
+  d = d.trim();
+
+  if (!d) {
+    console.warn("drawPath resulted in an empty path data string after processing commands.");
+    return null;
+  }
+
+  const newShape: DrawableShape = { type: 'path', d, color, fill, strokeWidth: width }; // Ensure type compatibility
+  console.log('[canvas.ts] Adding Path:', JSON.stringify(newShape));
   canvasShapes.push(newShape);
   notifyCanvasChange();
-  
-  // Update canvas state
+
   updateCanvasState(context);
-  
-  return null;
+  return null; // Explicitly return null
 };
-// *** END NEW TOOL ***
+// *** END MODIFIED TOOL ***
 
 // clearCanvas Tool
 const clearCanvasSchema: ToolSchema = {
@@ -360,13 +460,14 @@ const clearCanvasFunc: ToolFunction = async (_args: EvaluatedToolArguments, cont
   return null;
 };
 
-// Export tools
+// Export tools - USE THE NEW SCHEMA AND FUNCTION FOR drawPath
 export const canvasTools: { schema: ToolSchema, execute: ToolFunction }[] = [
   { schema: drawLineSchema, execute: drawLineFunc },
   { schema: drawRectSchema, execute: drawRectFunc },
   { schema: drawCircleSchema, execute: drawCircleFunc },
-  { schema: drawPathSchema, execute: drawPathFunc },
+  { schema: drawPathSchema_New, execute: drawPathFunc_New }, // Use the new versions
   { schema: clearCanvasSchema, execute: clearCanvasFunc },
+  // { schema: getCanvasJsonSchema, execute: getCanvasJsonFunc } // Removed
 ];
 
 
@@ -412,7 +513,7 @@ PRINT("House drawing complete!")
               acc[param.name] = { type: param.type, description: param.description || '' }; 
               return acc; 
           }, {} as Record<string, {type: string, description: string}>),
-          required: t.schema.parameters.filter(p => p.required).map(p => p.name)
+          required: t.schema.parameters.filter(p => p.required !== false).map(p => p.name) // Corrected filter logic
       },
       returnType: t.schema.returns
   })),

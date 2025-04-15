@@ -5,6 +5,8 @@ export interface AIServiceOptions {
   apiKey: string;
   model?: string;
   maxTokens?: number;
+  temperature?: number;
+  appSpecificGuidance?: string;
 }
 
 export class AIService {
@@ -12,8 +14,9 @@ export class AIService {
 
   constructor(options: AIServiceOptions) {
     this.options = {
-      model: 'gpt-4',
+      model: 'gpt-4o',
       maxTokens: 1000,
+      temperature: 0.7,
       ...options,
     };
   }
@@ -24,8 +27,6 @@ export class AIService {
     }
 
     try {
-      const fullPrompt = buildPrompt(toolRegistry, prompt, true);
-
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -35,10 +36,10 @@ export class AIService {
         body: JSON.stringify({
           model: this.options.model,
           messages: [
-            { role: "system", content: "You are an AI assistant generating NuwaScript code based on the provided tools and current system state." },
-            { role: "user", content: fullPrompt }
+            { role: "system", content: buildPrompt(toolRegistry, prompt, { appSpecificGuidance: this.options.appSpecificGuidance })},
           ],
           max_tokens: this.options.maxTokens,
+          temperature: this.options.temperature,
         }),
       });
 
@@ -82,12 +83,13 @@ export class AIService {
               role: 'system',
               content: 'You are a helpful assistant that explains NuwaScript code. Provide clear, concise explanations of what the code does.'
             },
-            { 
-              role: 'user', 
-              content: `Explain the following NuwaScript code:\n\n${code}` 
+            {
+              role: 'user',
+              content: `Explain the following NuwaScript code:\n\n${code}`
             }
           ],
           max_tokens: this.options.maxTokens,
+          temperature: this.options.temperature,
         }),
       });
 

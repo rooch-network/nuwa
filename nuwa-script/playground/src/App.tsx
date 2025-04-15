@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Editor from './components/Editor';
 import Examples from './components/Examples';
 import Output from './components/Output';
@@ -21,9 +21,10 @@ import { storageService } from './services/storage';
 import { basicTools } from './examples/basic';
 import { tradingTools } from './examples/trading';
 import { weatherTools } from './examples/weather';
-import { canvasTools, canvasShapes as initialCanvasShapes, subscribeToCanvasChanges } from './examples/canvas';
+import { canvasTools, canvasShapes as initialCanvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas';
 import { ExampleConfig } from './types/Example';
 import type { DrawableShape } from './components/DrawingCanvas';
+import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
 import './App.css';
 
@@ -33,13 +34,56 @@ interface CustomMessage {
   content: string;
 }
 
+// Class to handle buffering PRINT output
+class BufferingOutputHandler {
+    private buffer: string[] = [];
+    private outputPanelHandler: OutputHandler; // Handler to update the UI panel
+
+    constructor(outputPanelHandler: OutputHandler) {
+        this.outputPanelHandler = outputPanelHandler;
+    }
+
+    // Called by the interpreter for PRINT statements
+    handleOutput(message: string): void {
+        this.buffer.push(message);
+        // Optionally, still send to the output panel immediately if desired
+        // this.outputPanelHandler(message); 
+    }
+
+    // Clear the buffer (called before a run)
+    clear(): void {
+        this.buffer = [];
+    }
+
+    // Get the buffered messages as a single string and clear buffer
+    flush(): string | null {
+        if (this.buffer.length === 0) {
+            return null;
+        }
+        const combined = this.buffer.join('');
+        this.clear(); // Clear after flushing
+        return combined;
+    }
+
+    // Get the bound handler function to pass to the interpreter
+    getHandler(): OutputHandler {
+        return this.handleOutput.bind(this);
+    }
+}
+
+// Extend NuwaInterface to include the buffering handler
+interface ExtendedNuwaInterface extends NuwaInterface {
+  bufferingOutputHandler: BufferingOutputHandler;
+}
+
 function App() {
   // State management
   const [selectedExample, setSelectedExample] = useState<ExampleConfig | null>(null);
   const [script, setScript] = useState('');
   const [output, setOutput] = useState('');
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [nuwaInterface, setNuwaInterface] = useState<NuwaInterface | null>(null);
+  const [executionError, setExecutionError] = useState<string | undefined>(undefined);
+  // Use the extended interface for state
+  const [nuwaInterface, setNuwaInterface] = useState<ExtendedNuwaInterface | null>(null);
   const [apiKey, setApiKey] = useState(storageService.getApiKey());
   const [isRunning, setIsRunning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -49,6 +93,8 @@ function App() {
   const [messages, setMessages] = useState<CustomMessage[]>([]);
   const [currentToolSchemas, setCurrentToolSchemas] = useState<ToolSchema[]>([]);
   const [shapes, setShapes] = useState<DrawableShape[]>(initialCanvasShapes);
+  // Ref to hold the editor instance
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
   // Initialization
   useEffect(() => {
@@ -78,7 +124,7 @@ function App() {
     setSelectedExample(example);
     setScript(example.script);
     setOutput('');
-    setError(undefined);
+    setExecutionError(undefined);
     storageService.saveLastSelectedExample(example.id);
     
     // Ensure canvas state is explicitly cleared or initialized for the canvas example
@@ -102,16 +148,19 @@ function App() {
     
     // Store registry in global object (browser-compatible way)
     const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
-    (globalObj as any).__toolRegistry = toolRegistry;
+    (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry = toolRegistry;
     
-    // Define the output handler passed to the Interpreter constructor.
-    // This handler will be used for PRINT statements during execution.
-    const outputHandler: OutputHandler = (message) => {
-      // Update the output state directly when PRINT is called.
-      setOutput(prev => (prev ? prev + '\n' + message : message));
+    // Define the handler that updates the actual Output UI panel
+    const uiOutputHandler: OutputHandler = (message) => {
+        setOutput(prev => (prev ? prev + '\n' + message : message));
     };
 
-    const interpreter = new Interpreter(toolRegistry, outputHandler);
+    // Create the buffering handler, passing the UI handler to it (if needed for live output)
+    // If we ONLY want output in chat, we can pass a dummy handler: () => {}
+    const bufferingHandler = new BufferingOutputHandler(uiOutputHandler); 
+
+    // Pass the buffering handler's bound function to the Interpreter
+    const interpreter = new Interpreter(toolRegistry, bufferingHandler.getHandler());
     
     let exampleTools: { schema: ToolSchema, execute: ToolFunction }[] = []; 
     
@@ -144,47 +193,65 @@ function App() {
     });
     
     // Set the interpreter and registry in state.
-    // outputBuffer in state might be redundant now if handler updates output directly.
+    // Store the buffering handler instance
     setNuwaInterface({ 
         interpreter, 
-        outputBuffer: [], // Keep for potential future use or remove
-        toolRegistry 
+        outputBuffer: [], // This is now redundant, consider removing
+        toolRegistry,
+        bufferingOutputHandler: bufferingHandler // Store the handler instance
     }); 
     setCurrentToolSchemas(toolRegistry.getAllSchemas());
   };
 
   // Run script
-  const handleRun = async () => {
-    if (!nuwaInterface) return; 
-    
-    setIsRunning(true);
-    setOutput(''); 
-    setError(undefined);
-    
-    try {
-      console.log("Parsing script:", script);
-      const scriptAST = parse(script);
-      console.log("Parsed AST:", scriptAST); 
+  const handleRun = async (scriptToRun: string) => { // Accept script as argument
+    if (!nuwaInterface) return;
 
-      // Perform runtime check if needed, AST type might not be available
-      if (!scriptAST || typeof scriptAST !== 'object' || scriptAST.kind !== 'Script') { 
+    setIsRunning(true);
+    setOutput(''); // Clear Output panel before run
+    setExecutionError(undefined); // Clear previous errors
+
+    // Get the buffering handler instance
+    const bufferingHandler = nuwaInterface.bufferingOutputHandler;
+    // Clear buffer before execution
+    bufferingHandler.clear();
+
+    // No need to swap handlers anymore
+
+    try {
+      console.log("Parsing script:", scriptToRun);
+      const scriptAST = parse(scriptToRun); // Use the passed script
+      console.log("Parsed AST:", scriptAST);
+
+      if (!scriptAST || typeof scriptAST !== 'object' || scriptAST.kind !== 'Script') {
          throw new Error("Parsing did not return a valid Script AST node.");
       }
 
       console.log("Executing AST...");
+      // Interpreter uses the buffering handler provided during setup
       const scope = await nuwaInterface.interpreter.execute(scriptAST);
       console.log("Execution finished. Final scope:", scope);
+      
+      // After successful execution, flush buffer and add to chat if needed
+      const capturedOutput = bufferingHandler.flush();
+      if (capturedOutput !== null) { 
+        setMessages(prev => [...prev, {
+          role: 'assistant', // Use 'assistant' role for interpreter PRINT output
+          content: capturedOutput // Remove prefix, treat as direct AI response
+        }]);
+      }
+
     } catch (err) {
       console.error("Execution or Parsing error:", err);
       const errorMsg = err instanceof Error ? err.message : String(err);
-      setError(errorMsg);
-      setOutput(prev => prev ? prev + '\nERROR: ' + errorMsg : 'ERROR: ' + errorMsg); 
+      setExecutionError(errorMsg); // Set specific execution error state
     } finally {
+      // No need to restore handler anymore
       setIsRunning(false);
     }
   };
 
-  // Handle AI chat message
+  // AI Chat message handler
   const handleAIChatMessage = async (message: string) => {
     // Check if API key is set
     if (!apiKey) {
@@ -212,31 +279,74 @@ function App() {
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     
     setIsGenerating(true);
+    // Clear previous errors and output when starting a new generation
+    setExecutionError(undefined);
+    setOutput('');
+
     try {
       if (!selectedExample || !nuwaInterface || !nuwaInterface.toolRegistry) {
         throw new Error('Missing example or interpreter/toolRegistry not initialized');
       }
       
-      const aiService = new AIService({ apiKey });
+      // Define application-specific guidance for canvas example
+      let appSpecificGuidance = "";
+      if (selectedExample.id === 'canvas') {
+        appSpecificGuidance = `
+# Canvas-Specific Guidelines:
+- DO NOT automatically call clearCanvas {} at the beginning unless explicitly requested.
+- Build upon the existing canvas content unless the user asks to start fresh.
+- Use the current state variable 'canvas_json' to understand what's already drawn before adding new elements. It contains a JSON string representing all shapes.
+
+# Spatial Positioning Guidelines:
+- The canvas is 500x400 pixels. Coordinate system: (0,0) is top-left; x increases right, y increases down. Center is roughly (250, 200).
+- Before placing new shapes, carefully examine the 'canvas_json' state variable to check existing shapes (coordinates, size).
+- When placing objects relative to others (e.g., "next to", "above"), calculate positions thoughtfully based on the 'canvas_json' data to avoid unwanted overlaps and maintain reasonable spacing (e.g., 20-50 pixels generally looks good).
+- Ensure new shapes fit within canvas bounds (x: 0-500, y: 0-400).
+
+# Layout and Aesthetics Guidelines:
+- Consider the overall composition and visual appeal of the entire canvas when placing elements.
+- Arrange elements thoughtfully on the canvas, leaving appropriate space between them.
+- Consider the relative positions requested (e.g., 'sun in the sky', 'tree next to the house').
+- Avoid placing elements directly overlapping unless specifically instructed.
+- Try to create a visually balanced composition.
+
+# Thinking Process:
+- Use PRINT statements to explain your reasoning, especially for coordinate calculations and layout decisions. For example: PRINT("Placing the sun at x=400, y=80 to be in the top-right sky.")
+`;
+      }
+      
+      const aiService = new AIService({ 
+        apiKey,
+        appSpecificGuidance 
+      });
       const generatedCode = await aiService.generateNuwaScript(
         message,
         nuwaInterface.toolRegistry 
       );
       
-      // Add AI response message
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'I generated the following code for you:\n\n```nuwascript\n' + generatedCode + '\n```'
-      }]);
-      
+      // Update the editor content FIRST
       setScript(generatedCode);
+
+      // 2. Update the editor content directly via its instance
+      if (editorRef.current) {
+        editorRef.current.setValue(generatedCode);
+      } else {
+        // Fallback or log error if editor instance not available
+        console.warn("Editor instance not available to set value programmatically.");
+        // The editor might still pick up the change via defaultValue on next render if key changes, but direct update is better.
+      }
+
+      // Immediately run the generated script AFTER setting state
+      await handleRun(generatedCode);
+
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      setError(errorMsg);
-      // Add error message
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: `Error generating code: ${errorMsg}` 
+      // Set execution error state
+      setExecutionError(errorMsg);
+      // Add error message to chat
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Error generating or executing code: ${errorMsg}`
       }]);
     } finally {
       setIsGenerating(false);
@@ -246,8 +356,7 @@ function App() {
   // Clear output
   const handleClearOutput = () => {
     setOutput('');
-    setError(undefined);
-    // No separate buffer state to clear here anymore
+    setExecutionError(undefined); // Clear execution error too
   };
 
   // Start resize operation for editor/output panels
@@ -306,7 +415,7 @@ function App() {
         </div>
         <div className="flex items-center space-x-3">
           <button
-            onClick={handleRun}
+            onClick={() => handleRun(script)}
             disabled={isRunning || !script.trim() || !nuwaInterface}
             className="nuwa-button flex items-center"
           >
@@ -385,6 +494,14 @@ function App() {
                     </span>
                   </div>
                   <div className="h-[calc(100%-36px)] p-4 bg-white overflow-auto flex flex-col items-center justify-center">
+                    {/* Display Execution Error Here */}
+                    {executionError && (
+                      <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md flex items-start">
+                        <span className="w-5 h-5 mr-2 flex-shrink-0 text-red-600 font-bold">(!)</span>
+                        <pre className="text-sm whitespace-pre-wrap break-words flex-1">{executionError}</pre>
+                      </div>
+                    )}
+
                     {selectedExample?.id === 'canvas' ? (
                       <>
                         {/* Log shapes prop passed to DrawingCanvas - Return null to be valid JSX */} 
@@ -397,13 +514,17 @@ function App() {
                             width={500}
                             height={400}
                             shapes={shapes}
+                            onCanvasChange={(json) => {
+                              console.log('[App.tsx] Canvas JSON updated:', json);
+                              updateCanvasJSON(json);
+                            }}
                           />
                         </div>
                       </>
                     ) : (
                       // Render standard output for other examples
                       <>
-                        {!output && !error && !isRunning && (
+                        {!output && !executionError && !isRunning && (
                           <div className="text-center text-gray-500">
                             <div className="welcome-icon">
                               <BoltIcon size="small" className="mx-auto mb-3 opacity-50" />
@@ -414,7 +535,7 @@ function App() {
                         )}
                         <Output 
                           output={output} 
-                          error={error ?? null} 
+                          error={null} 
                           onClear={handleClearOutput} 
                           loading={isRunning}
                         />
@@ -442,10 +563,12 @@ function App() {
                   </button>
                 </div>
                 <div className="h-[calc(100%-32px)] overflow-hidden">
-                  <Editor 
-                    defaultValue={script} 
-                    onChange={setScript} 
-                    language="javascript" 
+                  <Editor
+                    key={selectedExample?.id || 'default'}
+                    defaultValue={script}
+                    readOnly={isRunning}
+                    onChange={(newCode = '') => setScript(newCode)}
+                    language="javascript"
                   />
                 </div>
               </div>
