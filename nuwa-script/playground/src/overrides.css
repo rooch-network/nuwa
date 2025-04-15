@@ -1,4 +1,4 @@
-/* CSS overrides to fix layout issues - 增强选择器特异性以解决冲突 */
+/* CSS overrides to fix layout issues - Enhance selector specificity to resolve conflicts */
 
 /* Force fixed sidebar width */
 html body #root aside.fixed-sidebar-width {
@@ -70,13 +70,62 @@ html body #root .sidebar-item-description {
   }
 } 
 
-/* 确保SVG图标大小不被App.css中的全局样式覆盖 */
+/* Set fixed width for AI chat component */
+html body #root div.w-80.min-w-\[320px\].max-w-xs {
+  width: 20rem !important;
+  min-width: 20rem !important;
+  max-width: 20rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* Ensure AI chat area content doesn't affect width - Stronger rules */
+html body #root .message-container {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  width: 100% !important;
+}
+
+html body #root .message-container * {
+  max-width: 100% !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+  white-space: normal !important;
+  text-overflow: ellipsis !important;
+}
+
+html body #root pre,
+html body #root code {
+  max-width: 100% !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+  white-space: pre-wrap !important;
+}
+
+/* Ensure code blocks don't expand the panel */
+html body #root pre {
+  white-space: pre-wrap !important;
+  overflow-x: auto !important;
+}
+
+/* Force inline elements to not exceed container */
+html body #root span,
+html body #root a {
+  display: inline-block !important;
+  max-width: 100% !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+}
+
+/* Ensure SVG icon sizes aren't overridden by global styles in App.css */
 html body #root .sidebar-item svg {
   max-width: 24px !important;
   max-height: 24px !important;
 }
 
-/* 确保侧边栏内容不被挤压 */
+/* Ensure sidebar content isn't compressed */
 html body #root aside.fixed-sidebar-width .flex-1 {
   overflow-y: auto !important;
 } 

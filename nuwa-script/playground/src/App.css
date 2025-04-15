@@ -22,7 +22,7 @@
   color: var(--text-light);
 }
 
-/* 控制所有SVG图标大小 - 确保没有图标变得过大 */
+/* Control all SVG icon sizes - ensure no icons become too large */
 svg {
   max-width: 64px;
   max-height: 64px;
@@ -33,7 +33,7 @@ svg {
   max-height: 36px;
 }
 
-/* 特别限制X图标大小 */
+/* Specifically limit X icon size */
 .welcome-icon svg {
   max-width: 32px !important;
   max-height: 32px !important;
@@ -324,7 +324,7 @@ svg {
   text-align: center;
 }
 
-/* 确保Canvas区域和内容区域显示正常 */
+/* Ensure Canvas area and content display properly */
 .canvas-container {
   min-height: 400px;
 }
@@ -361,7 +361,7 @@ svg {
   }
 }
 
-/* 确保AI对话区域内容不会影响宽度 */
+/* Ensure AI chat area content doesn't affect width */
 .w-80 * {
   max-width: 100%;
   overflow-wrap: break-word;
