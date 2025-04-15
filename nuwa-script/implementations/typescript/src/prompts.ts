@@ -10,6 +10,8 @@ NuwaScript is a simple, safe scripting language.
 - Null literal MUST be UPPERCASE: NULL.
 - Identifiers (variable names, tool names) are CASE-SENSITIVE and can be lower/mixed case.
 - String literals use DOUBLE QUOTES: "hello".
+- List literals use square brackets: [1, "a", TRUE, [nested_list]]. Elements are comma-separated.
+- Object literals use curly braces: { key1: "value", "key-2": 123, key3: [1, 2] }. Keys can be identifiers or strings (double-quoted). Values can be any expression. Pairs are comma-separated.
 - Comments start with //
 - Basic arithmetic and comparison operators are supported: +, -, *, /, ==, !=, >, <, >=, <=.
 - The '+' operator is ONLY for number addition, NOT string concatenation.
