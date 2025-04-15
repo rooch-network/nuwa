@@ -7,7 +7,18 @@ export type { Scope, OutputHandler } from './interpreter'; // Assuming they are 
 // Explicitly re-export members from tools.ts
 export { ToolRegistry } from './tools'; 
 // Re-export types from tools.ts
-export type { ToolSchema, ToolParameter, ToolFunction, EvaluatedToolArguments, RegisteredTool, NuwaType } from './tools'; 
+export type { 
+    ToolSchema, 
+    ToolParameter, 
+    ToolFunction, 
+    EvaluatedToolArguments, 
+    RegisteredTool, 
+    NuwaType,
+    StateMetadata,
+    StateValueWithMetadata,
+    StateStore,
+    ToolContext
+} from './tools'; 
 
 // Explicitly re-export members from values.ts
 export { isNuwaObject, isNuwaList, isNuwaString, isNuwaNumber, isNuwaBoolean, isNuwaNull, nuwaValuesAreEqual, nuwaValueToString } from './values';

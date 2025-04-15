@@ -16,7 +16,8 @@ NuwaScript is a simple, safe scripting language.
 
 # Core Statements:
 LET varName = <expression>
-CALL tool_name { arg1: <expression>, arg2: "literal", ... }
+CALL tool_name { arg1: <expression>, arg2: "literal", ... } // With arguments
+CALL tool_name {} // With no arguments (empty braces required)
 IF <condition_expression> THEN
   <statements>
 ELSE // Optional

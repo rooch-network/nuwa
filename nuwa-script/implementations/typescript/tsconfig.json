@@ -18,6 +18,7 @@
 
     /* Transpiling for ESM */
     "module": "ESNext", // Changed to ESNext for ESM output
+    "rootDir": "./src", // Change to src directory to flatten output structure
     "outDir": "./dist",
 
     /* If your code runs in Node.js (Keep for type checking) */
@@ -38,8 +39,7 @@
     }
   },
   "include": [
-    "src/**/*.ts", // Include all ts files in src
-    "examples/**/*.ts" // Optional: Keep if examples need building
+    "src/**/*.ts" // Include all ts files in src
   ],
-  "exclude": ["node_modules", "dist", "tests"] // Exclude tests from primary build
+  "exclude": ["node_modules", "dist", "tests", "examples"] // Exclude tests and examples from primary build
 }
