@@ -524,3 +524,153 @@ describe('Interpreter - Array Indexing', () => {
     });
 
 });
+
+// --- NEW: Describe block for Literal Expressions ---
+describe('Interpreter - Literal Expressions', () => {
+    let interpreter: Interpreter;
+    let capturedOutput: string[];
+    let mockOutputHandler: OutputHandler;
+
+    beforeEach(() => {
+        capturedOutput = [];
+        mockOutputHandler = (output: string) => capturedOutput.push(output);
+        // Use a clean interpreter without pre-registered tools unless needed for specific literal tests
+        interpreter = new Interpreter(new ToolRegistry(), mockOutputHandler);
+    });
+
+    async function runAndGetScope(script: string, initialScope?: Scope): Promise<Scope> {
+        const ast = parse(script);
+        return await interpreter.execute(ast, initialScope);
+    }
+
+    // --- List Literal Tests ---
+    test('should evaluate simple list literal', async () => {
+        const script = `LET x = [1, "two", TRUE, NULL, 3.14]`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual([1, "two", true, null, 3.14]);
+    });
+
+    test('should evaluate empty list literal', async () => {
+        const script = `LET x = []`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual([]);
+    });
+
+    test('should evaluate list literal with expressions', async () => {
+        const script = `
+            LET a = 10
+            LET b = "hello"
+            LET x = [a, a * 2, b, 5 > 2]
+        `;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual([10, 20, "hello", true]);
+    });
+
+    test('should evaluate nested list literals', async () => {
+        const script = `LET x = [1, [2, 3], [4, [5]]]`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual([1, [2, 3], [4, [5]]]);
+    });
+
+    test('should evaluate list literal in expressions (array access)', async () => {
+        const script = `LET x = ["a", "b", "c"][1]`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toBe("b");
+    });
+
+    // --- Object Literal Tests ---
+    test('should evaluate simple object literal', async () => {
+        const script = `LET x = { name: "Nuwa", version: 1, active: TRUE, config: NULL }`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual({ name: "Nuwa", version: 1, active: true, config: null });
+    });
+
+     test('should evaluate object literal with string keys', async () => {
+        const script = `LET x = { "first-name": "Nuwa", "dash-key": 123 }`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual({ "first-name": "Nuwa", "dash-key": 123 });
+    });
+
+    test('should evaluate empty object literal', async () => {
+        const script = `LET x = {}`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual({});
+    });
+
+    test('should evaluate object literal with expressions', async () => {
+        const script = `
+            LET factor = 10
+            LET label = "result"
+            LET x = { value: factor * 5, status: label, valid: factor > 0 }
+        `;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual({ value: 50, status: "result", valid: true });
+    });
+
+    test('should evaluate nested object literals', async () => {
+        const script = `LET x = { data: { value: 99, units: "m" }, id: "abc" }`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toEqual({ data: { value: 99, units: "m" }, id: "abc" });
+    });
+
+     test('should evaluate object literal in expressions (member access)', async () => {
+        const script = `LET x = { key: "value", num: 123 }.key`;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('x')).toBe("value");
+    });
+
+    // --- Combined Literal Tests ---
+    test('should evaluate nested list and object literals', async () => {
+        const script = `
+            LET id_1 = "001"
+            LET items = [
+                { id: id_1, tags: ["a", "b", 1] },
+                { id: "002", data: { nested: TRUE } }
+            ]
+            LET result = { success: TRUE, payload: items }
+        `;
+        const scope = await runAndGetScope(script);
+        expect(scope.get('result')).toEqual({
+            success: true,
+            payload: [
+                { id: "001", tags: ["a", "b", 1] },
+                { id: "002", data: { nested: true } }
+            ]
+        });
+    });
+
+     test('should allow list/object literals as tool arguments', async () => {
+        // Mock a simple tool that accepts list/object
+        const testToolSchema: ToolSchema = { name: 'processData', description: '', parameters: [{ name: 'data', type: 'any', required: true }], returns: 'any' };
+        let receivedData: any = null;
+        const testToolFunc: ToolFunction = async (args) => { receivedData = args['data']; return receivedData; };
+        interpreter.getToolRegistry().register(testToolSchema.name, testToolSchema, testToolFunc);
+
+        const script = `
+            LET myData = { items: [1, { active: TRUE }], name: "test" }
+            CALL processData { data: myData }
+            CALL processData { data: ["go", 2, FALSE] }
+            LET result = CALL processData { data: { x: 1 } }
+        `;
+        const scope = await runAndGetScope(script);
+
+        // Fix: Expect the data from the *last* call
+        expect(receivedData).toEqual({ x: 1 });
+
+        expect(scope.get('result')).toEqual({ x: 1 }); // Check value returned from last call
+    });
+
+     test('should parse object literal key as identifier or string', async () => {
+         // Test focuses on parsing, evaluation confirms it worked
+         const script = `
+             LET identifierKey = { key: 1 }
+             LET stringKey = { "key-string": 2 }
+             LET mixed = { id: 3, "str": 4 }
+         `;
+         const scope = await runAndGetScope(script);
+         expect(scope.get('identifierKey')).toEqual({ key: 1 });
+         expect(scope.get('stringKey')).toEqual({ "key-string": 2 });
+         expect(scope.get('mixed')).toEqual({ id: 3, "str": 4 });
+     });
+
+});

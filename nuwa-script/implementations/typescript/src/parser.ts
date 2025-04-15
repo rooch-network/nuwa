@@ -254,7 +254,7 @@ export class Parser {
     }
 
     private parsePrimary(): AST.Expression {
-        // Literals
+        // Literals (TRUE, FALSE, NULL, NUMBER, STRING)
         if (this.match(TokenType.TRUE)) return { kind: 'LiteralExpr', value: true };
         if (this.match(TokenType.FALSE)) return { kind: 'LiteralExpr', value: false };
         if (this.match(TokenType.NULL)) return { kind: 'LiteralExpr', value: null };
@@ -262,52 +262,52 @@ export class Parser {
             return { kind: 'LiteralExpr', value: parseFloat(this.previous().value) };
         }
         if (this.match(TokenType.STRING)) {
-             // Lexer already processed escapes and removed quotes via JSON.parse
             return { kind: 'LiteralExpr', value: this.previous().value };
         }
 
         // List Literal [ ... ]
         if (this.match(TokenType.LBRACKET)) {
-            const elements: AST.Expression[] = [];
-            // To handle potential ambiguity with index operator, we must *not* consume LBRACKET here
-            // if it's followed by an expression and RBRACKET in the context of parsePostfix.
-            // However, parsePrimary is called first. Let's assume list literals are distinct.
-            // The `match` call above already consumed LBRACKET for the list literal case.
-            if (!this.check(TokenType.RBRACKET)) { // Handle non-empty list
-                do {
-                    if (this.check(TokenType.RBRACKET)) break;
-                    elements.push(this.parseExpression());
-                } while (this.match(TokenType.COMMA));
-            }
-            this.consume(TokenType.RBRACKET, "Expected ']' after list elements.");
-
-             // !!! Important Correction for List Literals !!!
-            // The interpreter needs the evaluated values, not expressions, for a literal.
-            // We need a specific AST node for List Literals, or handle evaluation here.
-            // Let's introduce ListLiteralExpr to AST first.
-            // For now, let's keep parsing elements as Expressions and create a generic
-            // structure that the interpreter will handle. This is complex.
-
-            // **Temporary simplification**: Create a LiteralExpr with a placeholder or
-            // leave elements as expressions for the interpreter to resolve.
-            // Let's create a dedicated ListLiteralExpr node in AST later if needed.
-            // For now, let's assume the interpreter can handle evaluating expressions
-            // inside a structure representing the list.
-            // How to represent this in AST? Maybe just use LiteralExpr with an array value?
-            // This is tricky because the *elements* are expressions, not values yet.
-            //
-            // Let's stick to the original plan of having elements as Expression[] and
-            // create a dedicated node type if issues arise. The interpreter will evaluate them.
-            // Let's define ListLiteralExpr in ast.ts NEXT.
-            // *** TEMPORARY HACK for now: Return a LiteralExpr that the interpreter won't handle correctly ***
-            // We need to add ListLiteralExpr to ast.ts and modify this code block.
-            // For the current goal of ARRAY INDEXING, let's just throw an error for list literals for now.
-             throw new ParserError("List literals [ ... ] are not fully implemented yet.", this.previous());
-
-             /* // Ideal future code after adding ListLiteralExpr to ast.ts:
-              return { kind: 'ListLiteralExpr', elements };
-             */
+          // Remove the previous placeholder error
+          const elements: AST.Expression[] = [];
+          if (!this.check(TokenType.RBRACKET)) { // Handle non-empty list
+              do {
+                  // Allow trailing comma: Check for RBRACKET immediately after LBRACKET or COMMA
+                  if (this.check(TokenType.RBRACKET)) break;
+                  elements.push(this.parseExpression());
+              } while (this.match(TokenType.COMMA));
+          }
+          this.consume(TokenType.RBRACKET, "Expected ']' after list elements.");
+          return { kind: 'ListLiteralExpr', elements }; // Return the new AST node
         }
+
+        // Object Literal { ... }
+        if (this.match(TokenType.LBRACE)) {
+          const properties: Record<string, AST.Expression> = {};
+          if (!this.check(TokenType.RBRACE)) { // Handle non-empty object
+              do {
+                  // Allow trailing comma
+                  if (this.check(TokenType.RBRACE)) break;
+
+                  let key: string;
+                  // Key can be an identifier or a string literal
+                  if (this.match(TokenType.IDENTIFIER)) {
+                    key = this.previous().value;
+                  } else if (this.match(TokenType.STRING)) {
+                    key = this.previous().value; // Lexer already handled quotes/escapes
+                  } else {
+                    throw new ParserError("Expected identifier or string literal as object key.", this.peek());
+                  }
+
+                  this.consume(TokenType.COLON, "Expected ':' after object key.");
+                  const value = this.parseExpression();
+                  properties[key] = value;
+
+              } while (this.match(TokenType.COMMA));
+          }
+          this.consume(TokenType.RBRACE, "Expected '}' after object properties.");
+          return { kind: 'ObjectLiteralExpr', properties }; // Return the new AST node
+        }
+
 
         // Variable (single identifier only now)
         if (this.match(TokenType.IDENTIFIER)) {
@@ -323,11 +323,9 @@ export class Parser {
             return { kind: 'FunctionCallExpr', functionName: 'NOW' };
         }
 
-        // Tool Calls used as expressions
-        if (this.match(TokenType.CALL)) {
-            // Need to backtrack slightly as we consumed CALL
-            this.current--; // Go back to CALL token
-            return this.parseToolCallExpression();
+        // Tool Calls used as expressions - Parsed by parseToolCallExpression
+        if (this.check(TokenType.CALL)) {
+             return this.parseToolCallExpression();
         }
 
         // Parenthesized expression
@@ -338,7 +336,7 @@ export class Parser {
         }
 
         // Error
-        throw new ParserError(`Unexpected token type '${this.peek().type}' in expression`, this.peek());
+        throw new ParserError(`Unexpected token type '${this.peek().type}' in expression parsing`, this.peek());
     }
 
      // NEW HELPER for CALL used as an expression

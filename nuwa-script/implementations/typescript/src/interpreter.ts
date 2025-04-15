@@ -11,7 +11,7 @@ import {
     InvalidIterableError,
     IndexOutOfBoundsError
 } from './errors';
-import { isArrayIndexExpression, isMemberAccessExpression } from './ast';
+import { isArrayIndexExpression, isMemberAccessExpression, isListLiteralExpr, isObjectLiteralExpr } from './ast';
 
 // Type for the variable scope
 export type Scope = Map<string, NuwaValue>;
@@ -210,14 +210,28 @@ export class Interpreter {
             case 'MemberAccessExpr':
                 return await this.evaluateMemberAccessExpression(expression, scope);
 
+            // Add case for ListLiteralExpr
+            case 'ListLiteralExpr':
+                return await this.evaluateListLiteralExpr(expression, scope);
+
+            // Add case for ObjectLiteralExpr
+            case 'ObjectLiteralExpr':
+                return await this.evaluateObjectLiteralExpr(expression, scope);
+
             default:
                  // Update exhaustiveness check (though TS switch should handle it)
+                if (isListLiteralExpr(expression)) {
+                    return await this.evaluateListLiteralExpr(expression, scope);
+                }
+                if (isObjectLiteralExpr(expression)) {
+                    return await this.evaluateObjectLiteralExpr(expression, scope);
+                }
                 if (isArrayIndexExpression(expression)) {
                     return await this.evaluateArrayIndexExpression(expression, scope);
                 }
-                 if (isMemberAccessExpression(expression)) {
-                     return await this.evaluateMemberAccessExpression(expression, scope);
-                 }
+                if (isMemberAccessExpression(expression)) {
+                    return await this.evaluateMemberAccessExpression(expression, scope);
+                }
                 const exhaustiveCheck: never = expression;
                 throw new RuntimeError(`Unsupported expression kind: ${(exhaustiveCheck as any)?.kind}`, expression);
         }
@@ -388,6 +402,35 @@ export class Interpreter {
         // Perform access, converting undefined to null
         const result = array[index];
         return result === undefined ? null : result;
+    }
+
+    // NEW METHOD: Evaluates a ListLiteralExpr
+    private async evaluateListLiteralExpr(expr: AST.ListLiteralExpr, scope: Scope): Promise<NuwaValue[]> {
+      const evaluatedElements: NuwaValue[] = [];
+      for (const elementExpr of expr.elements) {
+        const evaluatedValue = await this.evaluateExpression(elementExpr, scope);
+        evaluatedElements.push(evaluatedValue);
+      }
+      return evaluatedElements;
+    }
+
+    // NEW METHOD: Evaluates an ObjectLiteralExpr
+    private async evaluateObjectLiteralExpr(expr: AST.ObjectLiteralExpr, scope: Scope): Promise<NuwaObject> {
+      const evaluatedProperties: NuwaObject = {};
+      for (const key in expr.properties) {
+        // Ensure hasOwnProperty check for safety, although TS AST structure makes it less critical
+        if (Object.prototype.hasOwnProperty.call(expr.properties, key)) {
+          const valueExpr = expr.properties[key];
+          if (valueExpr) { // Check if valueExpr is not undefined
+             const evaluatedValue = await this.evaluateExpression(valueExpr, scope);
+             evaluatedProperties[key] = evaluatedValue;
+          } else {
+              // Handle case where property value might be missing in AST (shouldn't happen with parser)
+              evaluatedProperties[key] = null; // Or throw error
+          }
+        }
+      }
+      return evaluatedProperties;
     }
 
     // --- Tool Execution Helper ---

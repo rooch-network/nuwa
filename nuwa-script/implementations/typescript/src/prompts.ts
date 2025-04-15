@@ -21,6 +21,7 @@ NuwaScript is a simple, safe scripting language.
 LET varName = <expression>
 CALL tool_name { arg1: <expression>, arg2: "literal", ... } // With arguments
 CALL tool_name {} // With no arguments (empty braces required)
+// **IMPORTANT: Tool arguments MUST use curly braces {}, NOT parentheses (). Example: CALL my_tool { name: "test" }**
 IF <condition_expression> THEN
   <statements>
 ELSE // Optional
@@ -52,10 +53,13 @@ This represents the current state of the system. You can use this information to
 {user_task}
 
 # Instructions:
-Generate *only* the NuwaScript code required to complete the user task using the available tools and syntax. Do not include explanations or markdown formatting. DO NOT wrap your code in markdown code blocks like \`\`\`NuwaScript\`\`\` or \`\`\`. Ensure all keywords and boolean/null literals are uppercase. Use available tools where appropriate. Use PRINT for intermediate thoughts or values if helpful, and use a reporting tool (like 'report_analysis_result') for the final answer if available.
 
-Consider the current system state when generating your code. If the state contains relevant information for the task, use it to inform your response.
-
+- Generate *only* the NuwaScript code required to complete the user task using the defined syntax and available tools.
+- Output *only* raw code. Do not include explanations, markdown formatting, or code blocks (like \`\`\`).
+- Ensure all keywords (LET, CALL, IF, etc.) and literals (TRUE, FALSE, NULL) are UPPERCASE. **Pay close attention to the CALL syntax using {}.**
+- **Strictly use only the tools listed under "# Available Tools:". Do not invent or call unlisted tools.**
+- **Use PRINT(<expression>) statements freely to output intermediate values, confirmations, or helpful information directly to the user.**
+- Consider the "# Current System State:" information when generating the code.
 # NuwaScript Code (provide raw code with no markdown formatting or code blocks):
 `;
 

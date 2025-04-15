@@ -27,7 +27,9 @@ export type Expression =
   | FunctionCallExpr
   | ToolCallExpr
   | ArrayIndexExpression
-  | MemberAccessExpr;
+  | MemberAccessExpr
+  | ListLiteralExpr
+  | ObjectLiteralExpr;
   // | CalcExpr; // Removed CALC
 
 export interface LiteralExpr extends BaseNode {
@@ -87,6 +89,19 @@ export interface MemberAccessExpr extends BaseNode {
   kind: 'MemberAccessExpr';
   object: Expression; // The expression whose member is accessed (e.g., variable or result of another expr)
   property: string;   // The name of the property being accessed
+}
+
+// Represents a list literal expression like [1, "a", x + 1]
+export interface ListLiteralExpr extends BaseNode {
+  kind: 'ListLiteralExpr';
+  elements: Expression[]; // Elements are expressions to be evaluated
+}
+
+// Represents an object literal expression like { key1: "value", key2: y, "quoted key": 1 }
+export interface ObjectLiteralExpr extends BaseNode {
+  kind: 'ObjectLiteralExpr';
+  properties: Record<string, Expression>; // Property values are expressions
+  // Note: Keys are strings. Parser will handle identifier vs string keys if needed.
 }
 
 // Represents CALC { formula: "...", vars: {...} } - REMOVED
@@ -188,4 +203,14 @@ export function isForStatement(node: BaseNode): node is ForStatement {
 
 export function isPrintStatement(node: BaseNode): node is PrintStatement {
      return (node as any)?.kind === 'PrintStatement';
+}
+
+// Add type guard for ListLiteralExpr
+export function isListLiteralExpr(node: BaseNode): node is ListLiteralExpr {
+    return (node as any)?.kind === 'ListLiteralExpr';
+}
+
+// Add type guard for ObjectLiteralExpr
+export function isObjectLiteralExpr(node: BaseNode): node is ObjectLiteralExpr {
+    return (node as any)?.kind === 'ObjectLiteralExpr';
 }
