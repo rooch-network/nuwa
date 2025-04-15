@@ -30,7 +30,7 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="h-4 w-4 text-gray-400 dark:text-gray-500 search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
             </svg>
           </div>
@@ -40,7 +40,7 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
       {filteredTools.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400 p-4 text-center">
           <div>
-            <svg className="h-12 w-12 mx-auto mb-3 opacity-50 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="h-12 w-12 mx-auto mb-3 opacity-50 text-gray-400 dark:text-gray-600 not-found-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z"></path>
             </svg>
             <p>No tools found matching "{searchQuery}"</p>

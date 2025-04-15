@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ReactNode } from 'react';
-import { BoltIcon } from './AppIcons'; // Import BoltIcon if used
+import { BoltIcon, XIcon } from './AppIcons'; // Import BoltIcon and XIcon if used
 
 type ActiveSidePanel = 'examples' | 'tools';
 
@@ -35,6 +35,26 @@ const Layout: React.FC<LayoutProps> = ({
   const [activeSidePanel, setActiveSidePanel] = useState<ActiveSidePanel>(initialActiveSidePanel);
   const [scriptPanelHeight, setScriptPanelHeight] = useState<string>('40%');
   const [isDragging, setIsDragging] = useState(false);
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    // Check if preference exists in localStorage
+    const savedPreference = localStorage.getItem('darkMode');
+    if (savedPreference !== null) {
+      return savedPreference === 'true';
+    }
+    // Otherwise, use system preference
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  // Apply dark mode class to html element
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    // Save preference to localStorage
+    localStorage.setItem('darkMode', darkMode.toString());
+  }, [darkMode]);
 
   // Update internal state if initial prop changes (though direct control via prop might be better)
   useEffect(() => {
@@ -45,6 +65,11 @@ const Layout: React.FC<LayoutProps> = ({
   const handleSidebarTabClick = (tab: ActiveSidePanel) => {
     setActiveSidePanel(tab);
     onSelectSidebarTab(tab); // Notify parent about the change
+  };
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
   };
 
   // Start resize operation for editor/output panels
@@ -105,6 +130,27 @@ const Layout: React.FC<LayoutProps> = ({
           <div className="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-200">NuwaScript Playground</div>
         </div>
         <div className="flex items-center space-x-3">
+          {/* Dark Mode Toggle Button */}
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {darkMode ? (
+              // Sun icon for light mode
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 theme-toggle-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            ) : (
+              // Moon icon for dark mode
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 theme-toggle-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
+          
+          {/* Run Button */}
           <button
             onClick={headerProps.onRunClick}
             disabled={headerProps.isRunDisabled}
@@ -182,7 +228,7 @@ const Layout: React.FC<LayoutProps> = ({
                     onClick={() => setScriptPanelHeight('40%')} // Reset height
                     className="text-gray-500 hover:text-gray-700 p-1" // Added padding for easier clicking
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> {/* Adjusted stroke width */}
+                    <XIcon size="small" className="reset-icon" style={{ width: '16px', height: '16px', display: 'inline-block' }} />
                   </button>
                 </div>
                  {/* Editor Content: Needs to fill remaining space */}

@@ -119,13 +119,82 @@ html body #root a {
   word-break: break-all !important;
 }
 
-/* Ensure SVG icon sizes aren't overridden by global styles in App.css */
+/* Ensure specific SVG icons display properly with the right size */
 html body #root .sidebar-item svg {
-  max-width: 24px !important;
-  max-height: 24px !important;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
 }
 
 /* Ensure sidebar content isn't compressed */
 html body #root aside.fixed-sidebar-width .flex-1 {
   overflow-y: auto !important;
+}
+
+/* Style theme toggle icon with appropriate size */
+html body #root button .theme-toggle-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: inline-block !important;
+}
+
+/* Ensure reset icon displays correctly */
+html body #root button .reset-icon {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  display: inline-block !important;
+}
+
+/* Logo sizing */
+html body #root .logo {
+  height: 2em !important;
+  width: auto !important;
+  min-height: 2em !important;
+  max-height: 2em !important;
+}
+
+/* Ensure all icon SVGs render properly regardless of global styles */
+html body #root button svg:not(.theme-toggle-icon):not(.reset-icon):not(.logo),
+html body #root .icon svg:not(.theme-toggle-icon):not(.reset-icon):not(.logo),
+html body #root [class*="-icon"]:not(.theme-toggle-icon):not(.reset-icon):not(.logo) {
+  width: 1em !important;
+  height: 1em !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* Respect explicitly set sizes through utility classes */
+html body #root .h-3, 
+html body #root .h-4,
+html body #root .h-5,
+html body #root .h-6,
+html body #root .h-8,
+html body #root .h-10,
+html body #root .h-12 {
+  height: auto !important;
+}
+
+html body #root .w-3, 
+html body #root .w-4,
+html body #root .w-5,
+html body #root .w-6,
+html body #root .w-8,
+html body #root .w-10,
+html body #root .w-12 {
+  width: auto !important;
 } 

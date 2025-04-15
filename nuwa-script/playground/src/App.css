@@ -22,8 +22,25 @@
   color: var(--text-light);
 }
 
-/* Control all SVG icon sizes - ensure no icons become too large */
+/* Dark mode root styles */
+.dark #root {
+  background-color: var(--background-dark);
+  color: var(--text-dark);
+}
+
+/* REMOVED: Global SVG size restrictions */
+/* Global SVG styles were causing display issues */
+/* 
 svg {
+  max-width: 64px;
+  max-height: 64px;
+}
+*/
+
+/* Only apply size limits to specific SVG containers */
+.app-icon svg, 
+.tool-icon svg,
+.feature-icon svg {
   max-width: 64px;
   max-height: 64px;
 }
@@ -37,6 +54,37 @@ svg {
 .welcome-icon svg {
   max-width: 32px !important;
   max-height: 32px !important;
+}
+
+/* Theme toggle button icon should be exactly sized */
+.theme-toggle-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  /* 确保这些属性不被其他样式覆盖 */
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Reset panel height button icon */
+.reset-icon {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  /* 确保这些属性不被其他样式覆盖 */
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Reset icon should not have circle background in certain contexts */
+button .reset-icon circle {
+  display: none;
 }
 
 /* Custom scrollbar styles */
@@ -92,7 +140,10 @@ svg {
 
 /* Logo animation */
 .logo {
-  height: 2em;
+  height: 2em !important;
+  width: auto !important;
+  min-height: 2em !important;
+  max-height: 2em !important;
   will-change: filter;
   transition: filter 300ms;
 }
@@ -130,10 +181,47 @@ svg {
   background-color: white;
 }
 
+.dark .output-section {
+  background-color: #1e1e1e;
+  color: #e2e8f0;
+}
+
 /* Ensure line numbers in the editor are visible */
 .cm-lineNumbers {
   color: #888 !important;
   background-color: #f8f9fa !important;
+}
+
+.dark .cm-lineNumbers {
+  color: #aaa !important;
+  background-color: #1e1e1e !important;
+}
+
+.dark .cm-editor {
+  background-color: #1e1e1e !important;
+}
+
+.dark .cm-editor .cm-content {
+  background-color: #1e1e1e !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .cm-editor .cm-gutters {
+  background-color: #2d2d2d !important;
+  color: #aaa !important;
+  border-right: 1px solid #444 !important;
+}
+
+.dark .cm-editor .cm-line {
+  color: #e2e8f0 !important;
+}
+
+.dark .cm-editor .cm-activeLineGutter {
+  background-color: rgba(50, 50, 50, 0.5) !important;
+}
+
+.dark .cm-editor .cm-activeLine {
+  background-color: rgba(50, 50, 50, 0.5) !important;
 }
 
 /* Syntax highlighting specifics - using colors that match Nuwa website */
@@ -366,4 +454,126 @@ svg {
   max-width: 100%;
   overflow-wrap: break-word;
   word-wrap: break-word;
+}
+
+/* Icon sizing classes */
+.search-icon,
+.not-found-icon,
+.tool-icon,
+.nav-icon,
+.action-icon,
+.toggle-icon,
+.warning-icon,
+.info-icon,
+.error-icon,
+.success-icon {
+  width: auto !important;
+  height: auto !important;
+  min-width: auto !important;
+  min-height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  display: inline-block !important;
+}
+
+/* Stronger dark mode overrides */
+.dark .bg-white,
+.dark [class*="bg-white"] {
+  background-color: #1e1e1e !important;
+}
+
+.dark .text-gray-700,
+.dark .text-gray-800,
+.dark .text-gray-900,
+.dark [class*="text-gray-7"],
+.dark [class*="text-gray-8"],
+.dark [class*="text-gray-9"] {
+  color: #e2e8f0 !important;
+}
+
+.dark .nuwa-button {
+  background-color: #646cff;
+}
+
+.dark .border-gray-200,
+.dark [class*="border-gray-2"] {
+  border-color: #444 !important;
+}
+
+.dark .resize-handle {
+  background-color: #444;
+}
+
+.dark .resize-handle:hover {
+  background-color: #646cff;
+}
+
+/* Force background colors in dark mode */
+body.dark,
+.dark body,
+.dark #root,
+.dark .main-container-for-resize,
+.dark .main-panel,
+.dark aside {
+  background-color: #1e1e1e !important;
+  color: #e2e8f0 !important;
+}
+
+/* Comprehensive dark mode styles */
+html.dark,
+.dark {
+  --background-light: #1e1e1e;
+  --text-light: #e2e8f0;
+}
+
+.dark .main-container-for-resize {
+  background-color: #1e1e1e !important;
+}
+
+.dark .bg-gray-100,
+.dark .bg-gray-200 {
+  background-color: #2d2d2d !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #333 !important;
+}
+
+.dark .hover\:bg-gray-50:hover {
+  background-color: #383838 !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+  background-color: #383838 !important;
+}
+
+.dark .text-gray-300,
+.dark .text-gray-400,
+.dark .text-gray-500 {
+  color: #9ca3af !important;
+}
+
+.dark .text-gray-600 {
+  color: #d1d5db !important;
+}
+
+.dark button.text-gray-500 {
+  color: #9ca3af !important;
+}
+
+.dark button.text-gray-500:hover {
+  color: #e2e8f0 !important;
+}
+
+/* Fix for Monaco editor in dark mode */
+.dark .monaco-editor {
+  background-color: #1e1e1e !important;
+}
+
+.dark .monaco-editor-background {
+  background-color: #1e1e1e !important;
+}
+
+.dark .monaco-editor .margin {
+  background-color: #1e1e1e !important;
 }

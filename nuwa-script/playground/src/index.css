@@ -186,3 +186,66 @@ button:active {
   transform: translateY(-1px);
   box-shadow: 0 4px 6px -1px rgba(var(--shadow-color), 0.1), 0 2px 4px -1px rgba(var(--shadow-color), 0.06);
 }
+
+/* Dark mode adjustments */
+.dark .reset-icon,
+.dark .theme-toggle-icon {
+  color: #e2e8f0; /* 浅灰色，适合深色背景 */
+}
+
+.dark .logo,
+.dark svg.logo {
+  filter: brightness(1.2);
+}
+
+/* 暗黑模式全局样式 */
+html.dark {
+  background-color: #1e1e1e;
+  color: #e2e8f0;
+}
+
+html.dark body {
+  background-color: #1e1e1e;
+  color: #e2e8f0;
+}
+
+html.dark .bg-white {
+  background-color: #1e1e1e !important;
+}
+
+html.dark .text-gray-700,
+html.dark .text-gray-800,
+html.dark .text-gray-900 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .border-t,
+html.dark .border-b,
+html.dark .border-r,
+html.dark .border-l,
+html.dark .border {
+  border-color: #444 !important;
+}
+
+/* 暗黑模式下的按钮 */
+html.dark button {
+  background-color: #2d2d2d;
+  color: #e2e8f0;
+}
+
+html.dark button:hover {
+  filter: brightness(1.1);
+}
+
+/* 暗黑模式下的背景颜色 */
+html.dark .bg-gray-100 {
+  background-color: #2d2d2d !important;
+}
+
+html.dark .bg-gray-50 {
+  background-color: #333 !important;
+}
+
+html.dark .hover\:bg-gray-100:hover {
+  background-color: #333 !important;
+}

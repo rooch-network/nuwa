@@ -3,6 +3,7 @@ import React from 'react';
 interface IconProps {
   size?: 'small' | 'medium' | 'large';
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export const BoltIcon: React.FC<IconProps> = ({ size = 'medium', className = '' }) => {
