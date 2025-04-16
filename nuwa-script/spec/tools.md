@@ -106,6 +106,8 @@ const getUserFunc: ToolFunction = async (args, context) => {
 
 An optional context object can be passed to the `ToolFunction` during execution. This provides a way for tools to interact with the interpreter's state or access other relevant information.
 
+**Purpose:** The primary purpose of the `ToolContext` is to enable **state awareness** for the AI agent generating or interacting with the script. By allowing tools to read and write to a shared state managed by the `ToolRegistry`, subsequent operations (including AI prompt generation) can be informed by the results or effects of previous tool calls within the same execution session. This allows for more complex, multi-step tasks where context needs to be maintained.
+
 **Interface:**
 
 ```typescript
@@ -138,19 +140,22 @@ interface StateValueWithMetadata {
 }
 ```
 
-**State Interaction:** The primary use of the context is to allow tools to read from and write to a shared key-value state managed by the `ToolRegistry`. This enables tools to share information or maintain state across multiple `CALL`s within a single script execution.
+**State Interaction:** Tools use the `setState`, `getStateValue`, etc., methods to interact with the shared key-value state. This state acts as a short-term memory for the script execution, allowing information to flow between different tool calls. For example, one tool might fetch data, and another tool might process that data based on a state variable set by the first tool.
 
-**Metadata:** Tools can optionally associate metadata (like descriptions and formatters) with state variables, which can be useful for observability or generating prompts for AI models.
+**Metadata:** Tools can optionally associate metadata (like descriptions and formatters) with state variables. This metadata is not typically used by the script logic itself but can be valuable for external systems, such as:
+*   **Observability:** Understanding what state variables represent.
+*   **AI Prompt Generation:** Providing descriptions and formatted values to help the AI understand the current state when generating the next script or response.
 
 ## Tool Registry (`ToolRegistry`)
 
-The `ToolRegistry` is the central component responsible for managing tools and state.
+The `ToolRegistry` is the central component responsible for managing the lifecycle of tools and the shared execution state.
 
 **Key Responsibilities:**
 
 *   **Registration:** Provides a `register(name, schema, execute)` method to add new tools.
 *   **Lookup:** Provides `lookup(name)` and `getSchema(name)` methods for the interpreter to find tools and their schemas.
-*   **State Management:** Manages the shared key-value state accessible via the `ToolContext`.
-*   **Context Creation:** Provides a `createToolContext()` method to generate the context object passed to tool functions.
+*   **State Management (Central Hub):** Acts as the central owner and manager of the shared key-value state. It ensures that all tools interacting via their `ToolContext` are reading from and writing to the same state instance for a given script execution session.
+*   **Context Creation:** Provides a `createToolContext()` method to generate the context object (containing access methods for the registry's state) that gets passed to tool functions.
+*   **(Optional) State Formatting:** The registry might provide helper methods (like `formatStateForPrompt` mentioned in some implementations) to transform the current state into a format suitable for inclusion in AI prompts, further enhancing the AI's state awareness.
 
-Typically, an application using the Nuwa Script interpreter will create a `ToolRegistry` instance, register all the necessary tools, and then pass the registry to the interpreter.
+Typically, an application using the Nuwa Script interpreter will create a `ToolRegistry` instance, potentially initialize some starting state, register all the necessary tools, and then pass the registry to the interpreter. The state then evolves as tools are called during script execution.
