@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ReactNode } from 'react';
-import { BoltIcon, XIcon } from './AppIcons'; // Import BoltIcon and XIcon if used
+import { BoltIcon, XIcon, SunIcon, MoonIcon, LoadingIcon } from './AppIcons'; // Import all required icon components
 
 type ActiveSidePanel = 'examples' | 'tools';
 
@@ -36,68 +36,56 @@ const Layout: React.FC<LayoutProps> = ({
   const [scriptPanelHeight, setScriptPanelHeight] = useState<string>('40%');
   const [isDragging, setIsDragging] = useState(false);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    // Check if preference exists in localStorage
     const savedPreference = localStorage.getItem('darkMode');
     if (savedPreference !== null) {
       return savedPreference === 'true';
     }
-    // Otherwise, use system preference
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  // Apply dark mode class to html element
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-    // Save preference to localStorage
     localStorage.setItem('darkMode', darkMode.toString());
   }, [darkMode]);
 
-  // Update internal state if initial prop changes (though direct control via prop might be better)
   useEffect(() => {
     setActiveSidePanel(initialActiveSidePanel);
   }, [initialActiveSidePanel]);
 
-
   const handleSidebarTabClick = (tab: ActiveSidePanel) => {
     setActiveSidePanel(tab);
-    onSelectSidebarTab(tab); // Notify parent about the change
+    onSelectSidebarTab(tab);
   };
 
-  // Toggle dark mode
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
   };
 
-  // Start resize operation for editor/output panels
   const startResize = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  // Handle resize on drag
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        // Try to find the main container reliably
-        const container = document.querySelector('.main-container-for-resize') as HTMLDivElement; // Add this class to the main div
+        const container = document.querySelector('.main-container-for-resize') as HTMLDivElement;
         if (container) {
           const containerRect = container.getBoundingClientRect();
           const y = e.clientY - containerRect.top;
 
-          const height = containerRect.height || 1; // Avoid division by zero
+          const height = containerRect.height || 1;
           const percentage = (y / height) * 100;
 
-          // Define min/max heights for the script panel
-          const minHeightPercent = 15; // e.g., 15% minimum height
-          const maxHeightPercent = 85; // e.g., 85% maximum height
+          const minHeightPercent = 15;
+          const maxHeightPercent = 85;
 
           const clampedPercentage = Math.min(Math.max(percentage, minHeightPercent), maxHeightPercent);
 
-          // Calculate the script panel height as the remaining percentage
           const scriptPanelHeightPercent = 100 - clampedPercentage;
           setScriptPanelHeight(`${scriptPanelHeightPercent}%`);
         }
@@ -117,14 +105,13 @@ const Layout: React.FC<LayoutProps> = ({
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp); // Ensure listener is removed
+      window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging]); // Dependency array is correct
+  }, [isDragging]);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 main-container-for-resize"> {/* Added class for resize */}
-      {/* Header */}
-      <header className="nuwa-header flex items-center justify-between px-4 py-2 shadow-md bg-white dark:bg-gray-800 flex-shrink-0"> {/* Ensure header doesn't shrink */}
+    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 main-container-for-resize">
+      <header className="nuwa-header flex items-center justify-between px-4 py-2 shadow-md bg-white dark:bg-gray-800 flex-shrink-0">
         <div className="flex items-center space-x-4">
           <a href="https://github.com/rooch-network/nuwa" target="_blank" rel="noopener noreferrer" className="flex items-center">
             <img src="/nuwa-icon.svg" alt="Nuwa Logo" className="logo h-8 w-8" />
@@ -132,7 +119,6 @@ const Layout: React.FC<LayoutProps> = ({
           <div className="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-200">NuwaScript Playground</div>
         </div>
         <div className="flex items-center space-x-3">
-          {/* Dark Mode Toggle Button */}
           <button
             onClick={toggleDarkMode}
             className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -140,19 +126,11 @@ const Layout: React.FC<LayoutProps> = ({
             title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
           >
             {darkMode ? (
-              // Sun icon for light mode
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 theme-toggle-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
+              <SunIcon className="theme-toggle-icon" />
             ) : (
-              // Moon icon for dark mode
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 theme-toggle-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
+              <MoonIcon className="theme-toggle-icon" />
             )}
           </button>
-          
-          {/* Run Button */}
           <button
             onClick={headerProps.onRunClick}
             disabled={headerProps.isRunDisabled}
@@ -160,10 +138,7 @@ const Layout: React.FC<LayoutProps> = ({
           >
             {headerProps.isRunning ? (
               <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <LoadingIcon size="small" className="-ml-1 mr-2 text-white" />
                 Running...
               </>
             ) : (
@@ -175,12 +150,10 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex flex-1 overflow-hidden"> {/* Ensure this flex container takes remaining space */}
-        {/* Left sidebar */}
+      <div className="flex flex-1 overflow-hidden">
         <aside 
           className="fixed-sidebar-width bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col"
-        > {/* Using our custom fixed-sidebar-width class */}
+        >
           <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
               className={`flex-1 py-2 px-4 text-sm font-medium text-center ${activeSidePanel === 'examples' ? 'bg-gray-100 dark:bg-gray-700 text-brand-primary' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
@@ -200,49 +173,41 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
         </aside>
 
-        {/* Middle and right content area */}
-        <main className="flex-1 flex flex-col overflow-hidden"> {/* Main area takes remaining horizontal space */}
-          <div className="flex flex-1 overflow-hidden"> {/* This inner flex handles horizontal layout */}
-
-            {/* Main application panel (takes available space) */}
-            <div className="flex-1 flex flex-col main-panel min-w-[600px]"> {/* Removed overflow-hidden */}
-              {/* Top part: Output/Canvas */}
-              <div className="flex-1 overflow-hidden relative bg-white flex flex-col"> {/* Ensure this takes space and allows children to flex */}
-                <div className="flex items-center px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0"> {/* Panel header */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex-1 flex flex-col main-panel min-w-[600px]">
+              <div className="flex-1 overflow-hidden relative bg-white flex flex-col">
+                <div className="flex items-center px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
                   <BoltIcon size="small" className="text-gray-700 mr-2 w-4 h-4" />
                   <span className="text-sm text-gray-700">{mainPanelTitle}</span>
                 </div>
-                 {/* Content area: Needs to fill remaining space */}
-                <div className="flex-1 p-4 bg-white overflow-auto flex flex-col"> {/* Use flex-1 to grow, flex-col */}
+                <div className="flex-1 p-4 bg-white overflow-auto flex flex-col">
                     {mainPanelContent}
                 </div>
               </div>
 
-              {/* Bottom part: Script Panel (controlled height) */}
-              <div className="border-t border-gray-200 flex flex-col" style={{ height: scriptPanelHeight }}> {/* Use flex-col here */}
+              <div className="border-t border-gray-200 flex flex-col" style={{ height: scriptPanelHeight }}>
                 <div
                   className="resize-handle cursor-ns-resize w-full h-1 bg-gray-200 hover:bg-blue-300 flex-shrink-0"
                   onMouseDown={startResize}
                 ></div>
-                <div className="px-4 py-1 bg-white border-b border-gray-200 text-sm text-gray-700 flex justify-between items-center flex-shrink-0"> {/* Panel header */}
+                <div className="px-4 py-1 bg-white border-b border-gray-200 text-sm text-gray-700 flex justify-between items-center flex-shrink-0">
                   <div>{scriptPanelTitle}</div>
                   <button
-                    onClick={() => setScriptPanelHeight('40%')} // Reset height
-                    className="text-gray-500 hover:text-gray-700 p-1" // Added padding for easier clicking
+                    onClick={() => setScriptPanelHeight('40%')}
+                    className="text-gray-500 hover:text-gray-700 p-1"
                   >
                     <XIcon size="small" className="reset-icon" style={{ width: '16px', height: '16px', display: 'inline-block' }} />
                   </button>
                 </div>
-                 {/* Editor Content: Needs to fill remaining space */}
-                <div className="flex-1 h-full"> {/* Use flex-1 to fill space, add h-full, remove overflow-hidden */}
+                <div className="flex-1 h-full">
                   {scriptPanelContent}
                 </div>
               </div>
             </div>
 
-            {/* AI Chat panel (fixed width) */}
-            <div className="w-80 min-w-[320px] max-w-xs border-l border-gray-200 bg-white overflow-hidden flex flex-col flex-shrink-0"> {/* Ensure fixed width and no shrinking */}
-              <div className="p-4 h-full flex flex-col"> {/* Ensure chat content fills height */}
+            <div className="w-80 min-w-[320px] max-w-xs border-l border-gray-200 bg-white overflow-hidden flex flex-col flex-shrink-0">
+              <div className="h-full flex flex-col">
                 {chatPanelContent}
               </div>
             </div>
@@ -253,4 +218,4 @@ const Layout: React.FC<LayoutProps> = ({
   );
 };
 
-export default Layout; 
+export default Layout;
