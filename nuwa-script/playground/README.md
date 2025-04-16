@@ -68,4 +68,4 @@ You can easily add new scenarios:
 
 ## License
 
-[MIT](LICENSE) is assumed if no specific license file is present.
+This project is licensed under the Apache License v2.0. See the [LICENSE](../../LICENSE) file in the root directory for details.

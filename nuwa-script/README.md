@@ -122,4 +122,8 @@ Read the detailed discussion in the [**Security Model Specification**](./spec/se
 
 ---
 
+## 📜 License
+
+This project is licensed under the Apache License v2.0. See the [LICENSE](../LICENSE) file for details.
+
 Let's define the next generation of executable AI intent together!
