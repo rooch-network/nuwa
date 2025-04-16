@@ -1,76 +1,89 @@
-// Defines the possible types of values during NuwaScript execution.
-export type NuwaValue =
+// Defines the standard JSON value types.
+export type JsonValue =
   | string
-  | number // Use standard JavaScript number type (IEEE 754 double)
+  | number
   | boolean
   | null
-  | NuwaValue[] // Represents lists/arrays
-  | NuwaObject; // Represents objects/maps
+  | JsonValue[] // Represents JSON arrays
+  | { [key: string]: JsonValue }; // Represents JSON objects
 
-// Explicit type for NuwaScript objects for clarity
-export type NuwaObject = { [key: string]: NuwaValue };
+// Remove NuwaObject type, use { [key: string]: JsonValue } directly
+// export type NuwaObject = { [key: string]: JsonValue };
 
 // --- Type Checking Helper Functions ---
 
-export function isNuwaObject(value: NuwaValue): value is NuwaObject {
+// Renamed from isNuwaObject
+export function isJsonObject(value: JsonValue | undefined): value is { [key: string]: JsonValue } {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function isNuwaList(value: NuwaValue): value is NuwaValue[] {
+// Renamed from isNuwaList
+export function isJsonArray(value: JsonValue | undefined): value is JsonValue[] {
   return Array.isArray(value);
 }
 
-export function isNuwaString(value: NuwaValue): value is string {
+// Renamed from isNuwaString
+export function isString(value: JsonValue | undefined): value is string {
   return typeof value === 'string';
 }
 
-export function isNuwaNumber(value: NuwaValue): value is number {
+// Renamed from isNuwaNumber
+export function isNumber(value: JsonValue | undefined): value is number {
   return typeof value === 'number';
 }
 
-export function isNuwaBoolean(value: NuwaValue): value is boolean {
+// Renamed from isNuwaBoolean
+export function isBoolean(value: JsonValue | undefined): value is boolean {
   return typeof value === 'boolean';
 }
 
-export function isNuwaNull(value: NuwaValue): value is null {
+// Renamed from isNuwaNull
+export function isNull(value: JsonValue | undefined): value is null {
     return value === null;
 }
 
 // --- Equality Comparison ---
-// Handles nested structures. Be cautious with circular references if they become possible.
-export function nuwaValuesAreEqual(v1: NuwaValue, v2: NuwaValue): boolean {
+// Update signature to use JsonValue
+export function jsonValuesAreEqual(v1: JsonValue | undefined, v2: JsonValue | undefined): boolean {
   if (v1 === v2) {
     return true; // Handles primitives and null comparison, plus same object reference
   }
 
+  // If one is undefined, the other must be too for equality
+  if (v1 === undefined || v2 === undefined) {
+      return v1 === v2;
+  }
+
   if (typeof v1 !== typeof v2) {
-    return false; // Different types
+    return false; // Different types (and neither is undefined)
   }
 
   if (v1 === null || v2 === null) {
       return v1 === v2; // Already covered by === but explicit
   }
 
-  if (isNuwaList(v1) && isNuwaList(v2)) {
+  if (isJsonArray(v1) && isJsonArray(v2)) {
     if (v1.length !== v2.length) {
       return false;
     }
     for (let i = 0; i < v1.length; i++) {
-      if (!nuwaValuesAreEqual(v1[i]!, v2[i]!)) {
+      // Recursive call
+      if (!jsonValuesAreEqual(v1[i], v2[i])) {
         return false;
       }
     }
     return true;
   }
 
-  if (isNuwaObject(v1) && isNuwaObject(v2)) {
+  if (isJsonObject(v1) && isJsonObject(v2)) {
     const keys1 = Object.keys(v1);
     const keys2 = Object.keys(v2);
     if (keys1.length !== keys2.length) {
       return false;
     }
     for (const key of keys1) {
-      if (!keys2.includes(key) || !nuwaValuesAreEqual(v1[key]!, v2[key]!)) {
+      // Recursive call
+      if (!keys2.includes(key) || !jsonValuesAreEqual(v1[key], v2[key])) {
         return false;
       }
     }
@@ -82,37 +95,42 @@ export function nuwaValuesAreEqual(v1: NuwaValue, v2: NuwaValue): boolean {
 }
 
 // --- String Representation (for PRINT or debugging) ---
-// Allow undefined as input, return e.g., "undefined" or empty string?
-// Let's return "undefined" for consistency, though null returns "NULL".
-export function nuwaValueToString(value: NuwaValue | undefined): string {
+// Update signature to use JsonValue | undefined
+// Renamed from nuwaValueToString
+export function jsonValueToString(value: JsonValue | undefined): string {
     if (value === undefined) {
-        return 'undefined'; // Or perhaps '' based on desired behavior?
+        return 'undefined';
     }
     if (value === null) {
         return 'NULL';
     }
     if (typeof value === 'string') {
-        return value; // Return string directly
+        // Maybe add quotes for clarity?
+        // return JSON.stringify(value);
+        return value; // Keep simple string return for now
     }
     if (typeof value === 'number') {
         return String(value);
     }
     if (typeof value === 'boolean') {
-        return value ? 'TRUE' : 'FALSE'; // Use uppercase literals?
+        return value ? 'TRUE' : 'FALSE';
     }
-    if (isNuwaList(value)) {
+    if (isJsonArray(value)) {
         // Recursive call for list elements
-        const listItems = value.map(item => nuwaValueToString(item));
+        const listItems = value.map(item => jsonValueToString(item));
         return `[${listItems.join(', ')}]`;
     }
-    if (isNuwaObject(value)) {
+    if (isJsonObject(value)) {
         // Recursive call for object values
         const objectEntries = Object.entries(value)
-            .map(([key, val]) => `${key}: ${nuwaValueToString(val)}`); // Assuming keys are simple strings
+            .map(([key, val]) => `${key}: ${jsonValueToString(val)}`);
         return `{${objectEntries.join(', ')}}`;
     }
 
     // Fallback for any unexpected case (should be unreachable given type definition)
-    const exhaustiveCheck: never = value;
-    return `[Unknown NuwaValue: ${exhaustiveCheck}]`;
+    // Need to handle the case where value is defined but not one of the above.
+    // Since JsonValue covers all standard JS types returned by typeof, this is tricky.
+    // Let's assume it won't happen with proper usage.
+    // const exhaustiveCheck: never = value; // This won't work directly anymore
+    return `[Unknown JSON Value: ${typeof value}]`;
 }

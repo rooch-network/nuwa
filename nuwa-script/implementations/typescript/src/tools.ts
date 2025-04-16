@@ -1,17 +1,12 @@
-import { NuwaValue } from './values'; // Import the runtime value type
+// import { NuwaValue } from './values'; // Import the runtime value type
+import { Scope } from './interpreter'; // For ToolContext potentially
+import { JsonValue } from './values'; // Import JsonValue
 
 /**
  * Defines the expected type of a tool parameter or return value.
  * Using strings for now; could use an enum or type literals.
  */
-export type NuwaType =
-  | 'string'
-  | 'number'
-  | 'boolean'
-  | 'null'
-  | 'list' // Represents NuwaValue[]
-  | 'object' // Represents NuwaObject
-  | 'any'; // Represents any NuwaValue
+export type NuwaType = 'string' | 'number' | 'boolean' | 'null' | 'array' | 'object' | 'any';
 
 /**
  * Describes a parameter expected by a tool.
@@ -37,24 +32,18 @@ export interface ToolSchema {
  * Defines the structure of the evaluated arguments passed to a tool function.
  * Maps parameter name to its runtime NuwaValue.
  */
-export type EvaluatedToolArguments = Record<string, NuwaValue>;
-
-/**
- * Defines a type for storing state information.
- * Maps a state key to its value.
- */
-export type StateStore = Map<string, NuwaValue>;
+export type EvaluatedToolArguments = { [key: string]: JsonValue | undefined }; // Use JsonValue
 
 /**
  * A safer version of StateStore that can handle undefined values.
  */
 export class SafeStateStore {
-  private store: Map<string, NuwaValue> = new Map();
+  private store: Map<string, JsonValue> = new Map();
   
   /**
    * Sets a value in the store, skipping undefined values
    */
-  set(key: string, value: NuwaValue | undefined): void {
+  set(key: string, value: JsonValue | undefined): void {
     if (value === undefined) {
       console.warn(`Attempted to set undefined value for state key: ${key}`);
       return;
@@ -65,7 +54,7 @@ export class SafeStateStore {
   /**
    * Gets a value from the store
    */
-  get(key: string): NuwaValue | undefined {
+  get(key: string): JsonValue | undefined {
     return this.store.get(key);
   }
   
@@ -93,48 +82,38 @@ export class SafeStateStore {
   /**
    * Returns entries from the store
    */
-  entries(): IterableIterator<[string, NuwaValue]> {
+  entries(): IterableIterator<[string, JsonValue]> {
     return this.store.entries();
   }
 }
 
 /**
- * Defines metadata for state values, providing description and formatting capabilities.
+ * Represents additional metadata associated with a state value.
  */
 export interface StateMetadata {
-  /**
-   * Description of the state value, explaining its meaning and purpose.
-   */
-  description: string;
-  
-  /**
-   * Optional formatter function to convert the state value to a more readable string.
-   */
-  formatter?: (value: NuwaValue) => string;
+    description?: string;
+    formatter?: (value: JsonValue) => string;
+    // Add other metadata like visibility, persistence hints, etc.
 }
 
 /**
- * Extended state value with optional metadata.
- * This is a separate structure and not meant to be stored directly in the StateStore.
+ * Represents a state value bundled with its metadata, used for setting state.
  */
 export interface StateValueWithMetadata {
-  /**
-   * The actual state value to be stored.
-   */
-  value: NuwaValue;
-  
-  /**
-   * Optional metadata for the state value.
-   * This is stored separately and not as part of the state value.
-   */
-  metadata?: StateMetadata;
+    value: JsonValue; // Use JsonValue
+    metadata: StateMetadata;
 }
 
 /**
  * Function context containing additional information like state that can be passed to tool functions.
  */
 export interface ToolContext {
-  state: StateStore;
+  setState: (key: string, value: JsonValue) => void; // Use JsonValue
+  getStateValue: (key: string) => JsonValue | undefined; // Use JsonValue
+  hasState: (key: string) => boolean;
+  getAllState: () => Map<string, JsonValue>; // Use JsonValue
+  clearState: () => void;
+  // Potentially add other context info like current scope (read-only?) or user info
 }
 
 /**
@@ -144,8 +123,8 @@ export interface ToolContext {
  */
 export type ToolFunction = (
     args: EvaluatedToolArguments,
-    context?: ToolContext
-) => NuwaValue | Promise<NuwaValue>;
+    context: ToolContext
+) => JsonValue | Promise<JsonValue>; // Use JsonValue
 
 
 /**
@@ -161,7 +140,7 @@ export interface RegisteredTool {
  */
 export class ToolRegistry {
   private tools: Map<string, RegisteredTool> = new Map();
-  private stateStore: StateStore = new Map();
+  private state: Map<string, JsonValue> = new Map(); // Use JsonValue for state
   private stateMetadata: Map<string, StateMetadata> = new Map();
 
   /**
@@ -218,8 +197,8 @@ export class ToolRegistry {
    * Gets the current state store.
    * @returns The current state store.
    */
-  getState(): StateStore {
-    return this.stateStore;
+  getState(): Map<string, JsonValue> { // Use JsonValue
+    return this.state;
   }
 
   /**
@@ -228,7 +207,11 @@ export class ToolRegistry {
    */
   createToolContext(): ToolContext {
     return {
-      state: this.stateStore
+      setState: this.setState.bind(this),
+      getStateValue: this.getStateValue.bind(this),
+      hasState: this.hasState.bind(this),
+      getAllState: this.getState.bind(this),
+      clearState: this.clearState.bind(this),
     };
   }
 
@@ -237,7 +220,7 @@ export class ToolRegistry {
    * @param key - The state key.
    * @param valueOrObject - The state value or an object containing value and metadata.
    */
-  setState(key: string, valueOrObject: NuwaValue | StateValueWithMetadata | undefined): void {
+  setState(key: string, valueOrObject: JsonValue | StateValueWithMetadata | undefined): void {
     // Skip if undefined
     if (valueOrObject === undefined) {
       console.warn(`Attempted to set undefined value for state key: ${key}`);
@@ -251,15 +234,15 @@ export class ToolRegistry {
         (valueOrObject as any).metadata !== undefined) {
       // If provided with a StateValueWithMetadata, extract value and metadata
       const { value, metadata } = valueOrObject as StateValueWithMetadata;
-      this.stateStore.set(key, value);
+      this.state.set(key, value);
       
       // If metadata is provided, register it
       if (metadata) {
         this.stateMetadata.set(key, metadata);
       }
     } else {
-      // Handle as direct NuwaValue
-      this.stateStore.set(key, valueOrObject as NuwaValue);
+      // Handle as direct JsonValue
+      this.state.set(key, valueOrObject as JsonValue);
     }
   }
 
@@ -268,8 +251,8 @@ export class ToolRegistry {
    * @param key - The state key.
    * @returns The state value or undefined if not found.
    */
-  getStateValue(key: string): NuwaValue | undefined {
-    return this.stateStore.get(key);
+  getStateValue(key: string): JsonValue | undefined { // Use JsonValue
+    return this.state.get(key);
   }
 
   /**
@@ -278,14 +261,14 @@ export class ToolRegistry {
    * @returns True if the state value exists, false otherwise.
    */
   hasState(key: string): boolean {
-    return this.stateStore.has(key);
+    return this.state.has(key);
   }
 
   /**
    * Clears all state values.
    */
   clearState(): void {
-    this.stateStore.clear();
+    this.state.clear();
     this.stateMetadata.clear();
   }
 
@@ -303,11 +286,11 @@ export class ToolRegistry {
    * @returns A formatted string representation of the current state.
    */
   formatStateForPrompt(): string {
-    if (this.stateStore.size === 0) {
+    if (this.state.size === 0) {
       return "No state information available.";
     }
 
-    const entries = Array.from(this.stateStore.entries());
+    const entries = Array.from(this.state.entries());
     return entries.map(([key, value]) => {
       const metadata = this.stateMetadata.get(key);
       
@@ -330,7 +313,7 @@ export class ToolRegistry {
    * @param value - The state value.
    * @returns Formatted value string.
    */
-  private defaultFormatter(key: string, value: NuwaValue): string {
+  private defaultFormatter(key: string, value: JsonValue): string {
     // Handle timestamps
     if (key.endsWith('_time') && typeof value === 'number') {
       const date = new Date(value);

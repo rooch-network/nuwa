@@ -1,5 +1,5 @@
 import { BaseNode } from './ast'; // Optional: include node for location info
-import { NuwaValue } from './values'; // Optional: include value details
+import { JsonValue } from './values'; // Optional: include value details
 
 /**
  * Base class for all NuwaScript interpreter errors.
@@ -31,15 +31,15 @@ export class RuntimeError extends InterpreterError {
  * Error related to type mismatches during operations.
  */
 export class TypeError extends InterpreterError {
-    public leftValue?: NuwaValue;
-    public rightValue?: NuwaValue;
+    public leftValue?: JsonValue;
+    public rightValue?: JsonValue;
     public operator?: string;
 
     constructor(
         message: string,
         details?: {
-            leftValue?: NuwaValue;
-            rightValue?: NuwaValue;
+            leftValue?: JsonValue;
+            rightValue?: JsonValue;
             operator?: string;
             node?: BaseNode;
         }

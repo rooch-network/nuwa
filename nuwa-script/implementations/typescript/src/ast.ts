@@ -1,7 +1,11 @@
+import { JsonValue } from './values'; // Import JsonValue
+
 /**
  * Represents the different types of runtime values NuwaScript deals with.
  * This is defined more concretely in values.ts, but needed here for Literal types.
  */
+// Remove NuwaValue definition here
+/*
 export type NuwaValue =
   | string
   | number
@@ -9,6 +13,7 @@ export type NuwaValue =
   | null
   | NuwaValue[]
   | { [key: string]: NuwaValue };
+*/
 
 // --- Base Nodes ---
 
@@ -34,7 +39,7 @@ export type Expression =
 
 export interface LiteralExpr extends BaseNode {
   kind: 'LiteralExpr';
-  value: NuwaValue;
+  value: JsonValue;
 }
 
 export interface VariableExpr extends BaseNode {

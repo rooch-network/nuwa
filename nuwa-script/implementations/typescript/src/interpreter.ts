@@ -1,8 +1,8 @@
 import * as AST from './ast';
 import { ToolRegistry, RegisteredTool, EvaluatedToolArguments, ToolContext } from './tools';
 import {
-    NuwaValue, NuwaObject, nuwaValuesAreEqual, isNuwaBoolean, isNuwaList,
-    isNuwaNumber, isNuwaObject, nuwaValueToString
+    JsonValue, isJsonObject, jsonValuesAreEqual, isBoolean, isJsonArray,
+    isNumber, isString, jsonValueToString, isNull
 } from './values';
 import {
     InterpreterError, RuntimeError, TypeError, UndefinedVariableError,
@@ -18,12 +18,12 @@ import { isArrayIndexExpression, isMemberAccessExpression, isListLiteralExpr, is
 // They can return a value directly or a promise (for potential future async built-ins)
 // Note: Currently NOW and FORMAT are sync.
 type BuiltinFunctionImplementation = (
-    args: NuwaValue[],
+    args: JsonValue[],
     callExpr: AST.FunctionCallExpr
-) => NuwaValue | Promise<NuwaValue>;
+) => JsonValue | Promise<JsonValue>;
 
 // Type for the variable scope
-export type Scope = Map<string, NuwaValue>;
+export type Scope = Map<string, JsonValue>;
 // Type for the output handler (e.g., for PRINT)
 export type OutputHandler = (output: string) => void;
 
@@ -61,8 +61,8 @@ export class Interpreter {
                 throw new RuntimeError(`Function PRINT() expects exactly 1 argument, got ${args.length}`, callExpr);
             }
             const valueToPrint = args[0];
-            // Use nuwaValueToString (which now handles undefined safely)
-            this.outputHandler(nuwaValueToString(valueToPrint));
+            // Use jsonValueToString (which now handles undefined safely)
+            this.outputHandler(jsonValueToString(valueToPrint));
             return null; // PRINT function returns null
         });
 
@@ -99,7 +99,7 @@ export class Interpreter {
      * @param key - The state key.
      * @param value - The state value.
      */
-    setState(key: string, value: NuwaValue): void {
+    setState(key: string, value: JsonValue): void {
         this.toolRegistry.setState(key, value);
     }
 
@@ -108,7 +108,7 @@ export class Interpreter {
      * @param key - The state key.
      * @returns The state value or undefined if not found.
      */
-    getStateValue(key: string): NuwaValue | undefined {
+    getStateValue(key: string): JsonValue | undefined {
         return this.toolRegistry.getStateValue(key);
     }
 
@@ -125,7 +125,7 @@ export class Interpreter {
      * Gets all state values from the tool registry.
      * @returns The state store.
      */
-    getAllState(): Map<string, NuwaValue> {
+    getAllState(): Map<string, JsonValue> {
         return this.toolRegistry.getState();
     }
 
@@ -184,7 +184,7 @@ export class Interpreter {
 
     private async executeIfStatement(stmt: AST.IfStatement, scope: Scope): Promise<void> {
         const conditionValue = await this.evaluateExpression(stmt.condition, scope);
-        if (!isNuwaBoolean(conditionValue)) {
+        if (!isBoolean(conditionValue)) {
             throw new InvalidConditionError(`IF condition evaluated to type ${typeof conditionValue}, expected boolean.`, stmt.condition);
         }
 
@@ -197,7 +197,7 @@ export class Interpreter {
 
     private async executeForStatement(stmt: AST.ForStatement, scope: Scope): Promise<void> {
         const iterableValue = await this.evaluateExpression(stmt.iterable, scope);
-        if (!isNuwaList(iterableValue)) {
+        if (!isJsonArray(iterableValue)) {
             throw new InvalidIterableError(`FOR loop expected an iterable list, got ${typeof iterableValue}.`, stmt.iterable);
         }
 
@@ -207,7 +207,7 @@ export class Interpreter {
             // variables from outer scopes if names clash, and to handle shadowing correctly.
             // For simplicity now, we just set/unset on the current scope.
             // A more robust implementation uses nested scopes.
-            const old_value = scope.get(stmt.iteratorVariable);
+            const old_value: JsonValue | undefined = scope.get(stmt.iteratorVariable);
             scope.set(stmt.iteratorVariable, item);
 
             try {
@@ -227,7 +227,7 @@ export class Interpreter {
 
     // --- Expression Evaluation ---
 
-    private async evaluateExpression(expression: AST.Expression, scope: Scope): Promise<NuwaValue> {
+    private async evaluateExpression(expression: AST.Expression, scope: Scope): Promise<JsonValue> {
         switch (expression.kind) {
             case 'LiteralExpr':
                 return expression.value;
@@ -277,7 +277,7 @@ export class Interpreter {
         }
     }
 
-    private evaluateVariableExpr(expr: AST.VariableExpr, scope: Scope): NuwaValue {
+    private evaluateVariableExpr(expr: AST.VariableExpr, scope: Scope): JsonValue {
         const name = expr.name;
         // --- IMPORTANT ---
         // The logic for dotted names (e.g., obj.prop.sub) is now handled by
@@ -292,22 +292,22 @@ export class Interpreter {
         return value;
     }
 
-    private async evaluateBinaryOpExpr(expr: AST.BinaryOpExpr, scope: Scope): Promise<NuwaValue> {
+    private async evaluateBinaryOpExpr(expr: AST.BinaryOpExpr, scope: Scope): Promise<JsonValue> {
         const left = await this.evaluateExpression(expr.left, scope);
         const right = await this.evaluateExpression(expr.right, scope);
         const op = expr.operator;
 
         switch (op) {
             // Equality (using deep equality check)
-            case '==': return nuwaValuesAreEqual(left, right);
-            case '!=': return !nuwaValuesAreEqual(left, right);
+            case '==': return jsonValuesAreEqual(left, right);
+            case '!=': return !jsonValuesAreEqual(left, right);
 
             // Comparisons (expect numbers)
             case '>':
             case '<':
             case '>=':
             case '<=':
-                if (!isNuwaNumber(left) || !isNuwaNumber(right)) {
+                if (!isNumber(left) || !isNumber(right)) {
                     throw new TypeError(`Comparison operator '${op}' requires number operands, got ${typeof left} and ${typeof right}.`, {leftValue: left, rightValue: right, operator: op, node: expr});
                 }
                 if (op === '>') return left > right;
@@ -318,12 +318,12 @@ export class Interpreter {
 
             // Logical (expect booleans)
             case 'AND':
-                if (!isNuwaBoolean(left) || !isNuwaBoolean(right)) {
+                if (!isBoolean(left) || !isBoolean(right)) {
                     throw new TypeError(`Logical operator 'AND' requires boolean operands, got ${typeof left} and ${typeof right}.`, {leftValue: left, rightValue: right, operator: op, node: expr});
                 }
                 return left && right;
             case 'OR':
-                 if (!isNuwaBoolean(left) || !isNuwaBoolean(right)) {
+                 if (!isBoolean(left) || !isBoolean(right)) {
                     throw new TypeError(`Logical operator 'OR' requires boolean operands, got ${typeof left} and ${typeof right}.`, {leftValue: left, rightValue: right, operator: op, node: expr});
                 }
                 return left || right;
@@ -333,7 +333,7 @@ export class Interpreter {
             case '-':
             case '*':
             case '/':
-                 if (!isNuwaNumber(left) || !isNuwaNumber(right)) {
+                 if (!isNumber(left) || !isNumber(right)) {
                     throw new TypeError(`Arithmetic operator '${op}' requires number operands, got ${typeof left} and ${typeof right}.`, {leftValue: left, rightValue: right, operator: op, node: expr});
                 }
                 if (op === '+') return left + right;
@@ -350,23 +350,23 @@ export class Interpreter {
         throw new UnsupportedOperationError(`Binary operator '${op}' is not supported.`, expr);
     }
 
-     private async evaluateUnaryOpExpr(expr: AST.UnaryOpExpr, scope: Scope): Promise<NuwaValue> {
+     private async evaluateUnaryOpExpr(expr: AST.UnaryOpExpr, scope: Scope): Promise<JsonValue> {
         const operand = await this.evaluateExpression(expr.operand, scope);
         const op = expr.operator;
 
         switch (op) {
             case 'NOT':
-                if (!isNuwaBoolean(operand)) {
+                if (!isBoolean(operand)) {
                      throw new TypeError(`Logical operator 'NOT' requires a boolean operand, got ${typeof operand}.`, {leftValue: operand, operator: op, node: expr});
                 }
                 return !operand;
             case '-': // Handle unary minus
-                 if (!isNuwaNumber(operand)) {
+                 if (!isNumber(operand)) {
                     throw new TypeError(`Unary operator '-' requires a number operand, got ${typeof operand}.`, {leftValue: operand, operator: op, node: expr});
                 }
                 return -operand;
             case '+': // Handle unary plus
-                if (!isNuwaNumber(operand)) {
+                if (!isNumber(operand)) {
                     throw new TypeError(`Unary operator '+' requires a number operand, got ${typeof operand}.`, {leftValue: operand, operator: op, node: expr});
                 }
                 return +operand; // Or just operand, as unary plus usually doesn't change number value
@@ -375,11 +375,11 @@ export class Interpreter {
         throw new UnsupportedOperationError(`Unary operator '${op}' is not supported.`, expr);
     }
 
-    private async evaluateFunctionCallExpr(expr: AST.FunctionCallExpr, scope: Scope): Promise<NuwaValue> {
+    private async evaluateFunctionCallExpr(expr: AST.FunctionCallExpr, scope: Scope): Promise<JsonValue> {
         const functionName = expr.functionName;
 
         // Evaluate arguments first
-        const evaluatedArgs = [];
+        const evaluatedArgs: JsonValue[] = [];
         for (const arg of expr.arguments) {
             evaluatedArgs.push(await this.evaluateExpression(arg, scope));
         }
@@ -398,7 +398,7 @@ export class Interpreter {
     }
 
     // Helper function for FORMAT logic
-    private evaluateFormatFunction(args: NuwaValue[], callExpr: AST.FunctionCallExpr): string {
+    private evaluateFormatFunction(args: JsonValue[], callExpr: AST.FunctionCallExpr): string {
         if (args.length !== 2) {
             throw new RuntimeError(`FORMAT function expects 2 arguments (template string, values object), got ${args.length}`, callExpr);
         }
@@ -406,23 +406,23 @@ export class Interpreter {
         const templateArg = args[0];
         const valuesArg = args[1];
 
-        if (typeof templateArg !== 'string') {
+        if (!isString(templateArg)) {
             throw new TypeError(`FORMAT function's first argument must be a string, got ${typeof templateArg}`, { node: callExpr.arguments[0] });
         }
 
-        // Explicitly check if valuesArg is undefined to satisfy the type checker before calling isNuwaObject
+        // Explicitly check if valuesArg is undefined to satisfy the type checker before calling isJsonObject
         if (valuesArg === undefined) {
              // This case should logically be unreachable due to the args.length check above
             throw new RuntimeError(`FORMAT function received undefined second argument (internal error).`, callExpr);
         }
 
-        // Now valuesArg is narrowed down to NuwaValue, so the call is safe
-        if (!isNuwaObject(valuesArg)) {
+        // Now valuesArg is narrowed down to JsonValue, so the call is safe
+        if (!isJsonObject(valuesArg)) {
             throw new TypeError(`FORMAT function's second argument must be an object, got ${typeof valuesArg}`, { node: callExpr.arguments[1] });
         }
 
         const templateString = templateArg;
-        const valuesObject = valuesArg; // Already checked as NuwaObject
+        const valuesObject = valuesArg; // Already checked as { [key: string]: JsonValue }
 
         // Regex to find {key}, {{, or }}
         // Define regex only once
@@ -445,9 +445,9 @@ export class Interpreter {
                 if (Object.prototype.hasOwnProperty.call(valuesObject, key)) {
                     const valueToFormat = valuesObject[key];
                     // Remove the explicit undefined check as hasOwnProperty confirms presence
-                    // Use non-null assertion (!) to satisfy TypeScript since NuwaValue doesn't include undefined
-                    // Ensure nuwaValueToString is imported from './values'
-                    result += nuwaValueToString(valueToFormat!); // Use existing helper from values.ts
+                    // Use non-null assertion (!) to satisfy TypeScript since JsonValue doesn't include undefined
+                    // Ensure jsonValueToString is imported from './values'
+                    result += jsonValueToString(valueToFormat!); // Use existing helper from values.ts
                 } else {
                     // Provide context in error message
                     throw new RuntimeError(`Key '${key}' not found in FORMAT arguments object`, callExpr.arguments[1]);
@@ -462,18 +462,18 @@ export class Interpreter {
         return result; // Return the final string directly
     }
 
-    private async evaluateToolCallExpr(expr: AST.ToolCallExpr, scope: Scope): Promise<NuwaValue> {
+    private async evaluateToolCallExpr(expr: AST.ToolCallExpr, scope: Scope): Promise<JsonValue> {
         return this.executeToolCall(expr.toolName, expr.arguments, scope);
     }
 
     // NEW METHOD: Evaluates a MemberAccessExpression (e.g., expr.property)
-    private async evaluateMemberAccessExpression(expr: AST.MemberAccessExpr, scope: Scope): Promise<NuwaValue> {
+    private async evaluateMemberAccessExpression(expr: AST.MemberAccessExpr, scope: Scope): Promise<JsonValue> {
         // 1. Evaluate the object part of the expression
         const objectValue = await this.evaluateExpression(expr.object, scope);
         const propertyName = expr.property;
 
         // 2. Check if the result is actually an object
-        if (!isNuwaObject(objectValue)) {
+        if (!isJsonObject(objectValue)) {
             // Provide context in the error message
              const objectExprString = expr.object.kind; // Basic representation
             throw new MemberAccessError(`Cannot access property '${propertyName}' on non-object value resulting from '${objectExprString}' (type: ${typeof objectValue}).`, expr);
@@ -497,21 +497,21 @@ export class Interpreter {
     }
 
     // NEW METHOD: Evaluates an ArrayIndexExpression
-    private async evaluateArrayIndexExpression(expr: AST.ArrayIndexExpression, scope: Scope): Promise<NuwaValue> {
+    private async evaluateArrayIndexExpression(expr: AST.ArrayIndexExpression, scope: Scope): Promise<JsonValue> {
         const objectValue = await this.evaluateExpression(expr.object, scope);
         const indexValue = await this.evaluateExpression(expr.index, scope);
 
         // Type checking
-        if (!isNuwaList(objectValue)) {
+        if (!isJsonArray(objectValue)) {
             throw new TypeError(`Cannot access index on non-list value (type: ${typeof objectValue}).`, { node: expr.object });
         }
-        if (!isNuwaNumber(indexValue) || !Number.isInteger(indexValue)) {
+        if (!isNumber(indexValue) || !Number.isInteger(indexValue)) {
             throw new TypeError(`List index must be an integer, got ${typeof indexValue} (${indexValue}).`, { node: expr.index });
         }
 
         // Bounds checking
         const index = indexValue as number; // Safe cast after checks
-        const array = objectValue as NuwaValue[]; // Safe cast after checks
+        const array = objectValue as JsonValue[]; // Safe cast after checks
         if (index < 0 || index >= array.length) {
             throw new IndexOutOfBoundsError(index, array.length, expr);
         }
@@ -522,8 +522,8 @@ export class Interpreter {
     }
 
     // NEW METHOD: Evaluates a ListLiteralExpr
-    private async evaluateListLiteralExpr(expr: AST.ListLiteralExpr, scope: Scope): Promise<NuwaValue[]> {
-      const evaluatedElements: NuwaValue[] = [];
+    private async evaluateListLiteralExpr(expr: AST.ListLiteralExpr, scope: Scope): Promise<JsonValue[]> {
+      const evaluatedElements: JsonValue[] = [];
       for (const elementExpr of expr.elements) {
         const evaluatedValue = await this.evaluateExpression(elementExpr, scope);
         evaluatedElements.push(evaluatedValue);
@@ -532,8 +532,8 @@ export class Interpreter {
     }
 
     // NEW METHOD: Evaluates an ObjectLiteralExpr
-    private async evaluateObjectLiteralExpr(expr: AST.ObjectLiteralExpr, scope: Scope): Promise<NuwaObject> {
-      const evaluatedProperties: NuwaObject = {};
+    private async evaluateObjectLiteralExpr(expr: AST.ObjectLiteralExpr, scope: Scope): Promise<{ [key: string]: JsonValue }> {
+      const evaluatedProperties: { [key: string]: JsonValue } = {};
       for (const key in expr.properties) {
         // Ensure hasOwnProperty check for safety, although TS AST structure makes it less critical
         if (Object.prototype.hasOwnProperty.call(expr.properties, key)) {
@@ -566,7 +566,7 @@ export class Interpreter {
         toolName: string,
         argsExpr: Record<string, AST.Expression>,
         scope: Scope
-    ): Promise<NuwaValue> {
+    ): Promise<JsonValue> {
         const tool = this.toolRegistry.lookup(toolName);
         if (!tool) {
             throw new ToolNotFoundError(`Tool '${toolName}' not found.`, {toolName});

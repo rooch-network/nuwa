@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach, it } from '@jest/globals'; // Add Jest types including \'it\'
+import { describe, test, expect, beforeEach, it } from '@jest/globals'; // Add Jest types including 'it'
 import { Interpreter, OutputHandler } from '../src/interpreter';
 import { parse } from '../src/parser'; // Assuming combined lexer/parser export
 import { ToolRegistry, ToolSchema, ToolParameter, ToolFunction, NuwaType } from '../src/tools';
 import { Scope } from '../src/interpreter'; // Assuming Scope type is exported or defined publicly
-import { NuwaValue, NuwaObject } from '../src/values';
+import { JsonValue } from '../src/values';
 import * as Errors from '../src/errors';
 import {
     RuntimeError, TypeError, UndefinedVariableError, IndexOutOfBoundsError,
@@ -14,11 +14,11 @@ import {
 
 interface MockCallLog {
     toolName: string;
-    args: Record<string, NuwaValue>;
+    args: Record<string, JsonValue | undefined>;
 }
 
 // Simple synchronous tool example
-const mockGetPrice: ToolFunction = (args) => {
+const mockGetPrice: ToolFunction = (args, context) => {
     if (args['token'] === 'BTC') return 65000;
     if (args['token'] === 'ETH') return 3500;
     return null;
@@ -30,15 +30,16 @@ const getPriceSchema: ToolSchema = {
 };
 
 // Asynchronous tool example
-const mockSwap: ToolFunction = async (args) => {
+const mockSwap: ToolFunction = async (args, context) => {
     // Simulate async operation
     await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
+    // Use non-null assertion assuming test args are always provided
     return {
         success: true,
-        from: args['from_token'],
-        to: args['to_token'],
-        amount: args['amount']
-    };
+        from: args['from_token']!,
+        to: args['to_token']!,
+        amount: args['amount']!
+    } as JsonValue; // Assert return type is JsonValue (specifically an object)
 };
 const swapSchema: ToolSchema = {
     name: 'swap', description: 'Swap tokens',
@@ -51,7 +52,7 @@ const swapSchema: ToolSchema = {
 };
 
 // Tool that intentionally throws an error
-const mockErrorTool: ToolFunction = (args) => {
+const mockErrorTool: ToolFunction = (args, context) => {
     throw new Error("Tool failed intentionally");
 };
 const errorToolSchema: ToolSchema = {
@@ -76,22 +77,22 @@ describe('NuwaScript Interpreter', () => {
         };
 
         // Register mock tools
-        toolRegistry.register(getPriceSchema.name, getPriceSchema, (args) => {
+        toolRegistry.register(getPriceSchema.name, getPriceSchema, (args, context) => {
             callLog.push({ toolName: getPriceSchema.name, args });
-            return mockGetPrice(args);
+            return mockGetPrice(args, context);
         });
-        toolRegistry.register(swapSchema.name, swapSchema, async (args) => {
+        toolRegistry.register(swapSchema.name, swapSchema, async (args, context) => {
              callLog.push({ toolName: swapSchema.name, args });
-             return await mockSwap(args);
+             return await mockSwap(args, context);
         });
-         toolRegistry.register(errorToolSchema.name, errorToolSchema, (args) => {
+         toolRegistry.register(errorToolSchema.name, errorToolSchema, (args, context) => {
              callLog.push({ toolName: errorToolSchema.name, args });
-             return mockErrorTool(args); // Will throw
+             return mockErrorTool(args, context); // Will throw
         });
     });
 
     // Helper function to run script and return final scope
-    async function runScript(scriptText: string, initialScope?: Record<string, NuwaValue>): Promise<Scope> {
+    async function runScript(scriptText: string, initialScope?: Record<string, JsonValue>): Promise<Scope> {
         const interpreter = new Interpreter(toolRegistry, mockOutputHandler);
         const ast = parse(scriptText); // Use combined parse function
         const initialMap = initialScope ? new Map(Object.entries(initialScope)) : undefined;
@@ -457,7 +458,7 @@ describe('NuwaScript Interpreter', () => {
          // Mock get_list
         toolRegistry.register(
             'get_list',
-            { name: 'get_list', description: '', parameters: [], returns: 'list'},
+            { name: 'get_list', description: '', parameters: [], returns: 'array'},
             () => {
                 callLog.push({ toolName: 'get_list', args: {} });
                 return [10, 20, 30]; // Example list
@@ -531,7 +532,7 @@ describe('Interpreter - Array Indexing', () => {
     // Note: We need to enable list literals in the parser first for these tests!
     // For now, let's assume lists are provided via initial scope.
 
-    async function runScriptAndCheckArrayIndexing(script: string, initialScope: Scope, expectedVar: string, expectedValue: NuwaValue) {
+    async function runScriptAndCheckArrayIndexing(script: string, initialScope: Scope, expectedVar: string, expectedValue: JsonValue) {
         const interpreter = new Interpreter();
         const ast = parse(script);
         const finalScope = await interpreter.execute(ast, initialScope);
@@ -551,7 +552,7 @@ describe('Interpreter - Array Indexing', () => {
 
     beforeEach(() => {
         // Initialize scope with some lists for testing
-        initialScope = new Map<string, NuwaValue>([
+        initialScope = new Map<string, JsonValue>([
             ['myList', [10, "hello", true, null, 20]],
             ['nestedList', [1, [2, 3], 4]],
             ['listOfObjects', [{id: 1, val: 'a'}, {id: 2, val: 'b'}]],
