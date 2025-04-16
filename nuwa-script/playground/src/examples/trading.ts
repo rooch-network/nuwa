@@ -3,12 +3,12 @@ import { ExampleConfig, ComponentStateManager } from '../types/Example';
 import type { 
   ToolSchema, 
   ToolFunction, 
-  NuwaValue,
   EvaluatedToolArguments,
   StateValueWithMetadata,
   ToolRegistry,
   ToolContext
 } from '../services/interpreter';
+import type { JsonValue } from '../../../implementations/typescript/src/values';
 
 // --- Trading State Management ---
 
@@ -103,18 +103,18 @@ const notifyTradingChange = () => {
 // Helper function to create state with metadata
 function createState<T>(value: T, description: string, formatter?: (value: unknown) => string): StateValueWithMetadata {
   return {
-    value: value as unknown as NuwaValue,
+    value: value as unknown as JsonValue,
     metadata: {
       description,
-      formatter: formatter as unknown as ((value: NuwaValue) => string) | undefined
+      formatter: formatter as unknown as ((value: JsonValue) => string) | undefined
     }
   };
 }
 
 // Update trading state in the registry
 export function updateTradingState(context?: ToolContext): void {
-  if (!context?.state) {
-    // If no context or no state in context, try to get global registry
+  if (!context) {
+    // If no context, try to get global registry
     const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
     const registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
     if (!registry) return;
@@ -326,7 +326,7 @@ const getPriceSchema: ToolSchema = {
   returns: 'number'
 };
 
-const getPriceFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<NuwaValue> => {
+const getPriceFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
   const symbol = getArgValue<string>(args, 'symbol', 'string', '');
   if (!symbol) {
     throw new Error('Symbol is required');
@@ -366,7 +366,7 @@ const getBalanceSchema: ToolSchema = {
   returns: 'number'
 };
 
-const getBalanceFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<NuwaValue> => {
+const getBalanceFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
   const symbol = getArgValue<string>(args, 'symbol', 'string', '');
   if (!symbol) {
     return 0;
@@ -391,10 +391,10 @@ const swapSchema: ToolSchema = {
     { name: 'toSymbol', type: 'string', description: 'Target asset symbol to receive', required: true },
     { name: 'amount', type: 'number', description: 'Amount to exchange', required: true }
   ],
-  returns: 'object' // Return type is an object
+  returns: 'object'
 };
 
-const swapFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<NuwaValue> => {
+const swapFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
   const fromSymbol = getArgValue<string>(args, 'fromSymbol', 'string', '');
   const toSymbol = getArgValue<string>(args, 'toSymbol', 'string', '');
   const amount = getArgValue<number>(args, 'amount', 'number', 0);
@@ -460,7 +460,7 @@ const swapFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: To
   addTrade(trade);
   
   // Update state in registry
-  updateTradingState(context);
+  updateTradingState();
   
   // Return trade details
   const result = {
@@ -487,7 +487,7 @@ const getMarketSentimentSchema: ToolSchema = {
   returns: 'number'
 };
 
-const getMarketSentimentFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<NuwaValue> => {
+const getMarketSentimentFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
   const symbol = getArgValue<string>(args, 'symbol', 'string', '');
   if (!symbol) {
     return 0;
@@ -503,7 +503,7 @@ const getMarketSentimentFunc: ToolFunction = async (args: EvaluatedToolArguments
   };
   
   // Update registry state
-  updateTradingState(context);
+  updateTradingState();
   
   return sentiments[symbol] || 0;
 };
@@ -529,23 +529,18 @@ LET INVESTMENT = 1000  // USDC investment amount
 // Get BTC and ETH prices using tool call expression
 LET btcPrice = CALL getPrice {symbol: "BTC"}
 LET ethPrice = CALL getPrice {symbol: "ETH"}
-PRINT("BTC Price:")
-PRINT(btcPrice)
-PRINT("ETH Price:")
-PRINT(ethPrice)
+PRINT(FORMAT("BTC Price: {price}", {price: btcPrice}))
+PRINT(FORMAT("ETH Price: {price}", {price: ethPrice}))
 
 // Get market sentiment
 LET btcSentiment = CALL getMarketSentiment {symbol: "BTC"}
 LET ethSentiment = CALL getMarketSentiment {symbol: "ETH"}
-PRINT("BTC Sentiment:")
-PRINT(btcSentiment)
-PRINT("ETH Sentiment:")
-PRINT(ethSentiment)
+PRINT(FORMAT("BTC Sentiment: {sentiment}", {sentiment: btcSentiment}))
+PRINT(FORMAT("ETH Sentiment: {sentiment}", {sentiment: ethSentiment}))
 
 // Get current balance
 LET usdcBalance = CALL getBalance {symbol: "USDC"}
-PRINT("USDC Balance:")
-PRINT(usdcBalance)
+PRINT(FORMAT("USDC Balance: {balance}", {balance: usdcBalance}))
 
 // Check if we have enough balance
 IF usdcBalance >= INVESTMENT THEN
@@ -563,10 +558,10 @@ IF usdcBalance >= INVESTMENT THEN
   END
 ELSE
   // Insufficient balance
-  PRINT("Insufficient balance, need")
-  PRINT(INVESTMENT)
-  PRINT("USDC but only have")
-  PRINT(usdcBalance)
+  PRINT(FORMAT("Insufficient balance, need {investment} USDC but only have {balance}", {
+    investment: INVESTMENT,
+    balance: usdcBalance
+  }))
 END
 `,
   tools: tradingTools.map(tool => tool.schema),

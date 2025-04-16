@@ -44,7 +44,7 @@ class BufferingOutputHandler {
 
     // Called by the interpreter for PRINT statements
     handleOutput(message: string): void {
-        this.buffer.push(message);
+        this.buffer.push(message + '\n');
         // Optionally, still send to the output panel immediately if desired
         // this.outputPanelHandler(message); 
     }

@@ -2,13 +2,14 @@ import { ExampleConfig, ComponentStateManager } from '../types/Example';
 import type { 
   ToolSchema, 
   ToolFunction, 
-  NuwaValue,
   EvaluatedToolArguments,
-  ToolContext,
   StateValueWithMetadata,
-  ToolRegistry
+  ToolRegistry,
+  ToolContext,
+  NuwaType,
+  JsonValue
 } from '../services/interpreter';
-import type { DrawableShape } from '../components/DrawingCanvas'; // Keep this import
+import type { DrawableShape } from '../components/DrawingCanvas';
 
 // --- Command Object Interface ---
 interface PathCommandObject {
@@ -86,10 +87,10 @@ export const updateCanvasJSON = (json: object) => {
 // Helper function to create state with metadata
 function createState<T>(value: T, description: string, formatter?: (value: unknown) => string): StateValueWithMetadata {
   return {
-    value: value as unknown as NuwaValue, // Type cast with more safety
+    value: value as unknown as JsonValue, // Type cast with more safety
     metadata: {
       description,
-      formatter: formatter as unknown as ((value: NuwaValue) => string) | undefined
+      formatter: formatter as unknown as ((value: JsonValue) => string) | undefined
     }
   };
 }
@@ -99,7 +100,7 @@ export function updateCanvasState(context?: ToolContext): void {
   // If no context or state, try to get registry from global object
   let registry: ToolRegistry | undefined;
   
-  if (context?.state) {
+  if (context) {
     registry = (context as unknown as { registry?: ToolRegistry }).registry;
   }
   
@@ -227,34 +228,29 @@ export const canvasStateManager: ComponentStateManager<CanvasState> = {
 // --- Canvas Tool Definitions ---
 
 // Helper function to determine the Nuwa type string from a JavaScript value
-const getActualNuwaType = (value: unknown): string => {
+const getActualNuwaType = (value: unknown): NuwaType => {
     if (value === null) return 'null';
     const jsType = typeof value;
     if (jsType === 'object') {
-        return Array.isArray(value) ? 'list' : 'object';
+        return Array.isArray(value) ? 'array' : 'object';
     }
     // Handles string, number, boolean, undefined, bigint, symbol, function
-    // Note: typeof undefined === 'undefined'. Tool args shouldn't be undefined if present.
-    return jsType; 
-}
+    return jsType as NuwaType; 
+};
 
-// Helper to get value from EvaluatedToolArguments
-const getArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: string, defaultVal: T): T => {
+// Helper function to get value from EvaluatedToolArguments
+const getArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: NuwaType, defaultVal: T): T => {
     const value = args[name];
 
-    // Undefined means arg was not provided at all
     if (value === undefined) {
-        // If type 'null' is expected, undefined doesn't match, use default.
-        // If other type is expected, undefined doesn't match, use default.
         return defaultVal;
     }
     
     const actualType = getActualNuwaType(value);
 
     if (actualType === expectedType || expectedType === 'any') {
-         // Allow null only if expectedType is 'null' or 'any'
          if (actualType === 'null' && expectedType !== 'null' && expectedType !== 'any') {
-             // Fall through to mismatch warning/default value
+            return defaultVal; // Return default value for null when not expecting null
          } else {
             return value as T;
          }
@@ -262,34 +258,6 @@ const getArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType
 
     console.warn(`Type mismatch for argument '${name}': Expected ${expectedType}, got ${actualType}. Using default.`);
     return defaultVal;
-};
-
-// Optional version
-const getOptArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: string): T | undefined => {
-    const value = args[name];
-
-    // Undefined means optional arg was not provided
-    if (value === undefined) {
-        return undefined;
-    }
-
-    const actualType = getActualNuwaType(value);
-    
-    if (actualType === expectedType || expectedType === 'any') {
-         // Allow null only if expectedType is 'null' or 'any'
-         if (actualType === 'null' && expectedType !== 'null' && expectedType !== 'any') {
-             // Fall through to mismatch warning/undefined
-         } else {
-            return value as T | undefined;
-         }
-    }
-
-    // Optional arg with wrong type, return undefined
-    // Don't warn if value is null and expected type wasn't null (this is valid for optional)
-    if (actualType !== 'null') { 
-        console.warn(`Type mismatch for optional argument '${name}': Expected ${expectedType}, got ${actualType}. Ignoring.`);
-    }
-    return undefined;
 };
 
 // drawLine Tool
@@ -349,7 +317,7 @@ const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments, context?
   const width = getArgValue<number>(args, 'width', 'number', 50);
   const height = getArgValue<number>(args, 'height', 'number', 30);
   const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const fill = getOptArgValue<string>(args, 'fill', 'string');
+  const fill = getArgValue<string>(args, 'fill', 'string', '');
 
   const newShape = { type: 'rect' as const, x, y, width, height, color, fill };
   console.log('[canvas.ts] Adding Rect:', JSON.stringify(newShape)); // Log added shape
@@ -382,7 +350,7 @@ const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments, contex
   const y = getArgValue<number>(args, 'y', 'number', 50);
   const radius = getArgValue<number>(args, 'radius', 'number', 25);
   const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const fill = getOptArgValue<string>(args, 'fill', 'string');
+  const fill = getArgValue<string>(args, 'fill', 'string', '');
 
   const newShape = { type: 'circle' as const, x, y, radius, color, fill };
   console.log('[canvas.ts] Adding Circle:', JSON.stringify(newShape)); // Log added shape
@@ -396,29 +364,24 @@ const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments, contex
 };
 
 // *** MODIFIED: drawPath Tool ***
-const drawPathSchema_New: ToolSchema = { // Renamed schema variable
+const drawPathSchema_New: ToolSchema = {
   name: 'drawPath',
-  description: 'Draws a complex path from a list of commands (e.g., [{ command: "M", x: 10, y: 10 }, { command: "L", x: 50, y: 50 }, { command: "Z" }]). Valid commands: M, L, C, Z.',
+  description: 'Draws a path on the canvas using SVG path commands.',
   parameters: [
-    {
-      name: 'commands',
-      type: 'list', // Expect a list
-      required: true,
-      description: 'An array of path command objects. Each object needs a "command" (string: M, L, C, or Z) and coordinate properties (x, y, x1, y1, x2, y2, cx1, cy1, cx2, cy2) as needed by the command.'
-    },
-    { name: 'color', type: 'string', description: 'Stroke color', required: false },
+    { name: 'commands', type: 'array', description: 'Array of path commands', required: true },
+    { name: 'color', type: 'string', description: 'Path color', required: false },
     { name: 'fill', type: 'string', description: 'Fill color (optional)', required: false },
-    { name: 'width', type: 'number', description: 'Stroke width', required: false }
+    { name: 'width', type: 'number', description: 'Path width', required: false }
   ],
   returns: 'null'
 };
 
 // Fix: Use the interface and add blocks to switch cases
-const drawPathFunc_New: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<null> => { // Return null explicitly
+const drawPathFunc_New: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<JsonValue> => { // Return null explicitly
   // Get commands, assert type for better checking later
-  const commandsInput = getArgValue<(PathCommandObject | Record<string, unknown>)[]>(args, 'commands', 'list', []); // Type hint for array elements, avoid 'any'
+  const commandsInput = getArgValue<(PathCommandObject | Record<string, unknown>)[]>(args, 'commands', 'array', []); // Changed to 'array' type
   const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const fill = getOptArgValue<string>(args, 'fill', 'string');
+  const fill = getArgValue<string>(args, 'fill', 'string', '');
   const width = getArgValue<number>(args, 'width', 'number', 2);
 
   if (!Array.isArray(commandsInput) || commandsInput.length === 0) {

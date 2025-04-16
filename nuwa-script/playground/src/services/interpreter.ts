@@ -5,17 +5,16 @@ import {
     ToolSchema, 
     ToolParameter, 
     ToolFunction, 
-    NuwaValue, 
+    JsonValue, 
     EvaluatedToolArguments,
     OutputHandler,
     Scope,
-    parse, // Added import for parse function
-    AST, // Added import for AST namespace
-    StateMetadata, // Import from nuwa-script instead of defining locally
-    StateValueWithMetadata, // Import from nuwa-script
-    StateStore, // Import from nuwa-script
-    ToolContext, // Import from nuwa-script
-    NuwaType // Import NuwaType
+    parse,
+    AST,
+    StateMetadata,
+    StateValueWithMetadata,
+    ToolContext,
+    NuwaType
 } from 'nuwa-script';
 
 // Define the Interpreter instance type - Removed as not needed
@@ -23,23 +22,20 @@ import {
 
 // Helper type for interpreter creation result
 export interface NuwaInterface {
-  interpreter: Interpreter; // Use the imported class directly
+  interpreter: Interpreter;
   outputBuffer: string[];
-  toolRegistry: ToolRegistry; // Use the imported class directly
+  toolRegistry: ToolRegistry;
 }
 
 // Factory function to create and configure a NuwaScript interpreter
 export function createInterpreter(): NuwaInterface {
-  // Instantiate directly from imports
   const toolRegistry = new ToolRegistry(); 
   const outputBuffer: string[] = [];
   
-  // Define the output handler using the imported type
   const outputHandler: OutputHandler = (message) => { 
     outputBuffer.push(message);
   };
 
-  // Create the interpreter instance
   const interpreter = new Interpreter(toolRegistry, outputHandler);
 
   return {
@@ -53,7 +49,7 @@ export function createInterpreter(): NuwaInterface {
 export { 
     Interpreter, 
     ToolRegistry, 
-    parse // Re-export the parse function
+    parse
 }; 
 
 // Re-export types
@@ -61,18 +57,17 @@ export type {
     ToolSchema, 
     ToolParameter, 
     ToolFunction, 
-    NuwaValue, 
+    JsonValue, 
     EvaluatedToolArguments, 
     OutputHandler, 
     Scope,
     Interpreter as InterpreterType, 
     ToolRegistry as ToolRegistryType,
-    AST, // Re-export the AST namespace type
+    AST,
     StateMetadata,
     StateValueWithMetadata,
-    StateStore,
     ToolContext,
-    NuwaType // Re-export NuwaType
+    NuwaType
 }; 
 
 // Remove debug logs
