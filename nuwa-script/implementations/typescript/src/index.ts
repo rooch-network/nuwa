@@ -1,11 +1,9 @@
-// Explicitly re-export members from interpreter.ts
-export { Interpreter } from './interpreter'; 
-// Add type exports if needed, e.g.:
-// export type { InterpreterOptions } from './interpreter'; 
-export type { Scope, OutputHandler } from './interpreter'; // Assuming they are defined here
+// Re-export core classes
+export { Interpreter } from './interpreter';
+export { ToolRegistry } from './tools';
+export { parse } from './parser';
+export { buildPrompt } from './prompts';
 
-// Explicitly re-export members from tools.ts
-export { ToolRegistry } from './tools'; 
 // Re-export types from tools.ts
 export type { 
     ToolSchema, 
@@ -16,21 +14,24 @@ export type {
     NuwaType,
     StateMetadata,
     StateValueWithMetadata,
-    StateStore,
     ToolContext
-} from './tools'; 
+} from './tools';
 
-// Explicitly re-export members from values.ts
-export { isNuwaObject, isNuwaList, isNuwaString, isNuwaNumber, isNuwaBoolean, isNuwaNull, nuwaValuesAreEqual, nuwaValueToString } from './values';
-// Re-export types from values.ts
-export type { NuwaValue, NuwaObject } from './values';
+// Re-export types and functions from values.ts
+export type { JsonValue } from './values';
+export { 
+    isJsonObject, 
+    isJsonArray, 
+    isString, 
+    isNumber, 
+    isBoolean, 
+    isNull, 
+    jsonValuesAreEqual, 
+    jsonValueToString 
+} from './values';
 
-// Explicitly re-export parser and AST
-export { parse } from './parser'; // Corrected function name
-export * as AST from './ast'; // Export all AST node types under the AST namespace
+// Re-export AST namespace
+export * as AST from './ast';
 
-// Explicitly re-export prompt builder
-export { buildPrompt } from './prompts'; // Added export for buildPrompt
-
-// Export errors if needed
-export * from './errors';
+// Re-export additional types
+export type { Scope, OutputHandler } from './interpreter';

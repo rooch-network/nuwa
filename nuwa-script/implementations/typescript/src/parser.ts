@@ -1,6 +1,6 @@
 import { Token, TokenType, tokenize } from './lexer';
 import * as AST from './ast';
-import { NuwaValue } from './values'; // For literal parsing
+import { JsonValue } from './values'; // For literal parsing
 
 class ParserError extends Error {
     constructor(message: string, public token?: Token) {
