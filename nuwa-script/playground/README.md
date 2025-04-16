@@ -1,78 +1,71 @@
 # NuwaScript Playground
 
-NuwaScript Playground is an interactive environment that allows users to explore and experience the NuwaScript language. Through this platform, you can learn NuwaScript syntax, test tool calls, and generate scripts using the AI assistant.
+Welcome to the NuwaScript Playground! This is an interactive web application designed for exploring, testing, and demonstrating the NuwaScript language and its TypeScript implementation.
+
+It provides a hands-on environment to:
+
+*   Learn NuwaScript syntax interactively.
+*   Experiment with calling different Tools.
+*   Use an AI assistant (powered by OpenAI) to generate NuwaScript code based on natural language prompts.
+
+This Playground is built using **Vite, React, and TypeScript**, and it utilizes the core NuwaScript interpreter found in the [TypeScript implementation](../implementations/typescript/). For detailed language specifications, refer to the [NuwaScript Spec](../spec/).
 
 ## Features
 
-- Multiple pre-configured examples showcasing NuwaScript usage in different scenarios
-- Built-in code editor with syntax highlighting
-- Real-time execution of NuwaScript code
-- Tool documentation and descriptions
-- AI assistant integration to help generate and explain scripts
-- Fully client-side, no backend services required
+*   **Interactive Editor:** Code editor with NuwaScript syntax highlighting.
+*   **Live Execution:** Run NuwaScript code directly in the browser and see real-time output.
+*   **Multiple Examples:** Explore pre-configured examples demonstrating various use cases and tool sets (e.g., Canvas Drawing, Trading Assistant).
+*   **Tool Inspection:** View the schemas and descriptions of tools available in each example.
+*   **AI Assistant:** Generate NuwaScript code from prompts using the OpenAI API (requires your own API key).
+*   **Client-Side:** Runs entirely in your browser, no backend required.
 
 ## Quick Start
 
-### Install Dependencies
+### 1. Navigate to the Directory
 
-First, install the project dependencies:
+```bash
+cd nuwa-script/playground
+```
+
+### 2. Install Dependencies
+
+Ensure you have Node.js and npm (or yarn) installed.
 
 ```bash
 npm install
+# or
+yarn install
 ```
 
-### Start the Development Server
-
-Run the following command to start the development server:
+### 3. Start the Development Server
 
 ```bash
 npm run dev
+# or
+yarn dev
 ```
 
-After the service starts, it typically opens at [http://localhost:5173](http://localhost:5173).
+This will typically start the server and open the Playground in your browser at `http://localhost:5173` (or another port if 5173 is busy).
 
 ## Usage Guide
 
-### Select an Example
+1.  **Select Example:** Choose an example scenario (e.g., Canvas, Trading) from the left sidebar. This loads the relevant tools and a sample script into the editor.
+2.  **Write/Edit Script:** Modify the NuwaScript code in the central editor panel.
+3.  **Run:** Click the "Run" button to execute the current script using the NuwaScript TypeScript interpreter.
+4.  **Use AI Assistant:**
+    *   Open the AI Assistant panel.
+    *   Enter your OpenAI API Key (this is stored locally in your browser's storage only and is not sent anywhere else besides OpenAI).
+    *   Type a request (e.g., "Draw a red circle next to the blue square" in the Canvas example). The AI will attempt to generate the corresponding NuwaScript code based on the tools available in the selected example.
 
-The left panel displays available examples. Each example has its own set of tools and sample code. Click on an example name to load it into the editor.
+## Adding New Examples
 
-### Edit and Run Scripts
+You can easily add new scenarios:
 
-1. Edit NuwaScript code in the central editor
-2. Click the "Run" button at the top to execute the script
-3. View the output results or error messages in the bottom panel
-
-### Using the AI Assistant
-
-1. Click the "AI Assistant" button at the top to open the AI panel
-2. Enter your OpenAI API Key (stored only in your browser's local storage)
-3. Ask questions or make requests, such as "Create a script to get Bitcoin prices"
-4. The AI will generate NuwaScript code and populate it in the editor
-
-## Example Introduction
-
-The Playground includes multiple examples:
-
-1. **Basic Example** - Demonstrates basic NuwaScript syntax, including variable declarations and simple tool calls
-2. **Cryptocurrency Trading Assistant** - Shows how to create an automated trading decision system
-3. **Weather Assistant** - Uses multiple APIs to retrieve and analyze weather information, providing clothing recommendations
-
-## Development and Extension
-
-### Adding New Examples
-
-1. Create a new example file in the `src/examples/` directory
-2. Define tool implementations and example configuration
-3. Export the new example and add it to `src/examples/index.ts`
-
-### Integration with the Real NuwaScript Interpreter
-
-The current implementation uses a simplified interpreter. To integrate with the complete NuwaScript TypeScript implementation:
-
-1. Import the nuwa-script TypeScript implementation
-2. Modify the `src/services/interpreter.ts` file to use the real interpreter
+1.  Create a new example configuration file (e.g., `myExample.ts`) in `src/examples/`.
+2.  Define the `ToolSchema` and `ToolFunction` implementations for your example's tools.
+3.  Create an `ExampleConfig` object, including an ID, name, description, sample script, the list of tools, and any specific AI prompts or state managers.
+4.  Import and add your `ExampleConfig` to the `examples` array in `src/examples/index.ts`.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) is assumed if no specific license file is present.
