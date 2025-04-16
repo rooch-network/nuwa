@@ -105,16 +105,16 @@ describe('NuwaScript Interpreter', () => {
         const script = `
             LET count = 100
             LET name = "Nuwa"
-            LET flag = TRUE
+            LET flag = true
             LET pi = 3.14
-            LET n = NULL // Assuming NULL is supported or becomes null literal
+            LET n = null
         `;
         const finalScope = await runScript(script);
         expect(finalScope.get('count')).toBe(100);
         expect(finalScope.get('name')).toBe('Nuwa');
         expect(finalScope.get('flag')).toBe(true);
         expect(finalScope.get('pi')).toBe(3.14);
-        expect(finalScope.get('n')).toBe(null); // Check if NULL literal parsing works
+        expect(finalScope.get('n')).toBe(null);
     });
 
     test('should handle LET statement with variable assignment', async () => {
@@ -140,8 +140,8 @@ describe('NuwaScript Interpreter', () => {
             LET x = 10 > 5 // true
             LET y = 5 == 5 // true
             LET z = "a" != "b" // true
-            LET a = TRUE AND FALSE // false
-            LET b = TRUE OR FALSE // true
+            LET a = true AND false // false
+            LET b = true OR false // true
             LET num1 = 10 + 5 * 2 // 20 (need precedence or parentheses)
             // LET num2 = (10 + 5) * 2 // 30 (test parentheses)
             LET num3 = 10 / 2 // 5
@@ -160,8 +160,8 @@ describe('NuwaScript Interpreter', () => {
 
      test('should evaluate unary NOT operator', async () => {
         const script = `
-            LET flagT = TRUE
-            LET flagF = FALSE
+            LET flagT = true
+            LET flagF = false
             LET notT = NOT flagT
             LET notF = NOT flagF
         `;
@@ -172,7 +172,7 @@ describe('NuwaScript Interpreter', () => {
 
      test('should handle type errors in operations', async () => {
         await expect(runScript('LET x = 10 > "hello"')).rejects.toThrow(Errors.TypeError);
-        await expect(runScript('LET x = TRUE AND 1')).rejects.toThrow(Errors.TypeError);
+        await expect(runScript('LET x = "true" AND false')).rejects.toThrow(Errors.TypeError);
         await expect(runScript('LET x = NOT 123')).rejects.toThrow(Errors.TypeError);
     });
 
@@ -213,17 +213,17 @@ describe('NuwaScript Interpreter', () => {
                 LET data = {
                     str: "text",
                     num: 123.45,
-                    boolT: TRUE,
-                    boolF: FALSE,
-                    nil: NULL,
-                    list: [1, "two", TRUE],
+                    boolT: true,
+                    boolF: false,
+                    nil: null,
+                    list: [1, "two", true],
                     obj: { nested: "ok" }
                 }
                 LET result = FORMAT("S:{str} N:{num} BT:{boolT} BF:{boolF} NL:{nil} L:{list} O:{obj}", data)
             `;
             const scope = await runScript(script);
-            // Check against the nuwaValueToString output format defined in values.ts
-            expect(scope.get('result')).toBe('S:text N:123.45 BT:TRUE BF:FALSE NL:NULL L:[1, two, TRUE] O:{nested: ok}');
+            // Check against the updated jsonValueToString output format
+            expect(scope.get('result')).toBe('S:text N:123.45 BT:true BF:false NL:null L:[1, two, true] O:{nested: ok}');
         });
 
         test('should handle escaped curly braces', async () => {
@@ -504,12 +504,12 @@ describe('NuwaScript Interpreter', () => {
             LET msg = "Hello"
             PRINT(msg)
             PRINT(123)
-            PRINT(TRUE)
-            PRINT(NULL)
+            PRINT(true)
+            PRINT(null)
         `;
         await runScript(script);
-        // Behavior remains the same: output handler is called
-        expect(capturedOutput).toEqual(['Hello', '123', 'TRUE', 'NULL']);
+        // Behavior remains the same: output handler is called, check lowercase
+        expect(capturedOutput).toEqual(['Hello', '123', 'true', 'null']);
     });
 
     test('PRINT function should return null', async () => {
@@ -674,7 +674,7 @@ describe('Interpreter - Literal Expressions', () => {
 
     // --- List Literal Tests ---
     test('should evaluate simple list literal', async () => {
-        const script = `LET x = [1, "two", TRUE, NULL, 3.14]`;
+        const script = `LET x = [1, "two", true, null, 3.14]`;
         const scope = await runAndGetScope(script);
         expect(scope.get('x')).toEqual([1, "two", true, null, 3.14]);
     });
@@ -709,7 +709,7 @@ describe('Interpreter - Literal Expressions', () => {
 
     // --- Object Literal Tests ---
     test('should evaluate simple object literal', async () => {
-        const script = `LET x = { name: "Nuwa", version: 1, active: TRUE, config: NULL }`;
+        const script = `LET x = { name: "Nuwa", version: 1, active: true, config: null }`;
         const scope = await runAndGetScope(script);
         expect(scope.get('x')).toEqual({ name: "Nuwa", version: 1, active: true, config: null });
     });
@@ -754,9 +754,9 @@ describe('Interpreter - Literal Expressions', () => {
             LET id_1 = "001"
             LET items = [
                 { id: id_1, tags: ["a", "b", 1] },
-                { id: "002", data: { nested: TRUE } }
+                { id: "002", data: { nested: true } }
             ]
-            LET result = { success: TRUE, payload: items }
+            LET result = { success: true, payload: items }
         `;
         const scope = await runAndGetScope(script);
         expect(scope.get('result')).toEqual({
@@ -776,9 +776,9 @@ describe('Interpreter - Literal Expressions', () => {
         interpreter.getToolRegistry().register(testToolSchema.name, testToolSchema, testToolFunc);
 
         const script = `
-            LET myData = { items: [1, { active: TRUE }], name: "test" }
+            LET myData = { items: [1, { active: true }], name: "test" }
             CALL processData { data: myData }
-            CALL processData { data: ["go", 2, FALSE] }
+            CALL processData { data: ["go", 2, false] }
             LET result = CALL processData { data: { x: 1 } }
         `;
         const scope = await runAndGetScope(script);

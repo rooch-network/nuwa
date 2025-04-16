@@ -5,9 +5,10 @@ export const GENERATION_PROMPT_TEMPLATE = `You are an AI assistant that generate
 NuwaScript is a simple, safe scripting language.
 
 # NuwaScript Syntax Rules:
-- Keywords MUST be UPPERCASE: LET, CALL, IF, THEN, ELSE, END, FOR, IN, DO, PRINT, NOW, AND, OR, NOT.
-- Boolean literals MUST be UPPERCASE: TRUE, FALSE.
-- Null literal MUST be UPPERCASE: NULL.
+- Keywords MUST be UPPERCASE: LET, CALL, IF, THEN, ELSE, END, FOR, IN, DO, AND, OR, NOT. (PRINT, NOW, FORMAT are built-in functions, not keywords)
+- Built-in function names MUST be UPPERCASE: PRINT, NOW, FORMAT.
+- Boolean literals MUST be lowercase: true, false.
+- Null literal MUST be lowercase: null.
 - Identifiers (variable names, tool names) are CASE-SENSITIVE and can be lower/mixed case.
 - String literals use DOUBLE QUOTES: "hello".
 - List literals use square brackets: [1, "a", TRUE, [nested_list]]. Elements are comma-separated.
@@ -32,10 +33,12 @@ END
 FOR itemVar IN <list_expression> DO
   <statements>
 END
-PRINT(<expression>) // Outputs a value
+// PRINT(<expression>) // Outputs a value - Moved to Built-in Functions
 
 # Built-in Functions (as expressions):
-NOW() // Returns current Unix timestamp (seconds)
+PRINT(<expression>) // Outputs the string representation of the expression (default adds newline) and returns NULL.
+NOW() // Returns current Unix timestamp (seconds) as a number.
+FORMAT(template_string, values_object) // Formats a string using named placeholders ({key}) from the values_object. Returns the formatted string. Example: FORMAT("User: {name}", {name: userName})
 
 # Available Tools:
 You have access to the following tools. Only use these registered tools with the exact names provided:
@@ -58,10 +61,11 @@ This represents the current state of the system. You can use this information to
 
 - Generate *only* the NuwaScript code required to complete the user task using the defined syntax and available tools.
 - Output *only* raw code. Do not include explanations, markdown formatting, or code blocks (like \`\`\`).
-- Ensure all keywords (LET, CALL, IF, etc.) and literals (TRUE, FALSE, NULL) are UPPERCASE. **Pay close attention to the CALL syntax using {}.**
+- Ensure all keywords (LET, CALL, IF, etc.) are UPPERCASE. Built-in function names (PRINT, NOW, FORMAT) MUST also be UPPERCASE. Literals true, false, null MUST be lowercase. **Pay close attention to the CALL syntax using {}.**
 - **Strictly use only the tools listed under "# Available Tools:". Do not invent or call unlisted tools.**
-- **The '+' operator is ONLY for number addition. DO NOT use '+' for string concatenation, not even inside PRINT(). To print complex messages with variables, use multiple PRINT statements.**
-- **Use PRINT(<expression>) statements freely to output intermediate values, confirmations, or helpful information directly to the user.**
+- **The '+' operator is ONLY for number addition. DO NOT use '+' for string concatenation.**
+- **To create complex strings with variables, use the FORMAT(template, {key: value, ...}) function.**
+- **Use PRINT(<expression>) statements freely to output intermediate values, confirmations, or helpful information directly to the user. Remember PRINT adds a newline.**
 - Consider the "# Current System State:" information when generating the code.
 # NuwaScript Code (provide raw code with no markdown formatting or code blocks):
 `;

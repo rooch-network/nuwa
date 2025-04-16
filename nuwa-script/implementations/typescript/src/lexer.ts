@@ -67,8 +67,10 @@ export interface Token {
     column: number;
 }
 
-// Maps specific uppercase strings to their keyword/operator/boolean types
+// Maps specific *lowercase* strings (for JSON compatibility) 
+// and *uppercase* strings (for keywords) to their token types
 const KEYWORDS: Record<string, TokenType> = {
+    // Keywords (Uppercase)
     LET: TokenType.LET,
     CALL: TokenType.CALL,
     IF: TokenType.IF,
@@ -78,14 +80,14 @@ const KEYWORDS: Record<string, TokenType> = {
     FOR: TokenType.FOR,
     IN: TokenType.IN,
     DO: TokenType.DO,
-    PRINT: TokenType.PRINT,
-    NOW: TokenType.NOW,
+    // PRINT, NOW, FORMAT are handled like IDENTIFIERs for function calls
     AND: TokenType.AND,
     OR: TokenType.OR,
     NOT: TokenType.NOT,
-    TRUE: TokenType.TRUE,
-    FALSE: TokenType.FALSE,
-    NULL: TokenType.NULL,
+    // Literals (Lowercase for JSON compatibility)
+    true: TokenType.TRUE,     // Map lowercase 'true' to TRUE TokenType
+    false: TokenType.FALSE,   // Map lowercase 'false' to FALSE TokenType
+    null: TokenType.NULL,     // Map lowercase 'null' to NULL TokenType
 };
 
 // Order matters! Longer operators first (e.g., >= before >)
@@ -174,18 +176,22 @@ export function tokenize(input: string): Token[] {
                     let finalType: TokenType = type;
                     let finalValue = value;
 
-                    // Handle identifiers that might be keywords or booleans
+                    // Handle identifiers that might be keywords or literals
                     if (type === TokenType.IDENTIFIER) {
-                        const keywordType = KEYWORDS[value]; // Check uppercase value
+                        // Check the KEYWORDS map using the *exact* matched value
+                        const keywordType = KEYWORDS[value]; 
                         if (keywordType) {
                             finalType = keywordType;
+                            // Value for TRUE/FALSE/NULL tokens should ideally be the keyword itself?
+                            // Or should parser handle conversion? Let's keep value as matched string for now.
+                        } else {
+                            // It's a regular identifier, keep type as IDENTIFIER
+                            // and value as the case-sensitive matched string.
                         }
-                        // Identifiers remain case-sensitive, value stored as matched
                     }
-                    // Handle boolean literal values (TRUE/FALSE)
-                    else if (type === TokenType.TRUE || type === TokenType.FALSE) {
-                        // Value already correct ('TRUE' or 'FALSE')
-                    }
+                    // The parser will handle converting token values like "true"/"false"/"null" 
+                    // into actual boolean/null values for LiteralExpr.
+                    
                     // Handle string literal value (remove quotes, process escapes)
                     else if (type === TokenType.STRING) {
                         finalValue = JSON.parse(value); // Use JSON.parse for robustness

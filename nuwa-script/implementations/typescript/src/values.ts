@@ -102,7 +102,7 @@ export function jsonValueToString(value: JsonValue | undefined): string {
         return 'undefined';
     }
     if (value === null) {
-        return 'NULL';
+        return 'null';
     }
     if (typeof value === 'string') {
         // Maybe add quotes for clarity?
@@ -113,7 +113,7 @@ export function jsonValueToString(value: JsonValue | undefined): string {
         return String(value);
     }
     if (typeof value === 'boolean') {
-        return value ? 'TRUE' : 'FALSE';
+        return value ? 'true' : 'false';
     }
     if (isJsonArray(value)) {
         // Recursive call for list elements
