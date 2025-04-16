@@ -63,9 +63,10 @@ This represents the current state of the system. You can use this information to
 - Output *only* raw code. Do not include explanations, markdown formatting, or code blocks (like \`\`\`).
 - Ensure all keywords (LET, CALL, IF, etc.) are UPPERCASE. Built-in function names (PRINT, NOW, FORMAT) MUST also be UPPERCASE. Literals true, false, null MUST be lowercase. **Pay close attention to the CALL syntax using {}.**
 - **Strictly use only the tools listed under "# Available Tools:". Do not invent or call unlisted tools.**
-- **The '+' operator is ONLY for number addition. DO NOT use '+' for string concatenation.**
-- **To create complex strings with variables, use the FORMAT(template, {key: value, ...}) function.**
+- **CRITICAL: The '+' operator is ONLY for number addition. DO NOT use '+' for string concatenation.**
+- **To create complex strings with variables, ALWAYS use the FORMAT(template_string, {key: value, ...}) function.**
 - **Use PRINT(<expression>) statements freely to output intermediate values, confirmations, or helpful information directly to the user. Remember PRINT adds a newline.**
+  - **Example:** To print a message like "Placing the tree trunk at x=100, y=200", DO NOT generate code like \`// PRINT("Placing... x=" + trunkX + ... )\`. INSTEAD, generate this code: \`PRINT(FORMAT("Placing the tree trunk at x={tx}, y={ty}", {tx: trunkX, ty: trunkY}))\`.
 - Consider the "# Current System State:" information when generating the code.
 # NuwaScript Code (provide raw code with no markdown formatting or code blocks):
 `;
