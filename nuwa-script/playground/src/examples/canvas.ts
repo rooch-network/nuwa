@@ -11,17 +11,6 @@ import type {
 } from '../services/interpreter';
 import type { DrawableShape } from '../components/DrawingCanvas';
 
-// // --- Command Object Interface --- // REMOVED
-// interface PathCommandObject {
-//     command: string;
-//     x?: number;
-//     y?: number;
-//     cx1?: number;
-//     cy1?: number;
-//     cx2?: number;
-//     cy2?: number;
-// }
-
 // --- Canvas State Interface ---
 export interface CanvasState {
   shapes: DrawableShape[];
@@ -456,7 +445,7 @@ CALL drawRect {x: 175, y: 220, width: 50, height: 80, color: "saddlebrown", fill
 CALL drawCircle {x: 250, y: 200, radius: 20, color: "blue", fill: "lightblue"}
 
 // Example using the new drawPath with SVG string
-CALL drawPath { d: "M 350 50 L 400 100 L 350 150 Z", color: "green", fill: "lightgreen", width: 2 }
+//CALL drawPath { d: "M 350 50 L 400 100 L 350 150 Z", color: "green", fill: "lightgreen", width: 2 }
 
 PRINT("House and path drawing complete!")
 `,

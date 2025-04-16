@@ -6,9 +6,9 @@ import type {
   EvaluatedToolArguments,
   StateValueWithMetadata,
   ToolRegistry,
-  ToolContext
+  ToolContext,
+  JsonValue,
 } from '../services/interpreter';
-import type { JsonValue } from '../../../implementations/typescript/src/values';
 
 // --- Trading State Management ---
 
@@ -45,7 +45,6 @@ export const tradingState: TradingState = {
     { symbol: 'BTC', balance: 0.5, price: 67500.42, change24h: 2.3 },
     { symbol: 'ETH', balance: 5.0, price: 3250.18, change24h: -1.2 },
     { symbol: 'SOL', balance: 100.0, price: 142.87, change24h: 5.7 },
-    { symbol: 'AVAX', balance: 50.0, price: 35.62, change24h: -0.8 },
   ],
   tradeHistory: [
     {
