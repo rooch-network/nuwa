@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Editor from './components/Editor';
 import Examples from './components/Examples';
 import Output from './components/Output';
 import ToolPanel from './components/ToolPanel';
 import AIChat from './components/AIChat';
 import { BoltIcon } from './components/AppIcons';
-import DrawingCanvas from './components/DrawingCanvas';
 import Layout from './components/Layout';
 import { examples, examplesById } from './examples';
 import { renderExampleComponent } from './components/ExampleComponents';
@@ -21,7 +20,7 @@ import { parse } from 'nuwa-script';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
 import { tradingTools } from './examples/trading';
-import { canvasTools, canvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas';
+import { canvasTools, canvasShapes, updateCanvasJSON } from './examples/canvas';
 import { ExampleConfig } from './types/Example';
 import type { DrawableShape } from './components/DrawingCanvas';
 import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
@@ -36,17 +35,13 @@ interface CustomMessage {
 // Class to handle buffering PRINT output
 class BufferingOutputHandler {
     private buffer: string[] = [];
-    private outputPanelHandler: OutputHandler; // Handler to update the UI panel
 
-    constructor(outputPanelHandler: OutputHandler) {
-        this.outputPanelHandler = outputPanelHandler;
+    constructor() {
     }
 
     // Called by the interpreter for PRINT statements
     handleOutput(message: string): void {
-        this.buffer.push(message + '\n');
-        // Optionally, still send to the output panel immediately if desired
-        // this.outputPanelHandler(message); 
+        this.buffer.push(message);
     }
 
     // Clear the buffer (called before a run)
@@ -59,7 +54,7 @@ class BufferingOutputHandler {
         if (this.buffer.length === 0) {
             return null;
         }
-        const combined = this.buffer.join('');
+        const combined = this.buffer.join('\n');
         this.clear(); // Clear after flushing
         return combined;
     }
@@ -103,18 +98,13 @@ function App() {
       handleSelectExample(examples[0]);
     }
 
-    // Subscribe to canvas shape changes
-    const unsubscribe = subscribeToCanvasChanges(() => {
-      console.log('[App.tsx] Canvas shapes updated in canvas.ts. Global state:', JSON.stringify(canvasShapes)); // Log global state
-      const newShapes = [...canvasShapes];
-      setShapes(newShapes);
-      console.log('[App.tsx] React state set with new shapes:', JSON.stringify(newShapes)); // Log state being set
-    });
-
-    // Cleanup subscription
-    return () => unsubscribe();
-
   }, []);
+
+  // Memoize the onCanvasChange callback
+  const handleCanvasChange = useCallback((json: object) => {
+    console.log('[App.tsx] Canvas JSON updated (via callback):', json);
+    updateCanvasJSON(json); // Still update global state/tool registry state
+  }, []); // Empty dependency array: callback reference is stable
 
   // Select example
   const handleSelectExample = (example: ExampleConfig) => {
@@ -127,8 +117,9 @@ function App() {
     // Reset canvas state for canvas example
     if (example.id === 'canvas') {
         console.log('[App.tsx] Canvas example selected. Clearing shapes.');
-        canvasShapes.length = 0;
-        setShapes([]);
+        canvasShapes.length = 0; // Clear global array
+        setShapes([]); // Clear react state
+        updateCanvasJSON({}); // Notify registry about empty canvas
     }
 
     // Setup interpreter AFTER potentially clearing state
@@ -143,14 +134,7 @@ function App() {
     const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
     (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry = toolRegistry;
     
-    // Define the handler that updates the actual Output UI panel
-    const uiOutputHandler: OutputHandler = (message) => {
-        setOutput(prev => (prev ? prev + '\n' + message : message));
-    };
-
-    // Create the buffering handler, passing the UI handler to it (if needed for live output)
-    // If we ONLY want output in chat, we can pass a dummy handler: () => {}
-    const bufferingHandler = new BufferingOutputHandler(uiOutputHandler); 
+    const bufferingHandler = new BufferingOutputHandler(); 
 
     // Pass the buffering handler's bound function to the Interpreter
     const interpreter = new Interpreter(toolRegistry, bufferingHandler.getHandler());
@@ -355,7 +339,7 @@ function App() {
 
       {selectedExample?.componentId ? (
         // Render custom component based on componentId
-        <div className="component-container w-full h-full">
+        <div className="component-container w-full">
           {renderExampleComponent(
             selectedExample.componentId,
             // Pass component-specific props if needed
@@ -363,10 +347,7 @@ function App() {
               width: 500,
               height: 400,
               shapes: shapes,
-              onCanvasChange: (json: object) => {
-                console.log('[App.tsx] Canvas JSON updated:', json);
-                updateCanvasJSON(json);
-              }
+              onCanvasChange: handleCanvasChange
             } : undefined
           )}
         </div>

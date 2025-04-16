@@ -13,7 +13,7 @@ interface DrawingCanvasProps {
   width: number;
   height: number;
   shapes: DrawableShape[];
-  onCanvasChange?: (json: object) => void;
+  onCanvasChange: (json: object) => void; // Restored prop, made mandatory
 }
 
 // Function to get the JSON representation of canvas
@@ -27,19 +27,31 @@ export const getCanvasJSON = (stageRef: React.RefObject<Konva.Stage | null>): ob
 
 const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ width, height, shapes, onCanvasChange }) => {
   const stageRef = useRef<Konva.Stage | null>(null);
-  
-  // Trigger onCanvasChange callback when shapes change
+  const lastJsonRef = useRef<string | null>(null); // Ref to store last JSON string
+
   useEffect(() => {
     if (stageRef.current && onCanvasChange) {
-      // Wait for konva to finish rendering
-      setTimeout(() => {
-        const json = getCanvasJSON(stageRef);
-        if (json) {
-          onCanvasChange(json);
+      // Use requestAnimationFrame to ensure Konva has rendered
+      requestAnimationFrame(() => { 
+        if (!stageRef.current) return; // Check ref again inside async callback
+        
+        const stage = stageRef.current;
+        const jsonString = stage.toJSON(); // Get JSON string representation
+
+        // Only call onCanvasChange if JSON string has actually changed
+        if (jsonString !== lastJsonRef.current) {
+          lastJsonRef.current = jsonString; // Update the ref
+          try {
+            const jsonObject = JSON.parse(jsonString); // Parse string to object
+            onCanvasChange(jsonObject);
+          } catch (e) {
+            console.error("Failed to parse Konva stage JSON:", e);
+          }
         }
-      }, 0);
+      });
     }
-  }, [shapes, onCanvasChange]);
+    // Dependency array: only re-run if shapes array reference changes OR onCanvasChange function reference changes.
+  }, [shapes, onCanvasChange]); 
 
   return (
     <Stage 

@@ -3,8 +3,6 @@ import {
   tradingState, 
   subscribeToTradingChanges, 
   TradingState, 
-  Asset, 
-  TradeHistory 
 } from '../../examples/trading';
 
 interface TradingDashboardProps {

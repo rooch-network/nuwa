@@ -97,7 +97,9 @@ const Layout: React.FC<LayoutProps> = ({
 
           const clampedPercentage = Math.min(Math.max(percentage, minHeightPercent), maxHeightPercent);
 
-          setScriptPanelHeight(`${clampedPercentage}%`);
+          // Calculate the script panel height as the remaining percentage
+          const scriptPanelHeightPercent = 100 - clampedPercentage;
+          setScriptPanelHeight(`${scriptPanelHeightPercent}%`);
         }
       }
     };
@@ -203,7 +205,7 @@ const Layout: React.FC<LayoutProps> = ({
           <div className="flex flex-1 overflow-hidden"> {/* This inner flex handles horizontal layout */}
 
             {/* Main application panel (takes available space) */}
-            <div className="flex-1 overflow-hidden flex flex-col main-panel min-w-[600px]"> {/* Ensure min-width and flex-1 */}
+            <div className="flex-1 flex flex-col main-panel min-w-[600px]"> {/* Removed overflow-hidden */}
               {/* Top part: Output/Canvas */}
               <div className="flex-1 overflow-hidden relative bg-white flex flex-col"> {/* Ensure this takes space and allows children to flex */}
                 <div className="flex items-center px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0"> {/* Panel header */}
@@ -232,7 +234,7 @@ const Layout: React.FC<LayoutProps> = ({
                   </button>
                 </div>
                  {/* Editor Content: Needs to fill remaining space */}
-                <div className="flex-1 overflow-hidden"> {/* Use flex-1 to fill space */}
+                <div className="flex-1 h-full"> {/* Use flex-1 to fill space, add h-full, remove overflow-hidden */}
                   {scriptPanelContent}
                 </div>
               </div>
