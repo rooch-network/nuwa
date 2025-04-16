@@ -78,8 +78,8 @@ export const updateCanvasJSON = (json: object) => {
     ));
   }
   
-  // Notify change
-  notifyCanvasChange();
+  // // Notify change - REMOVED: This should only be notified when canvasShapes itself changes
+  // notifyCanvasChange();
 };
 // --- End Shared State ---
 

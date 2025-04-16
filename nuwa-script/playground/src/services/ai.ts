@@ -15,7 +15,7 @@ export class AIService {
   constructor(options: AIServiceOptions) {
     this.options = {
       model: 'gpt-4o',
-      maxTokens: 1000,
+      maxTokens: 2000,
       temperature: 0.7,
       ...options,
     };

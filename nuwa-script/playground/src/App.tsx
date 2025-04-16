@@ -20,7 +20,7 @@ import { parse } from 'nuwa-script';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
 import { tradingTools } from './examples/trading';
-import { canvasTools, canvasShapes, updateCanvasJSON } from './examples/canvas';
+import { canvasTools, canvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas';
 import { ExampleConfig } from './types/Example';
 import type { DrawableShape } from './components/DrawingCanvas';
 import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
@@ -98,13 +98,22 @@ function App() {
       handleSelectExample(examples[0]);
     }
 
-  }, []);
+    // Subscribe to canvas shape changes - RESTORED
+    const unsubscribe = subscribeToCanvasChanges(() => {
+      console.log('[App.tsx] Syncing shapes via subscription. Global state:', JSON.stringify(canvasShapes)); 
+      setShapes([...canvasShapes]); // Update React state when global shapes change
+    });
+
+    // Cleanup subscription - RESTORED
+    return () => unsubscribe();
+
+  }, []); // Runs once on mount
 
   // Memoize the onCanvasChange callback
   const handleCanvasChange = useCallback((json: object) => {
     console.log('[App.tsx] Canvas JSON updated (via callback):', json);
-    updateCanvasJSON(json); // Still update global state/tool registry state
-  }, []); // Empty dependency array: callback reference is stable
+    updateCanvasJSON(json); // Update global JSON state and tool registry state
+  }, []);
 
   // Select example
   const handleSelectExample = (example: ExampleConfig) => {
@@ -118,7 +127,8 @@ function App() {
     if (example.id === 'canvas') {
         console.log('[App.tsx] Canvas example selected. Clearing shapes.');
         canvasShapes.length = 0; // Clear global array
-        setShapes([]); // Clear react state
+        // No need to call setShapes here, the notifyCanvasChange from clearCanvasFunc will trigger the subscription
+        // setShapes([]); // REMOVED
         updateCanvasJSON({}); // Notify registry about empty canvas
     }
 
@@ -175,16 +185,12 @@ function App() {
     setOutput(''); // Clear Output panel before run
     setExecutionError(undefined); // Clear previous errors
 
-    // Get the buffering handler instance
     const bufferingHandler = nuwaInterface.bufferingOutputHandler;
-    // Clear buffer before execution
     bufferingHandler.clear();
-
-    // No need to swap handlers anymore
 
     try {
       console.log("Parsing script:", scriptToRun);
-      const scriptAST = parse(scriptToRun); // Use the passed script
+      const scriptAST = parse(scriptToRun);
       console.log("Parsed AST:", scriptAST);
 
       if (!scriptAST || typeof scriptAST !== 'object' || scriptAST.kind !== 'Script') {
@@ -192,11 +198,9 @@ function App() {
       }
 
       console.log("Executing AST...");
-      // Interpreter uses the buffering handler provided during setup
       const scope = await nuwaInterface.interpreter.execute(scriptAST);
       console.log("Execution finished. Final scope:", scope);
-      
-      // After successful execution, flush buffer and add to chat if needed
+
       const capturedOutput = bufferingHandler.flush();
       if (capturedOutput !== null) { 
         setMessages(prev => [...prev, {
