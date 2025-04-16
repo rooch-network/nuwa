@@ -497,8 +497,8 @@ describe('NuwaScript Interpreter', () => {
     });
 
 
-    // --- PRINT Statement Tests ---
-     test('PRINT statement should call output handler', async () => {
+    // --- PRINT Function Tests (formerly Statement) ---
+     test('PRINT function should call output handler', async () => {
         const script = `
             LET msg = "Hello"
             PRINT(msg)
@@ -507,7 +507,21 @@ describe('NuwaScript Interpreter', () => {
             PRINT(NULL)
         `;
         await runScript(script);
+        // Behavior remains the same: output handler is called
         expect(capturedOutput).toEqual(['Hello', '123', 'TRUE', 'NULL']);
+    });
+
+    test('PRINT function should return null', async () => {
+        const script = `LET result = PRINT("test")`;
+        const finalScope = await runScript(script);
+        expect(finalScope.get('result')).toBeNull();
+        // Also check that output still happened
+        expect(capturedOutput).toEqual(['test']);
+    });
+
+     test('should handle PRINT function with exactly one argument', async () => {
+        await expect(runScript(`PRINT()`)).rejects.toThrow(/expects exactly 1 argument, got 0/);
+        await expect(runScript(`PRINT(1, 2)`)).rejects.toThrow(/expects exactly 1 argument, got 2/);
     });
 
 });

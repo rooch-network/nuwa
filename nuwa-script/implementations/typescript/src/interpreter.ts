@@ -55,6 +55,17 @@ export class Interpreter {
              return this.evaluateFormatFunction(args, callExpr);
         });
 
+        // Register PRINT
+        this.builtinFunctions.set('PRINT', (args, callExpr) => {
+            if (args.length !== 1) {
+                throw new RuntimeError(`Function PRINT() expects exactly 1 argument, got ${args.length}`, callExpr);
+            }
+            const valueToPrint = args[0];
+            // Use nuwaValueToString (which now handles undefined safely)
+            this.outputHandler(nuwaValueToString(valueToPrint));
+            return null; // PRINT function returns null
+        });
+
         // Add future built-ins here, e.g.:
         // this.builtinFunctions.set('LENGTH', this.evaluateLengthFunction);
     }
@@ -148,8 +159,11 @@ export class Interpreter {
             case 'ForStatement':
                 await this.executeForStatement(statement, scope);
                 break;
-            case 'PrintStatement':
-                await this.executePrintStatement(statement, scope);
+            // Add case for ExpressionStatement
+            case 'ExpressionStatement':
+                 // Evaluate the expression for its side effects (e.g., PRINT)
+                 // Discard the result (e.g., null from PRINT)
+                await this.evaluateExpression(statement.expression, scope);
                 break;
             default:
                 // This ensures exhaustiveness checking if new statement kinds are added
@@ -166,11 +180,6 @@ export class Interpreter {
     private async executeCallStatement(stmt: AST.CallStatement, scope: Scope): Promise<void> {
         // Evaluate arguments and execute the tool, ignoring the return value
         await this.executeToolCall(stmt.toolName, stmt.arguments, scope);
-    }
-
-     private async executePrintStatement(stmt: AST.PrintStatement, scope: Scope): Promise<void> {
-        const value = await this.evaluateExpression(stmt.value, scope);
-        this.outputHandler(nuwaValueToString(value)); // Use the toString helper
     }
 
     private async executeIfStatement(stmt: AST.IfStatement, scope: Scope): Promise<void> {

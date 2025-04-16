@@ -120,7 +120,8 @@ export type Statement =
   | CallStatement
   | IfStatement
   | ForStatement
-  | PrintStatement; // Include PRINT here as a statement
+  | ExpressionStatement;
+  // | PrintStatement; // Remove PrintStatement from Statement type
 
 export interface LetStatement extends BaseNode {
   kind: 'LetStatement';
@@ -148,9 +149,10 @@ export interface ForStatement extends BaseNode {
   loopBlock: Statement[]; // Body is a list of statements
 }
 
-export interface PrintStatement extends BaseNode {
-  kind: 'PrintStatement';
-  value: Expression; // The expression to evaluate and print
+// Add the ExpressionStatement interface
+export interface ExpressionStatement extends BaseNode {
+    kind: 'ExpressionStatement';
+    expression: Expression;
 }
 
 // --- Top Level ---
@@ -199,10 +201,6 @@ export function isIfStatement(node: BaseNode): node is IfStatement {
 
 export function isForStatement(node: BaseNode): node is ForStatement {
      return (node as any)?.kind === 'ForStatement';
-}
-
-export function isPrintStatement(node: BaseNode): node is PrintStatement {
-     return (node as any)?.kind === 'PrintStatement';
 }
 
 // Add type guard for ListLiteralExpr

@@ -43,15 +43,27 @@ export class Parser {
             case TokenType.CALL:
                 // Check if it's CALL used as statement or expression context (not really possible at statement level)
                 return this.parseCallStatement();
-             case TokenType.PRINT:
-                return this.parsePrintStatement();
             case TokenType.IF:
                 return this.parseIfStatement();
             case TokenType.FOR:
                 return this.parseForStatement();
             default:
-                throw new ParserError(`Unexpected token type '${this.peek().type}' at start of statement`, this.peek());
-                // Or potentially try parsing an expression statement if the language supported it
+                // If it doesn't match known statement keywords, try parsing an expression statement.
+                // This allows function calls like PRINT(...) or potentially others to stand alone.
+                try {
+                    const expression = this.parseExpression();
+                    // TODO: Should we add a check here to ensure it's a valid expression for a statement?
+                    // For now, allow any expression to be a statement.
+                    return { kind: 'ExpressionStatement', expression };
+                } catch (error) {
+                    // If parsing an expression fails here, THEN it's truly an unexpected token.
+                    if (error instanceof ParserError) {
+                         // Re-throw the original parser error for better context
+                        throw error;
+                    }
+                     // Throw a generic error if it wasn't a ParserError (shouldn't happen often)
+                    throw new ParserError(`Unexpected token type '${this.peek().type}' at start of statement or invalid expression.`, this.peek());
+                }
         }
     }
 
@@ -71,15 +83,7 @@ export class Parser {
         return { kind: 'CallStatement', toolName: nameToken.value, arguments: args };
     }
 
-    private parsePrintStatement(): AST.PrintStatement {
-        this.consume(TokenType.PRINT, "Expected 'PRINT' keyword.");
-        this.consume(TokenType.LPAREN, "Expected '(' after 'PRINT'.");
-        const value = this.parseExpression();
-        this.consume(TokenType.RPAREN, "Expected ')' after PRINT expression.");
-        return { kind: 'PrintStatement', value };
-    }
-
-     private parseIfStatement(): AST.IfStatement {
+    private parseIfStatement(): AST.IfStatement {
         this.consume(TokenType.IF, "Expected 'IF' keyword.");
         const condition = this.parseExpression();
         this.consume(TokenType.THEN, "Expected 'THEN' after IF condition.");
@@ -309,29 +313,26 @@ export class Parser {
         }
 
 
-        // Handle IDENTIFIER: could be variable or function call
-        if (this.match(TokenType.IDENTIFIER)) {
+        // Handle IDENTIFIER, NOW, PRINT as potential function calls
+        if (this.match(TokenType.IDENTIFIER, TokenType.NOW, TokenType.PRINT)) {
             const identifierToken = this.previous();
-            // Check if it's a function call (IDENTIFIER followed by LPAREN)
+            // Check if it's a function call (IDENTIFIER/NOW/PRINT followed by LPAREN)
             if (this.match(TokenType.LPAREN)) {
-                return this.parseFunctionCallExpression(identifierToken); // Use helper
+                // Special check for NOW() which was handled differently before
+                if (identifierToken.type === TokenType.NOW) {
+                    // Consume RPAREN immediately for NOW, ensure no args passed in parser
+                    this.consume(TokenType.RPAREN, "Expected ')' after 'NOW()'.");
+                    return { kind: 'FunctionCallExpr', functionName: identifierToken.value, arguments: [] };
+                }
+                 // For IDENTIFIER or PRINT, parse arguments using helper
+                return this.parseFunctionCallExpression(identifierToken);
             }
-            // Otherwise, it's a variable access
-            // Dotted names like obj.prop are handled by parsePostfix
-            return { kind: 'VariableExpr', name: identifierToken.value };
-        }
-
-        // Special case for NOW() before removing it completely?
-        // No, the above IDENTIFIER match should handle NOW if lexer returns IDENTIFIER for it.
-        // Let's ensure the lexer tokenizes NOW as IDENTIFIER or handle NOW explicitly here.
-        // Assuming Lexer provides NOW token:
-        if (this.match(TokenType.NOW)) {
-             const nowToken = this.previous();
-             // Expect LPAREN and RPAREN for function call syntax
-             this.consume(TokenType.LPAREN, "Expected '(' after 'NOW'.");
-             this.consume(TokenType.RPAREN, "Expected ')' after 'NOW()'.");
-             // Use the generic FunctionCallExpr structure
-             return { kind: 'FunctionCallExpr', functionName: nowToken.value, arguments: [] };
+            // If it was IDENTIFIER without LPAREN, it's a variable access
+            if (identifierToken.type === TokenType.IDENTIFIER) {
+                 return { kind: 'VariableExpr', name: identifierToken.value };
+            }
+            // If it was NOW or PRINT without LPAREN, it's a syntax error
+             throw new ParserError(`Expected '(' after '${identifierToken.value}' for function call.`, this.peek());
         }
 
         // Tool Calls used as expressions - Parsed by parseToolCallExpression
@@ -368,6 +369,7 @@ export class Parser {
             throw new ParserError(`Function NOW() expects no arguments, got ${args.length}`, nameToken);
         }
         // We won't add a check for FORMAT here, leave full validation to interpreter
+        // We also won't add a check for PRINT here, interpreter will handle arg count.
 
         return { kind: 'FunctionCallExpr', functionName: nameToken.value, arguments: args };
     }
