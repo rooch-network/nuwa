@@ -11,16 +11,16 @@ import type {
 } from '../services/interpreter';
 import type { DrawableShape } from '../components/DrawingCanvas';
 
-// --- Command Object Interface ---
-interface PathCommandObject {
-    command: string;
-    x?: number;
-    y?: number;
-    cx1?: number;
-    cy1?: number;
-    cx2?: number;
-    cy2?: number;
-}
+// // --- Command Object Interface --- // REMOVED
+// interface PathCommandObject {
+//     command: string;
+//     x?: number;
+//     y?: number;
+//     cx1?: number;
+//     cy1?: number;
+//     cx2?: number;
+//     cy2?: number;
+// }
 
 // --- Canvas State Interface ---
 export interface CanvasState {
@@ -363,94 +363,40 @@ const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments, contex
   return null;
 };
 
-// *** MODIFIED: drawPath Tool ***
-const drawPathSchema_New: ToolSchema = {
+// *** drawPath Tool using SVG Path String ***
+const drawPathSchema: ToolSchema = {
   name: 'drawPath',
-  description: 'Draws a path on the canvas using SVG path commands.',
+  description: 'Draws a path on the canvas using an SVG path data string (d attribute).',
   parameters: [
-    { name: 'commands', type: 'array', description: 'Array of path commands', required: true },
+    { name: 'd', type: 'string', description: 'SVG path data string (e.g., "M10 10 H 90 V 90 H 10 Z")', required: true },
     { name: 'color', type: 'string', description: 'Path color', required: false },
     { name: 'fill', type: 'string', description: 'Fill color (optional)', required: false },
-    { name: 'width', type: 'number', description: 'Path width', required: false }
+    { name: 'width', type: 'number', description: 'Path stroke width', required: false }
   ],
   returns: 'null'
 };
 
-// Fix: Use the interface and add blocks to switch cases
-const drawPathFunc_New: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<JsonValue> => { // Return null explicitly
-  // Get commands, assert type for better checking later
-  const commandsInput = getArgValue<(PathCommandObject | Record<string, unknown>)[]>(args, 'commands', 'array', []); // Changed to 'array' type
+const drawPathFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<JsonValue> => { 
+  // Get arguments using the updated schema
+  const d = getArgValue<string>(args, 'd', 'string', ''); 
   const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const fill = getArgValue<string>(args, 'fill', 'string', '');
+  const fill = getArgValue<string>(args, 'fill', 'string', ''); // Empty string means no fill by default
   const width = getArgValue<number>(args, 'width', 'number', 2);
 
-  if (!Array.isArray(commandsInput) || commandsInput.length === 0) {
-    console.warn("drawPath called with empty or invalid commands list.");
-    return null;
+  if (!d || typeof d !== 'string' || d.trim() === '') {
+    console.warn("drawPath called with empty or invalid 'd' string.");
+    return null; // Return null if path data is invalid
   }
 
-  let d = "";
-  for (const cmdObj of commandsInput) {
-    // Basic validation
-    if (typeof cmdObj !== 'object' || cmdObj === null || !cmdObj.command || typeof cmdObj.command !== 'string') {
-      console.warn("Skipping invalid command object:", cmdObj);
-      continue;
-    }
-    const command = cmdObj.command.toUpperCase();
-    d += command;
+  // No need to process commands array anymore
 
-    // Use block scope for each case
-    switch (command) {
-      case 'M':
-      case 'L': { // Add block scope
-        // Type assertion after validation improves safety somewhat
-        const typedCmd = cmdObj as PathCommandObject;
-        const x = Number(typedCmd.x);
-        const y = Number(typedCmd.y);
-        if (!isNaN(x) && !isNaN(y)) {
-           d += ` ${x} ${y}`;
-        } else {
-           console.warn(`Invalid coordinates for ${command}:`, cmdObj);
-        }
-        break;
-      } // Close block scope
-      case 'C': { // Add block scope
-        const typedCmd = cmdObj as PathCommandObject;
-        const cx1 = Number(typedCmd.cx1); const cy1 = Number(typedCmd.cy1);
-        const cx2 = Number(typedCmd.cx2); const cy2 = Number(typedCmd.cy2);
-        const endX = Number(typedCmd.x); const endY = Number(typedCmd.y);
-        if (!isNaN(cx1) && !isNaN(cy1) && !isNaN(cx2) && !isNaN(cy2) && !isNaN(endX) && !isNaN(endY)) {
-            d += ` ${cx1} ${cy1}, ${cx2} ${cy2}, ${endX} ${endY}`;
-        } else {
-             console.warn(`Invalid coordinates for ${command}:`, cmdObj);
-        }
-        break;
-      } // Close block scope
-      case 'Z': { // Add block scope (good practice even if empty)
-        // No coordinates needed
-        break;
-      } // Close block scope
-      default: { // Add block scope
-        console.warn(`Unsupported path command: ${command}`);
-        break;
-      } // Close block scope
-    }
-    d += " ";
-  }
-  d = d.trim();
-
-  if (!d) {
-    console.warn("drawPath resulted in an empty path data string after processing commands.");
-    return null;
-  }
-
-  const newShape: DrawableShape = { type: 'path', d, color, fill, strokeWidth: width }; // Ensure type compatibility
+  const newShape: DrawableShape = { type: 'path', d: d.trim(), color, fill: fill || undefined, strokeWidth: width }; // Use fill only if provided
   console.log('[canvas.ts] Adding Path:', JSON.stringify(newShape));
   canvasShapes.push(newShape);
-  notifyCanvasChange();
+  notifyCanvasChange(); // Notify UI about shape change
 
-  updateCanvasState(context);
-  return null; // Explicitly return null
+  updateCanvasState(context); // Update tool state
+  return null; // Return null as per schema
 };
 // *** END MODIFIED TOOL ***
 
@@ -474,12 +420,12 @@ const clearCanvasFunc: ToolFunction = async (_args: EvaluatedToolArguments, cont
   return null;
 };
 
-// Export tools - USE THE NEW SCHEMA AND FUNCTION FOR drawPath
+// Export tools - ENSURE THIS LIST IS CORRECT
 export const canvasTools: { schema: ToolSchema, execute: ToolFunction }[] = [
   { schema: drawLineSchema, execute: drawLineFunc },
   { schema: drawRectSchema, execute: drawRectFunc },
   { schema: drawCircleSchema, execute: drawCircleFunc },
-  { schema: drawPathSchema_New, execute: drawPathFunc_New },
+  { schema: drawPathSchema, execute: drawPathFunc }, // Ensure using the updated schema/func
   { schema: clearCanvasSchema, execute: clearCanvasFunc }
 ];
 
@@ -509,10 +455,11 @@ CALL drawRect {x: 175, y: 220, width: 50, height: 80, color: "saddlebrown", fill
 // Draw a window
 CALL drawCircle {x: 250, y: 200, radius: 20, color: "blue", fill: "lightblue"}
 
-PRINT("House drawing complete!")
+// Example using the new drawPath with SVG string
+CALL drawPath { d: "M 350 50 L 400 100 L 350 150 Z", color: "green", fill: "lightgreen", width: 2 }
+
+PRINT("House and path drawing complete!")
 `,
-  // Provide tool schemas for the example config (used by AI prompt generation etc.)
-  // Map ToolSchema back to the format ExampleConfig expects for UI/AI interaction
   tools: canvasTools.map(t => t.schema),
   aiPrompt: `# Canvas-Specific Guidelines:
 - DO NOT automatically call clearCanvas {} at the beginning unless explicitly requested.
@@ -533,7 +480,11 @@ PRINT("House drawing complete!")
 - Try to create a visually balanced composition.
 
 # Thinking Process:
-- Use PRINT statements to explain your reasoning, especially for coordinate calculations and layout decisions. For example: PRINT("Placing the sun at x=400, y=80 to be in the top-right sky.")`,
+- Use PRINT statements to explain your reasoning, especially for coordinate calculations and layout decisions. For example: PRINT("Placing the sun at x=400, y=80 to be in the top-right sky.")
+
+# Tool Usage Notes:
+- Use drawPath with a single 'd' parameter containing the SVG path string.
+`,
   componentId: 'canvas',
   stateManager: canvasStateManager
 };
