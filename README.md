@@ -150,7 +150,18 @@ The agent creator can add more instructions when creating.
 | ⚙️ On-Chain Execution | Full action traceability via Move smart contracts |
 | 🔁 Async Tasks | TaskEngine for deferred off-chain computation |
 
+## 💬 NuwaScript: The Language of Agent Intent
 
+To enable structured, safe, and interpretable agent behavior, Nuwa utilizes **NuwaScript**. This is a purpose-built scripting language designed for AI agents to express multi-step plans involving logic, state, and interaction with external tools. Instead of directly executing potentially unsafe code, AI models generate NuwaScript, which is then safely interpreted.
+
+Key aspects of NuwaScript:
+*   **Simple & AI-Friendly Syntax:** Easy for LLMs to generate and understand.
+*   **Safe Execution:** Sandboxed environment; external actions only through controlled `CALL`s to host-defined Tools.
+*   **Structured Logic:** Supports variables (`LET`), conditions (`IF`), and loops (`FOR`).
+*   **State Awareness:** Enables context management across steps via `ToolContext`.
+*   **Platform Agnostic:** Interpretable in diverse environments (web, server, potentially on-chain).
+
+[**Learn more about NuwaScript and its specification here >>**](./nuwa-script/README.md)
 
 ## Source Code Structure
 

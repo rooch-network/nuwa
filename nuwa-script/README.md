@@ -1,4 +1,4 @@
-# NuwaScript
+# NuwaScript: The Language of Agent Intent
 
 NuwaScript is a lightweight, structured, and cross-platform scripting language designed specifically for AI Agents. It enables AI to generate interpretable, executable, and auditable sequences of logic and actions, acting as the language of Agent intent and action.
 
