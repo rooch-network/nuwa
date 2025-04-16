@@ -82,18 +82,37 @@ export function nuwaValuesAreEqual(v1: NuwaValue, v2: NuwaValue): boolean {
 }
 
 // --- String Representation (for PRINT or debugging) ---
-export function nuwaValueToString(value: NuwaValue): string {
+// Allow undefined as input, return e.g., "undefined" or empty string?
+// Let's return "undefined" for consistency, though null returns "NULL".
+export function nuwaValueToString(value: NuwaValue | undefined): string {
+    if (value === undefined) {
+        return 'undefined'; // Or perhaps '' based on desired behavior?
+    }
     if (value === null) {
-        return 'null';
+        return 'NULL';
+    }
+    if (typeof value === 'string') {
+        return value; // Return string directly
+    }
+    if (typeof value === 'number') {
+        return String(value);
+    }
+    if (typeof value === 'boolean') {
+        return value ? 'TRUE' : 'FALSE'; // Use uppercase literals?
     }
     if (isNuwaList(value)) {
-        // Avoid deep/circular structures in default toString
-        return `[List(${value.length})]`; // Simple representation
-        // Or implement a limited depth JSON.stringify like approach if needed
+        // Recursive call for list elements
+        const listItems = value.map(item => nuwaValueToString(item));
+        return `[${listItems.join(', ')}]`;
     }
     if (isNuwaObject(value)) {
-        return `{Object(${Object.keys(value).length} keys)}`; // Simple representation
+        // Recursive call for object values
+        const objectEntries = Object.entries(value)
+            .map(([key, val]) => `${key}: ${nuwaValueToString(val)}`); // Assuming keys are simple strings
+        return `{${objectEntries.join(', ')}}`;
     }
-    // For primitives, use standard conversion
-    return String(value);
+
+    // Fallback for any unexpected case (should be unreachable given type definition)
+    const exhaustiveCheck: never = value;
+    return `[Unknown NuwaValue: ${exhaustiveCheck}]`;
 }

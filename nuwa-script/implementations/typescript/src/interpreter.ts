@@ -198,7 +198,7 @@ export class Interpreter {
             case 'UnaryOpExpr':
                 return await this.evaluateUnaryOpExpr(expression, scope);
             case 'FunctionCallExpr':
-                return this.evaluateFunctionCallExpr(expression); // NOW() is sync
+                return this.evaluateFunctionCallExpr(expression, scope);
              case 'ToolCallExpr':
                 return await this.evaluateToolCallExpr(expression, scope);
 
@@ -335,14 +335,95 @@ export class Interpreter {
         throw new UnsupportedOperationError(`Unary operator '${op}' is not supported.`, expr);
     }
 
-    private evaluateFunctionCallExpr(expr: AST.FunctionCallExpr): NuwaValue {
-        switch (expr.functionName) {
-            case 'NOW':
-                // Return timestamp in seconds (like Unix time)
-                return Math.floor(Date.now() / 1000);
+    private async evaluateFunctionCallExpr(expr: AST.FunctionCallExpr, scope: Scope): Promise<NuwaValue> {
+        const functionName = expr.functionName;
+
+        // Evaluate arguments first
+        const evaluatedArgs = [];
+        for (const arg of expr.arguments) {
+            evaluatedArgs.push(await this.evaluateExpression(arg, scope));
         }
-        // No other built-ins defined as expressions yet
-        throw new UnsupportedOperationError(`Built-in function '${expr.functionName}' is not supported as an expression.`, expr);
+
+        // Handle built-in functions
+        switch (functionName) {
+            case 'NOW':
+                if (evaluatedArgs.length !== 0) {
+                    throw new RuntimeError(`Function NOW() expects no arguments, got ${evaluatedArgs.length}`, expr);
+                }
+                return Math.floor(Date.now() / 1000);
+
+            case 'FORMAT':
+                return this.evaluateFormatFunction(evaluatedArgs, expr);
+
+            // Future: User-defined functions might be looked up in scope here
+            default:
+                throw new RuntimeError(`Unknown function called: ${functionName}`, expr);
+        }
+    }
+
+    // Helper function for FORMAT logic
+    private evaluateFormatFunction(args: NuwaValue[], callExpr: AST.FunctionCallExpr): string {
+        if (args.length !== 2) {
+            throw new RuntimeError(`FORMAT function expects 2 arguments (template string, values object), got ${args.length}`, callExpr);
+        }
+
+        const templateArg = args[0];
+        const valuesArg = args[1];
+
+        if (typeof templateArg !== 'string') {
+            throw new TypeError(`FORMAT function's first argument must be a string, got ${typeof templateArg}`, { node: callExpr.arguments[0] });
+        }
+
+        // Explicitly check if valuesArg is undefined to satisfy the type checker before calling isNuwaObject
+        if (valuesArg === undefined) {
+             // This case should logically be unreachable due to the args.length check above
+            throw new RuntimeError(`FORMAT function received undefined second argument (internal error).`, callExpr);
+        }
+
+        // Now valuesArg is narrowed down to NuwaValue, so the call is safe
+        if (!isNuwaObject(valuesArg)) {
+            throw new TypeError(`FORMAT function's second argument must be an object, got ${typeof valuesArg}`, { node: callExpr.arguments[1] });
+        }
+
+        const templateString = templateArg;
+        const valuesObject = valuesArg; // Already checked as NuwaObject
+
+        // Regex to find {key}, {{, or }}
+        // Define regex only once
+        const regex = /\{([a-zA-Z_][a-zA-Z_0-9]*)\}|\{\{|\}\}/g;
+        let result = '';
+        let lastIndex = 0;
+        let match; // Declare match here
+
+        while ((match = regex.exec(templateString)) !== null) {
+            // Append text before the match
+            result += templateString.substring(lastIndex, match.index);
+
+            if (match[0] === '{{') { // Escaped '{'
+                result += '{';
+            } else if (match[0] === '}}') { // Escaped '}'
+                result += '}';
+            } else if (match[1]) { // Named placeholder {key}
+                const key = match[1];
+                // Use Object.prototype.hasOwnProperty for safety
+                if (Object.prototype.hasOwnProperty.call(valuesObject, key)) {
+                    const valueToFormat = valuesObject[key];
+                    // Remove the explicit undefined check as hasOwnProperty confirms presence
+                    // Use non-null assertion (!) to satisfy TypeScript since NuwaValue doesn't include undefined
+                    // Ensure nuwaValueToString is imported from './values'
+                    result += nuwaValueToString(valueToFormat!); // Use existing helper from values.ts
+                } else {
+                    // Provide context in error message
+                    throw new RuntimeError(`Key '${key}' not found in FORMAT arguments object`, callExpr.arguments[1]);
+                }
+            }
+            lastIndex = regex.lastIndex;
+        }
+
+        // Append remaining text after the last match
+        result += templateString.substring(lastIndex);
+
+        return result; // Return the final string directly
     }
 
     private async evaluateToolCallExpr(expr: AST.ToolCallExpr, scope: Scope): Promise<NuwaValue> {

@@ -62,12 +62,12 @@ export interface UnaryOpExpr extends BaseNode {
   operand: Expression;
 }
 
-export type BuiltinFunctionName = 'NOW';
+// export type BuiltinFunctionName = 'NOW'; // Remove this specific type
 
 export interface FunctionCallExpr extends BaseNode {
   kind: 'FunctionCallExpr';
-  functionName: BuiltinFunctionName;
-  // arguments: Expression[]; // NOW() has no args, PRINT is a statement
+  functionName: string; // Allow any function name
+  arguments: Expression[]; // Add arguments array
 }
 
 // Represents CALL tool { ... } used as an expression

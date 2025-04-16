@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeEach, it } from '@jest/globals'; // Add Jest types including \'it\'
 import { Interpreter, OutputHandler } from '../src/interpreter';
 import { parse } from '../src/parser'; // Assuming combined lexer/parser export
 import { ToolRegistry, ToolSchema, ToolParameter, ToolFunction, NuwaType } from '../src/tools';
@@ -189,6 +190,119 @@ describe('NuwaScript Interpreter', () => {
         const script = `LET x = 10 / 0`;
         await expect(runScript(script)).rejects.toThrow(Errors.DivisionByZeroError);
     });
+
+    // --- FORMAT Function Tests ---
+    // This describe block MUST be INSIDE the main 'NuwaScript Interpreter' describe block
+    // to have access to runScript helper function.
+    describe('FORMAT Function', () => {
+        test('should format string with basic key replacement', async () => {
+            const script = `LET result = FORMAT("Hello, {name}!", {name: "Nuwa"})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('Hello, Nuwa!');
+        });
+
+        test('should format string with multiple keys', async () => {
+            const script = `LET result = FORMAT("{greeting}, {audience}!", {greeting: "Hi", audience: "World"})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('Hi, World!');
+        });
+
+        test('should format different value types', async () => {
+            const script = `
+                LET data = {
+                    str: "text",
+                    num: 123.45,
+                    boolT: TRUE,
+                    boolF: FALSE,
+                    nil: NULL,
+                    list: [1, "two", TRUE],
+                    obj: { nested: "ok" }
+                }
+                LET result = FORMAT("S:{str} N:{num} BT:{boolT} BF:{boolF} NL:{nil} L:{list} O:{obj}", data)
+            `;
+            const scope = await runScript(script);
+            // Check against the nuwaValueToString output format defined in values.ts
+            expect(scope.get('result')).toBe('S:text N:123.45 BT:TRUE BF:FALSE NL:NULL L:[1, two, TRUE] O:{nested: ok}');
+        });
+
+        test('should handle escaped curly braces', async () => {
+            const script = `LET result = FORMAT("Show literal braces {{ and }} with value {val}", {val: 10})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('Show literal braces { and } with value 10');
+        });
+
+        test('should handle adjacent placeholders and braces', async () => {
+            const script = `LET result = FORMAT("{a}{b}, {{literal}} {c}", {a: 1, b: 2, c: 3})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('12, {literal} 3');
+        });
+
+        test('should throw RuntimeError for missing key', async () => {
+            const script = `LET result = FORMAT("Hello, {name}!", { NOME: "Nuwa" })`;
+            await expect(runScript(script)).rejects.toThrow(RuntimeError);
+            await expect(runScript(script)).rejects.toThrow(/Key 'name' not found in FORMAT arguments object/);
+        });
+
+        test('should throw RuntimeError for wrong number of arguments (0)', async () => {
+            const script = `LET result = FORMAT()`;
+            await expect(runScript(script)).rejects.toThrow(RuntimeError);
+            await expect(runScript(script)).rejects.toThrow(/FORMAT function expects 2 arguments/);
+        });
+
+        test('should throw RuntimeError for wrong number of arguments (1)', async () => {
+            const script = `LET result = FORMAT("template")`;
+            await expect(runScript(script)).rejects.toThrow(RuntimeError);
+            await expect(runScript(script)).rejects.toThrow(/FORMAT function expects 2 arguments/);
+        });
+
+        test('should throw RuntimeError for wrong number of arguments (3)', async () => {
+            const script = `LET result = FORMAT("template", {}, {})`;
+            await expect(runScript(script)).rejects.toThrow(RuntimeError);
+            await expect(runScript(script)).rejects.toThrow(/FORMAT function expects 2 arguments/);
+        });
+
+        test('should throw TypeError if first argument is not a string', async () => {
+            const script = `LET result = FORMAT(123, {})`;
+            await expect(runScript(script)).rejects.toThrow(TypeError);
+            await expect(runScript(script)).rejects.toThrow(/first argument must be a string/);
+        });
+
+        test('should throw TypeError if second argument is not an object', async () => {
+            const script = `LET result = FORMAT("template", [1, 2])`;
+            await expect(runScript(script)).rejects.toThrow(TypeError);
+            await expect(runScript(script)).rejects.toThrow(/second argument must be an object/);
+        });
+
+        test('should handle empty template string', async () => {
+            const script = `LET result = FORMAT("", {a: 1})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('');
+        });
+
+        test('should handle template with no placeholders', async () => {
+            const script = `LET result = FORMAT("Just text.", {a: 1})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('Just text.');
+        });
+
+        test('should handle empty values object', async () => {
+            const script = `LET result = FORMAT("Static text", {})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('Static text');
+        });
+
+        test('should throw error for missing key with empty values object', async () => {
+            const script = `LET result = FORMAT("Needs {key}", {})`;
+            await expect(runScript(script)).rejects.toThrow(RuntimeError);
+            await expect(runScript(script)).rejects.toThrow(/Key 'key' not found/);
+        });
+
+        test('should handle valid identifier keys', async () => {
+            const script = `LET result = FORMAT("{_key1} {key2_} {k3y_}", {_key1: "a", key2_: "b", k3y_: "c"})`;
+            const scope = await runScript(script);
+            expect(scope.get('result')).toBe('a b c');
+        });
+    }); // End of FORMAT Function describe block
 
     // --- Member Access Tests ---
     test('should access object properties', async () => {
@@ -393,7 +507,7 @@ describe('NuwaScript Interpreter', () => {
             PRINT(NULL)
         `;
         await runScript(script);
-        expect(capturedOutput).toEqual(['Hello', '123', 'true', 'null']);
+        expect(capturedOutput).toEqual(['Hello', '123', 'TRUE', 'NULL']);
     });
 
 });

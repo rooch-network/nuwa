@@ -309,18 +309,29 @@ export class Parser {
         }
 
 
-        // Variable (single identifier only now)
+        // Handle IDENTIFIER: could be variable or function call
         if (this.match(TokenType.IDENTIFIER)) {
-            // Now only handles simple 'variable', not 'variable.dotted.name'
-            // Dotted names are handled by parsePostfix recognizing the DOT token.
-            return { kind: 'VariableExpr', name: this.previous().value };
+            const identifierToken = this.previous();
+            // Check if it's a function call (IDENTIFIER followed by LPAREN)
+            if (this.match(TokenType.LPAREN)) {
+                return this.parseFunctionCallExpression(identifierToken); // Use helper
+            }
+            // Otherwise, it's a variable access
+            // Dotted names like obj.prop are handled by parsePostfix
+            return { kind: 'VariableExpr', name: identifierToken.value };
         }
 
-        // Function Calls (NOW())
+        // Special case for NOW() before removing it completely?
+        // No, the above IDENTIFIER match should handle NOW if lexer returns IDENTIFIER for it.
+        // Let's ensure the lexer tokenizes NOW as IDENTIFIER or handle NOW explicitly here.
+        // Assuming Lexer provides NOW token:
         if (this.match(TokenType.NOW)) {
-            this.consume(TokenType.LPAREN, "Expected '(' after 'NOW'.");
-            this.consume(TokenType.RPAREN, "Expected ')' after 'NOW()'.");
-            return { kind: 'FunctionCallExpr', functionName: 'NOW' };
+             const nowToken = this.previous();
+             // Expect LPAREN and RPAREN for function call syntax
+             this.consume(TokenType.LPAREN, "Expected '(' after 'NOW'.");
+             this.consume(TokenType.RPAREN, "Expected ')' after 'NOW()'.");
+             // Use the generic FunctionCallExpr structure
+             return { kind: 'FunctionCallExpr', functionName: nowToken.value, arguments: [] };
         }
 
         // Tool Calls used as expressions - Parsed by parseToolCallExpression
@@ -339,7 +350,29 @@ export class Parser {
         throw new ParserError(`Unexpected token type '${this.peek().type}' in expression parsing`, this.peek());
     }
 
-     // NEW HELPER for CALL used as an expression
+    // NEW HELPER for generic function calls like NAME(arg1, arg2, ...)
+    private parseFunctionCallExpression(nameToken: Token): AST.FunctionCallExpr {
+        // LPAREN already consumed by the check in parsePrimary
+        const args: AST.Expression[] = [];
+        if (!this.check(TokenType.RPAREN)) { // Check if args are present
+            do {
+                // Allow trailing comma before RPAREN
+                if (this.check(TokenType.RPAREN)) break;
+                args.push(this.parseExpression());
+            } while (this.match(TokenType.COMMA));
+        }
+        this.consume(TokenType.RPAREN, `Expected ')' after function arguments for '${nameToken.value}'.`);
+
+        // Optional: Basic argument count checks at parse time (stricter checks in interpreter)
+        if (nameToken.value === 'NOW' && args.length !== 0) {
+            throw new ParserError(`Function NOW() expects no arguments, got ${args.length}`, nameToken);
+        }
+        // We won't add a check for FORMAT here, leave full validation to interpreter
+
+        return { kind: 'FunctionCallExpr', functionName: nameToken.value, arguments: args };
+    }
+
+    // NEW HELPER for CALL used as an expression
     private parseToolCallExpression(): AST.ToolCallExpr {
          this.consume(TokenType.CALL, "Expected 'CALL' keyword."); // Already checked, but good practice
          const nameToken = this.consume(TokenType.IDENTIFIER, "Expected tool name after 'CALL'.");
