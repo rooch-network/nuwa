@@ -13,6 +13,15 @@ import {
 } from './errors';
 import { isArrayIndexExpression, isMemberAccessExpression, isListLiteralExpr, isObjectLiteralExpr } from './ast';
 
+// Type for built-in function implementations
+// They receive evaluated arguments and the original AST node for error reporting
+// They can return a value directly or a promise (for potential future async built-ins)
+// Note: Currently NOW and FORMAT are sync.
+type BuiltinFunctionImplementation = (
+    args: NuwaValue[],
+    callExpr: AST.FunctionCallExpr
+) => NuwaValue | Promise<NuwaValue>;
+
 // Type for the variable scope
 export type Scope = Map<string, NuwaValue>;
 // Type for the output handler (e.g., for PRINT)
@@ -21,11 +30,33 @@ export type OutputHandler = (output: string) => void;
 export class Interpreter {
     private toolRegistry: ToolRegistry;
     private readonly outputHandler: OutputHandler;
+    // Registry for built-in functions
+    private readonly builtinFunctions: Map<string, BuiltinFunctionImplementation>;
 
     constructor(toolRegistry?: ToolRegistry, outputHandler?: OutputHandler) {
         this.toolRegistry = toolRegistry ?? new ToolRegistry();
         // Default output handler simply logs to console
         this.outputHandler = outputHandler ?? ((output) => console.log(output));
+
+        // Initialize and register built-in functions
+        this.builtinFunctions = new Map();
+
+        // Register NOW
+        this.builtinFunctions.set('NOW', (args, callExpr) => {
+            if (args.length !== 0) {
+                throw new RuntimeError(`Function NOW() expects no arguments, got ${args.length}`, callExpr);
+            }
+            return Math.floor(Date.now() / 1000);
+        });
+
+        // Register FORMAT
+        // Note: We keep evaluateFormatFunction as a private method for clarity
+        this.builtinFunctions.set('FORMAT', (args, callExpr) => {
+             return this.evaluateFormatFunction(args, callExpr);
+        });
+
+        // Add future built-ins here, e.g.:
+        // this.builtinFunctions.set('LENGTH', this.evaluateLengthFunction);
     }
 
     /**
@@ -344,20 +375,16 @@ export class Interpreter {
             evaluatedArgs.push(await this.evaluateExpression(arg, scope));
         }
 
-        // Handle built-in functions
-        switch (functionName) {
-            case 'NOW':
-                if (evaluatedArgs.length !== 0) {
-                    throw new RuntimeError(`Function NOW() expects no arguments, got ${evaluatedArgs.length}`, expr);
-                }
-                return Math.floor(Date.now() / 1000);
+        // Look up the function in the registry
+        const funcImpl = this.builtinFunctions.get(functionName);
 
-            case 'FORMAT':
-                return this.evaluateFormatFunction(evaluatedArgs, expr);
-
-            // Future: User-defined functions might be looked up in scope here
-            default:
-                throw new RuntimeError(`Unknown function called: ${functionName}`, expr);
+        if (funcImpl) {
+            // Call the registered implementation
+            // Use await in case the implementation is async in the future
+            return await funcImpl(evaluatedArgs, expr);
+        } else {
+            // Future: Could check for user-defined functions in scope here
+            throw new RuntimeError(`Unknown function called: ${functionName}`, expr);
         }
     }
 
