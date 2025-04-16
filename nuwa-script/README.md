@@ -1,161 +1,125 @@
-# NuwaScript Specification
+# NuwaScript
 
-NuwaScript is a lightweight, structured, and cross-platform scripting language designed for AI Agents. It enables AI to generate interpretable, executable, and auditable sequences of logic and actions.
+NuwaScript is a lightweight, structured, and cross-platform scripting language designed specifically for AI Agents. It enables AI to generate interpretable, executable, and auditable sequences of logic and actions, acting as the language of Agent intent and action.
 
----
-
-## 🧱 Design Goals
-
-- Human- and AI-friendly syntax
-- Supports variable binding, conditionals, and loops
-- Tool invocation (CALL) and expression evaluation (CALC)
-- Executable in any environment (on-chain/off-chain)
-- Safe, side-effect-free, and statically analyzable
+Its goal is to empower AI Agents to act autonomously, safely, and transparently across diverse platforms, including web environments and blockchains.
 
 ---
 
-## ✨ Core Syntax
+## 🧭 Why NuwaScript?
 
-### 1. LET (Variable Assignment)
-```nuwa
-LET x = 42
-LET result = CALC { formula: "a + b", vars: { a: 1, b: 2 } }
-LET user = CALL get_user { id: "0xabc" }
-```
+In the age of AI Agents, traditional programming languages fall short in one critical dimension:
 
-### 2. CALL (Invoke Tools)
-```nuwa
-CALL swap {
-  from_token: "USDT",
-  to_token: "BTC",
-  amount: 100
-}
-```
-- All tools follow `CALL tool_name { ...args }`
-- Tools are externally defined (e.g., get_price, get_balance)
+> ❌ They are designed for humans to write, but not for AIs to plan, explain, and execute actions autonomously.
 
-### 3. IF (Conditional Control)
+**NuwaScript** is a purpose-built scripting language designed from the ground up for **AI-generated behavior planning**. It addresses the growing need for:
+
+- ✅ A structured, safe, and deterministic way for AI to express action plans  
+- ✅ Seamless coordination between tools, conditions, variables, and memory  
+- ✅ Executable logic that can be interpreted in any environment — off-chain or on-chain  
+- ✅ Transparent, auditable, and resumable workflows powered by AI logic
+
+While existing languages like Python or JSON-based schemas are human-friendly, they are either **too powerful (unsafe for autonomous execution)** or **not expressive enough (lacking control flow, conditional logic, and native tool integration).**
+
+What makes NuwaScript unique is that it helps **AI overcome its own cognitive limits**.
+
+> 💡 AI models are good at generating thoughts — not at precisely invoking multi-step tools.  
+> With NuwaScript, AI can **outsource execution to a script**, making tool usage verifiable, repeatable, and explainable.
+
+**NuwaScript is different**. It's not a general-purpose language — it's a **goal-oriented, declarative behavior language** that:
+
+- Describes what an AI agent intends to do  
+- Defines when it should do it (conditions, timing)  
+- Expresses how it interacts with external tools  
+- Allows interruption, continuation, and reasoning around state
+
+In short:  
+> 🧠 **NuwaScript is the language of executable intent.**  
+> It gives AI agents a clear, verifiable, and programmable way to act — not just speak.
+
+---
+
+## 📜 Specification
+
+The detailed technical specification for the NuwaScript language, including its grammar, Abstract Syntax Tree (AST) structure, Tool system, and security model, can be found in the [**`/spec` directory**](./spec/README.md).
+
+---
+
+## ✨ Core Features
+
+*   **Simple & AI-Friendly Syntax:** Designed to be easily generated and understood by Large Language Models (LLMs).
+*   **Structured Control Flow:** Supports variable binding (`LET`), conditionals (`IF`/`THEN`/`ELSE`/`END`), and list iteration (`FOR`/`IN`/`DO`/`END`).
+*   **Tool-Based Extensibility:** Core functionality is provided through external "Tools" invoked via `CALL`, allowing controlled interaction with any environment.
+*   **Built-in Functions:** Includes essential functions like `PRINT`, `NOW`, and `FORMAT`.
+*   **State Management:** Tools can interact with a shared state via `ToolContext`, enabling state awareness for AI agents.
+*   **Safety-Oriented:** Designed to prevent arbitrary code execution, with interactions mediated strictly through tools (See [Safety](#safety)).
+*   **Platform Agnostic:** Can be implemented and executed in various environments.
+
+---
+
+## 💡 Core Syntax Overview
+
 ```nuwa
-IF price > 70000 THEN
-  CALL swap { from_token: "USDT", to_token: "BTC", amount: 100 }
+// Variable assignment (supports primitives, lists, objects)
+LET counter = 0
+LET isActive = true
+LET config = { threshold: 0.75, name: "default" }
+LET items = [10, "data", false, null]
+
+// Using built-in functions
+PRINT("Starting process...")
+LET msg = FORMAT("Processing item {index} of {total}", { index: counter, total: items.length })
+PRINT(msg)
+LET timestamp = NOW()
+
+// Tool invocation (the primary way to interact)
+LET result = CALL process_item { item: items[0], config: config }
+CALL log_event { type: "process_result", data: result, time: timestamp }
+
+// Conditional logic
+IF result.status == "success" AND result.value > config.threshold THEN
+  PRINT("High value success!")
+  CALL trigger_alert { level: "high", value: result.value }
 ELSE
-  CALL reply { channel: "nuwa-chat", message: "Price too high." }
+  PRINT("Condition not met or process failed.")
 END
-```
-- Supports operators: `==`, `!=`, `>`, `<`, `>=`, `<=`
-- Supports logical ops: `AND`, `OR`, `NOT`
 
-### 4. FOR (Iteration over List)
-```nuwa
-FOR nft IN listed DO
-  IF nft.rarity > 90 THEN
-    CALL buy_nft { id: nft.id, price: nft.price }
-  END
+// Looping through a list
+FOR item IN items DO
+  PRINT(FORMAT("Looping - item: {i}", {i: item}))
+  CALL process_item { item: item, config: config }
 END
-```
-- The list (`listed`) must be iterable
-- The element (`nft`) is scoped per iteration
 
-### 5. CALC (Expression Evaluation)
-```nuwa
-LET estimated_value = CALC {
-  formula: "floor_price + (rarity - 50) * 0.01 * floor_price",
-  vars: {
-    floor_price: nft.floor_price,
-    rarity: nft.rarity
-  }
-}
+PRINT("Script finished.")
 ```
-- Supports basic math and variable substitution
-- Executed using a safe embedded math engine
-
-### 6. Built-in Functions
-```nuwa
-NOW()      // current timestamp
-```
+*(Refer to the [Grammar Specification](./spec/grammar.md) for full details)*
 
 ---
 
-## 🧰 Tool Function Schema
-Every tool must declare its interface:
-```json
-{
-  "name": "get_price",
-  "inputs": {
-    "token": "String"
-  },
-  "outputs": "Number"
-}
-```
+## 🧰 Tool Ecosystem
 
-Tools may be async and resolved via relayers, APIs, or blockchain modules.
+The power and safety of NuwaScript come from its Tool-centric design. All interactions with the outside world (APIs, databases, blockchains, UI elements) are handled by Tools defined by the host application and invoked using `CALL`.
+
+Learn more about defining and using tools in the [**Tools Specification**](./spec/tools.md).
 
 ---
 
-## 🧠 Sample Script
-```nuwa
-LET price = CALL get_price { token: "BTC" }
+## 🚀 Implementations
 
-IF price < 70000 THEN
-  CALL swap {
-    from_token: "USDT",
-    to_token: "BTC",
-    amount: 100
-  }
-ELSE
-  CALL reply {
-    channel: "trading-room",
-    message: "BTC too expensive for now."
-  }
-END
-```
+NuwaScript is designed to be implemented in various languages to suit different execution environments. We envision support for multiple backends, **including Move for on-chain smart contract execution**.
+
+Currently available implementations:
+
+*   **[TypeScript](./implementations/typescript/README.md):** The primary and most up-to-date implementation, actively used for experimentation and development. Includes parser, interpreter, and tooling.
 
 ---
 
-## 📦 JSON AST Format
-Every NuwaScript can be compiled to JSON:
-```json
-[
-  {
-    "type": "let",
-    "var": "price",
-    "call": { "tool": "get_price", "args": { "token": "BTC" } }
-  },
-  {
-    "type": "if",
-    "cond": { "op": "<", "left": "price", "right": 70000 },
-    "then": [
-      { "type": "call", "tool": "swap", "args": { "from_token": "USDT", "to_token": "BTC", "amount": 100 } }
-    ],
-    "else": [
-      { "type": "call", "tool": "reply", "args": { "channel": "trading-room", "message": "BTC too expensive for now." } }
-    ]
-  }
-]
-```
+## 🚧 Safety
+
+Security is a fundamental design principle. NuwaScript mitigates risks by having a limited core syntax and mandating that all external actions occur through well-defined, host-controlled Tools.
+
+Read the detailed discussion in the [**Security Model Specification**](./spec/security.md).
 
 ---
 
-## 🚧 Safety & Constraints
-- No arbitrary code execution
-- No infinite loops or dynamic jumps
-- Only registered tools can be used
-- Variable scope is either global or block-local
-
----
-
-## 🔮 Future Extensions
-- Function definitions and reuse
-- Script imports and modularization
-- Signed scripts for verifiable on-chain use
-- Agent memory and meta-reasoning integration
-
----
-
-## 🧩 What is NuwaScript?
-
-> NuwaScript is the language of Agent intent and action. Not a chat template, not a UI flow — it’s a **real behavior script**.
-
-It empowers AI Agents to act autonomously, safely, and transparently across platforms and chains.
-
-Let’s define the next generation of executable intent together.
+Let's define the next generation of executable AI intent together!
