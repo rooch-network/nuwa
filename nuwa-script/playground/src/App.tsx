@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Editor from './components/Editor';
 import Examples from './components/Examples';
 import Output from './components/Output';
@@ -24,7 +24,6 @@ import { canvasTools, canvasShapes, subscribeToCanvasChanges, updateCanvasJSON }
 import { ExampleConfig } from './types/Example';
 import type { DrawableShape } from './components/DrawingCanvas';
 import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
-
 
 // Define some types to supplement original component interfaces
 interface CustomMessage {
@@ -88,6 +87,7 @@ function App() {
   const [currentToolSchemas, setCurrentToolSchemas] = useState<ToolSchema[]>([]);
   const [shapes, setShapes] = useState<DrawableShape[]>(canvasShapes);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null); // Keep ref if Editor needs it
+  const [editorContent, setEditorContent] = useState(''); // 编辑器内容状态
 
   // Initialization
   useEffect(() => {
@@ -98,43 +98,45 @@ function App() {
       handleSelectExample(examples[0]);
     }
 
-    // Subscribe to canvas shape changes - RESTORED
+    // Subscribe to canvas shape changes 
     const unsubscribe = subscribeToCanvasChanges(() => {
       console.log('[App.tsx] Syncing shapes via subscription. Global state:', JSON.stringify(canvasShapes)); 
-      setShapes([...canvasShapes]); // Update React state when global shapes change
+      // 强制更新状态以触发重新渲染
+      setShapes(prevShapes => {
+        // 确保是一个新的引用以触发渲染
+        return [...canvasShapes];
+      });
     });
 
-    // Cleanup subscription - RESTORED
+    // Cleanup subscription 
     return () => unsubscribe();
-
   }, []); // Runs once on mount
 
-  // Memoize the onCanvasChange callback
+  // Memoize the onCanvasChange callback to prevent unnecessary re-renders
   const handleCanvasChange = useCallback((json: object) => {
     console.log('[App.tsx] Canvas JSON updated (via callback):', json);
     updateCanvasJSON(json); // Update global JSON state and tool registry state
   }, []);
 
-  // Select example
-  const handleSelectExample = (example: ExampleConfig) => {
+  // Select example and setup the interpreter
+  const handleSelectExample = useCallback((example: ExampleConfig) => {
     setSelectedExample(example);
     setScript(example.script);
+    setEditorContent(example.script);
     setOutput('');
     setExecutionError(undefined);
     storageService.saveLastSelectedExample(example.id);
     
     // Reset canvas state for canvas example
     if (example.id === 'canvas') {
-        console.log('[App.tsx] Canvas example selected. Clearing shapes.');
-        canvasShapes.length = 0; // Clear global array
-        // No need to call setShapes here, the notifyCanvasChange from clearCanvasFunc will trigger the subscription
-        // setShapes([]); // REMOVED
-        updateCanvasJSON({}); // Notify registry about empty canvas
+      console.log('[App.tsx] Canvas example selected. Clearing shapes.');
+      canvasShapes.length = 0; // Clear global array
+      updateCanvasJSON({}); // Notify registry about empty canvas
     }
 
     // Setup interpreter AFTER potentially clearing state
     setupInterpreter(example);
-  };
+  }, []);
 
   // Setup interpreter and tools
   const setupInterpreter = (example: ExampleConfig) => {
@@ -157,7 +159,7 @@ function App() {
     }
     
     exampleTools.forEach(tool => {
-        toolRegistry.register(tool.schema.name, tool.schema, tool.execute);
+      toolRegistry.register(tool.schema.name, tool.schema, tool.execute);
     });
     
     // If example has a state manager, use it to initialize the state
@@ -166,19 +168,19 @@ function App() {
       example.stateManager.updateStateInRegistry();
     }
     
-    // Set the interpreter and registry in state.
-    // Store the buffering handler instance
+    // Set the interpreter and registry in state
     setNuwaInterface({ 
-        interpreter, 
-        outputBuffer: [], // This is now redundant, consider removing
-        toolRegistry,
-        bufferingOutputHandler: bufferingHandler // Store the handler instance
+      interpreter, 
+      outputBuffer: [], 
+      toolRegistry,
+      bufferingOutputHandler: bufferingHandler 
     }); 
+    
     setCurrentToolSchemas(toolRegistry.getAllSchemas());
   };
 
-  // Run script
-  const handleRun = async (scriptToRun: string) => { // Accept script as argument
+  // Run script - 改进执行流程
+  const handleRun = async (scriptToRun: string) => {
     if (!nuwaInterface) return;
 
     setIsRunning(true);
@@ -189,37 +191,56 @@ function App() {
     bufferingHandler.clear();
 
     try {
-      console.log("Parsing script:", scriptToRun);
+      console.log("[App.tsx] Parsing and executing script...");
       const scriptAST = parse(scriptToRun);
-      console.log("Parsed AST:", scriptAST);
 
       if (!scriptAST || typeof scriptAST !== 'object' || scriptAST.kind !== 'Script') {
-         throw new Error("Parsing did not return a valid Script AST node.");
+        throw new Error("Parsing did not return a valid Script AST node.");
       }
 
-      console.log("Executing AST...");
+      // 确保同步 script 状态
+      setScript(scriptToRun);
+      
+      // 执行脚本
       const scope = await nuwaInterface.interpreter.execute(scriptAST);
       console.log("Execution finished. Final scope:", scope);
+      
+      // 如果是 Canvas 示例，确保触发刷新
+      if (selectedExample?.id === 'canvas') {
+        // 更新一次画布状态以确保刷新
+        console.log("[App.tsx] Canvas example executed, force refreshing canvas...");
+        setShapes([...canvasShapes]);
+      }
 
       const capturedOutput = bufferingHandler.flush();
       if (capturedOutput !== null) { 
         setMessages(prev => [...prev, {
-          role: 'assistant', // Use 'assistant' role for interpreter PRINT output
-          content: capturedOutput // Remove prefix, treat as direct AI response
+          role: 'assistant',
+          content: capturedOutput
         }]);
       }
 
     } catch (err) {
       console.error("Execution or Parsing error:", err);
       const errorMsg = err instanceof Error ? err.message : String(err);
-      setExecutionError(errorMsg); // Set specific execution error state
+      setExecutionError(errorMsg);
     } finally {
-      // No need to restore handler anymore
       setIsRunning(false);
     }
   };
 
-  // AI Chat message handler
+  // 处理脚本变更
+  const handleScriptChange = useCallback((newCode = '') => {
+    setEditorContent(newCode);
+  }, []);
+
+  // 处理运行按钮点击
+  const handleRunClick = useCallback(() => {
+    // 使用最新的编辑器内容执行
+    handleRun(editorContent);
+  }, [editorContent]);
+
+  // AI 聊天消息处理
   const handleAIChatMessage = async (message: string) => {
     // Check if API key is set
     if (!apiKey) {
@@ -268,19 +289,15 @@ function App() {
         nuwaInterface.toolRegistry 
       );
       
-      // Update the editor content FIRST
+      // Update the editor content
+      setEditorContent(generatedCode);
       setScript(generatedCode);
 
-      // 2. Update the editor content directly via its instance
       if (editorRef.current) {
         editorRef.current.setValue(generatedCode);
-      } else {
-        // Fallback or log error if editor instance not available
-        console.warn("Editor instance not available to set value programmatically.");
-        // The editor might still pick up the change via defaultValue on next render if key changes, but direct update is better.
       }
 
-      // Immediately run the generated script AFTER setting state
+      // Immediately run the generated script
       await handleRun(generatedCode);
 
     } catch (err) {
@@ -297,17 +314,17 @@ function App() {
     }
   };
 
-  // Clear output
-  const handleClearOutput = () => {
+  // 清除输出
+  const handleClearOutput = useCallback(() => {
     setOutput('');
-    setExecutionError(undefined); // Clear execution error too
-  };
+    setExecutionError(undefined);
+  }, []);
 
-  // Prepare props for Layout component
+  // 准备布局组件属性
   const headerProps = {
-    onRunClick: () => handleRun(script),
-    isRunning: isRunning,
-    isRunDisabled: isRunning || !script.trim() || !nuwaInterface
+    onRunClick: handleRunClick,
+    isRunning,
+    isRunDisabled: isRunning || !editorContent.trim() || !nuwaInterface
   };
 
   const sidebarContent = activeSidePanel === 'examples' ? (
@@ -330,8 +347,8 @@ function App() {
     />
   );
 
-  // Render main panel content based on selected example
-  const mainPanelContent = (
+  // Memoize the mainPanelContent to prevent unnecessary re-renders
+  const mainPanelContent = useMemo(() => (
     <>
       {/* Display Execution Error */}
       {executionError && (
@@ -376,27 +393,28 @@ function App() {
         </>
       )}
     </>
-  );
+  ), [executionError, selectedExample?.componentId, selectedExample?.id, shapes, handleCanvasChange, output, isRunning, handleClearOutput]);
 
-  const scriptPanelContent = (
+  // Memoize the scriptPanelContent to prevent unnecessary re-renders
+  const scriptPanelContent = useMemo(() => (
     <Editor
-      key={selectedExample?.id ? `${selectedExample.id}-${script}` : `default-${script}`}
-      defaultValue={script}
+      key={selectedExample?.id || 'default'} 
+      defaultValue={editorContent}
       readOnly={isRunning}
-      onChange={(newCode = '') => setScript(newCode)}
+      onChange={handleScriptChange}
       language="nuwa"
       editorInstanceRef={editorRef}
     />
-  );
+  ), [selectedExample?.id, isRunning, handleScriptChange, editorContent]);
 
-  const chatPanelContent = (
+  const chatPanelContent = useMemo(() => (
     <AIChat 
       onSendMessage={handleAIChatMessage}
       messages={messages}
       isProcessing={isGenerating}
       apiKeySet={!!apiKey}
     />
-  );
+  ), [handleAIChatMessage, messages, isGenerating, apiKey]);
 
   // Build dynamic title for main panel based on selected example
   const getMainPanelTitle = () => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import DrawingCanvas from './DrawingCanvas';
 import TradingDashboard from './trading/TradingDashboard';
 
@@ -12,11 +12,14 @@ export const COMPONENT_IDS = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyComponent = React.ComponentType<any>;
 
-// Define component mapping
+// Define component mapping with memoized components for better performance
 const componentMap: Record<string, AnyComponent> = {
-  [COMPONENT_IDS.CANVAS]: DrawingCanvas,
-  [COMPONENT_IDS.TRADING_DASHBOARD]: TradingDashboard,
+  [COMPONENT_IDS.CANVAS]: DrawingCanvas, // DrawingCanvas is already memoized
+  [COMPONENT_IDS.TRADING_DASHBOARD]: memo(TradingDashboard), // Memoize TradingDashboard
 };
+
+// Cache for memoized rendered components to prevent unnecessary re-renders
+const componentCache: Record<string, React.ReactNode> = {};
 
 /**
  * Render component based on component ID
@@ -33,10 +36,16 @@ export const renderExampleComponent = (componentId: string, props: any = {}) => 
     return null;
   }
   
-  // Log props being passed to component
-  console.log(`[ExampleComponents] Rendering component ${componentId} with props:`, props);
+  // Create a cache key based on componentId and serialized props
+  // Only re-render if the component id or props actually change
+  const cacheKey = `${componentId}-${JSON.stringify(props)}`;
   
-  return <Component {...props} />;
+  if (!componentCache[cacheKey]) {
+    componentCache[cacheKey] = <Component {...props} />;
+    console.log(`[ExampleComponents] Rendering component ${componentId} with props:`, props);
+  }
+  
+  return componentCache[cacheKey];
 };
 
-export default componentMap; 
+export default componentMap;

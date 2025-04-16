@@ -1,19 +1,19 @@
-import React, { useRef, useEffect } from 'react';
-import { Stage, Layer, Line, Rect, Circle, Path } from 'react-konva'; // Removed Shape as it wasn't used
+import React, { useRef, useEffect, memo, useState } from 'react';
+import { Stage, Layer, Line, Rect, Circle, Path } from 'react-konva';
 import Konva from 'konva';
 
 // Define the possible shapes AI can draw
 export type DrawableShape = 
   | { type: 'line', points: number[], color: string, strokeWidth: number }
-  | { type: 'rect', x: number, y: number, width: number, height: number, color: string, fill?: string } // Added optional fill
-  | { type: 'circle', x: number, y: number, radius: number, color: string, fill?: string } // Added optional fill
-  | { type: 'path', d: string, color: string, fill?: string, strokeWidth: number }; // Added path type
+  | { type: 'rect', x: number, y: number, width: number, height: number, color: string, fill?: string }
+  | { type: 'circle', x: number, y: number, radius: number, color: string, fill?: string }
+  | { type: 'path', d: string, color: string, fill?: string, strokeWidth: number };
 
 interface DrawingCanvasProps {
   width: number;
   height: number;
   shapes: DrawableShape[];
-  onCanvasChange: (json: object) => void; // Restored prop, made mandatory
+  onCanvasChange: (json: object) => void;
 }
 
 // Function to get the JSON representation of canvas
@@ -25,33 +25,69 @@ export const getCanvasJSON = (stageRef: React.RefObject<Konva.Stage | null>): ob
   return JSON.parse(stageJSON);
 };
 
-const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ width, height, shapes, onCanvasChange }) => {
+// Use React.memo to prevent unnecessary re-renders of the canvas component
+const DrawingCanvas: React.FC<DrawingCanvasProps> = memo(({ width, height, shapes, onCanvasChange }) => {
   const stageRef = useRef<Konva.Stage | null>(null);
   const lastJsonRef = useRef<string | null>(null); // Ref to store last JSON string
+  const shapesRef = useRef<DrawableShape[]>([]); // Initialize empty to ensure first render
+  const [forceUpdateKey, setForceUpdateKey] = useState(0); // Add a state to force refresh
 
+  // Update render on initial load and whenever shapes array changes
   useEffect(() => {
-    if (stageRef.current && onCanvasChange) {
+    // Add debug logs to track shapes changes
+    console.log('[DrawingCanvas] Shapes changed:', shapes.length, 'shapes');
+    
+    // Detect changes from previous shapes
+    const prevShapesJSON = JSON.stringify(shapesRef.current);
+    const newShapesJSON = JSON.stringify(shapes);
+    const hasShapesChanged = prevShapesJSON !== newShapesJSON;
+    
+    // Ensure a force update triggers after initial render, even if shapes are the same
+    if (hasShapesChanged) {
+      console.log('[DrawingCanvas] Shapes content changed, updating...');
+      shapesRef.current = [...shapes]; // Copy new shapes to ref
+      
+      // Force component refresh - this solves the initial rendering issue
+      setForceUpdateKey(prev => prev + 1);
+      
       // Use requestAnimationFrame to ensure Konva has rendered
-      requestAnimationFrame(() => { 
-        if (!stageRef.current) return; // Check ref again inside async callback
-        
-        const stage = stageRef.current;
-        const jsonString = stage.toJSON(); // Get JSON string representation
+      if (stageRef.current && onCanvasChange) {
+        requestAnimationFrame(() => { 
+          if (!stageRef.current) return;
+          
+          const stage = stageRef.current;
+          const jsonString = stage.toJSON();
 
-        // Only call onCanvasChange if JSON string has actually changed
-        if (jsonString !== lastJsonRef.current) {
-          lastJsonRef.current = jsonString; // Update the ref
-          try {
-            const jsonObject = JSON.parse(jsonString); // Parse string to object
-            onCanvasChange(jsonObject);
-          } catch (e) {
-            console.error("Failed to parse Konva stage JSON:", e);
+          // Only call onCanvasChange if JSON string has actually changed
+          if (jsonString !== lastJsonRef.current) {
+            lastJsonRef.current = jsonString;
+            try {
+              const jsonObject = JSON.parse(jsonString);
+              onCanvasChange(jsonObject);
+            } catch (e) {
+              console.error("Failed to parse Konva stage JSON:", e);
+            }
           }
-        }
-      });
+        });
+      }
+    } else {
+      console.log('[DrawingCanvas] Shapes reference changed but content is the same');
     }
-    // Dependency array: only re-run if shapes array reference changes OR onCanvasChange function reference changes.
   }, [shapes, onCanvasChange]); 
+
+  // Perform initial render immediately after component mount
+  useEffect(() => {
+    console.log('[DrawingCanvas] Initial mount, forcing first render');
+    // Force a render when component mounts
+    setForceUpdateKey(prev => prev + 1);
+    
+    // Cleanup on component unmount
+    return () => {
+      console.log('[DrawingCanvas] Component unmounting');
+    };
+  }, []);
+
+  console.log(`[DrawingCanvas] Rendering with key ${forceUpdateKey}, ${shapes.length} shapes`);
 
   return (
     <Stage 
@@ -59,6 +95,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ width, height, shapes, on
       width={width} 
       height={height} 
       style={{ border: '1px solid #ccc', background: '#fff' }}
+      key={`canvas-stage-${forceUpdateKey}`} // Add key to support forced re-renders
     >
       <Layer>
         {shapes.map((shape, index) => {
@@ -66,7 +103,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ width, height, shapes, on
             case 'line':
               return (
                 <Line
-                  key={index}
+                  key={`${index}-${forceUpdateKey}`}
                   points={shape.points}
                   stroke={shape.color}
                   strokeWidth={shape.strokeWidth}
@@ -77,41 +114,39 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ width, height, shapes, on
             case 'rect':
               return (
                 <Rect
-                  key={index}
+                  key={`${index}-${forceUpdateKey}`}
                   x={shape.x}
                   y={shape.y}
                   width={shape.width}
                   height={shape.height}
                   stroke={shape.color}
-                  fill={shape.fill} // Use fill color if provided
-                  strokeWidth={1} // Default stroke width for rect
+                  fill={shape.fill}
+                  strokeWidth={1}
                 />
               );
             case 'circle':
               return (
                 <Circle
-                  key={index}
+                  key={`${index}-${forceUpdateKey}`}
                   x={shape.x}
                   y={shape.y}
                   radius={shape.radius}
                   stroke={shape.color}
-                  fill={shape.fill} // Use fill color if provided
-                  strokeWidth={1} // Default stroke width for circle
+                  fill={shape.fill}
+                  strokeWidth={1}
                 />
               );
             case 'path':
               return (
                 <Path
-                  key={index}
-                  data={shape.d} // Use the 'd' property for path data
+                  key={`${index}-${forceUpdateKey}`}
+                  data={shape.d}
                   stroke={shape.color}
                   strokeWidth={shape.strokeWidth}
                   fill={shape.fill}
                 />
               );
             default:
-              // Ensure exhaustiveness checking if new shape types are added
-              // const _exhaustiveCheck: never = shape; 
               console.warn("Unsupported shape type:", shape);
               return null; 
           }
@@ -119,6 +154,6 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ width, height, shapes, on
       </Layer>
     </Stage>
   );
-};
+});
 
 export default DrawingCanvas;

@@ -150,6 +150,8 @@ const Editor: React.FC<EditorProps> = ({
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | undefined>(undefined);
+  const lastKnownValueRef = useRef<string>(defaultValue);
+  const isChangingRef = useRef<boolean>(false);
   
   // Use document.documentElement.classList to determine dark mode
   const isDarkMode = () => document.documentElement.classList.contains('dark');
@@ -167,26 +169,62 @@ const Editor: React.FC<EditorProps> = ({
       viewRef.current?.destroy();
       viewRef.current = undefined;
     };
-  }, [defaultValue, onChange, language, readOnly]);
+  }, []);  // 这里移除了依赖项，防止重新初始化编辑器
   
-  // Update editor content when default value changes from outside
+  // 专门处理外部传入的defaultValue变更
   useEffect(() => {
-    const currentValue = viewRef.current?.state.doc.toString() || '';
-    if (viewRef.current && defaultValue !== currentValue) {
-      const transaction = viewRef.current.state.update({
-        changes: { from: 0, to: currentValue.length, insert: defaultValue },
+    // 只在编辑器已创建，并且defaultValue确实发生变化时更新
+    if (viewRef.current && defaultValue !== lastKnownValueRef.current && !isChangingRef.current) {
+      // 设置标志避免循环更新
+      isChangingRef.current = true;
+      lastKnownValueRef.current = defaultValue;
+      
+      // 保存当前选择状态和滚动位置
+      const view = viewRef.current;
+      const currentSelection = view.state.selection;
+      const scrollInfo = {
+        top: view.scrollDOM.scrollTop,
+        left: view.scrollDOM.scrollLeft
+      };
+      
+      // 应用事务更新
+      const transaction = view.state.update({
+        changes: { from: 0, to: view.state.doc.length, insert: defaultValue },
+        selection: currentSelection // 保留选择状态
       });
-      viewRef.current.dispatch(transaction);
+      
+      view.focus(); // 确保编辑器保持焦点
+      view.dispatch(transaction);
+      
+      // 在UI更新后恢复滚动位置
+      setTimeout(() => {
+        if (viewRef.current) {
+          viewRef.current.scrollDOM.scrollTop = scrollInfo.top;
+          viewRef.current.scrollDOM.scrollLeft = scrollInfo.left;
+        }
+        isChangingRef.current = false;
+      }, 0);
     }
   }, [defaultValue]);
   
-  // Create or recreate editor with current settings
+  // 创建或重新创建编辑器实例
   const createEditor = () => {
     const dark = isDarkMode();
     const currentValue = viewRef.current?.state.doc.toString() || defaultValue;
     
     if (viewRef.current) {
+      // 保存重要状态
+      const hasFocus = document.activeElement === viewRef.current.contentDOM;
+      const scrollInfo = {
+        top: viewRef.current.scrollDOM.scrollTop,
+        left: viewRef.current.scrollDOM.scrollLeft
+      };
+      
       viewRef.current.destroy();
+      viewRef.current = undefined;
+      
+      // 在销毁后确保元素存在
+      if (!editorRef.current) return;
     }
     
     const startState = EditorState.create({
@@ -204,8 +242,10 @@ const Editor: React.FC<EditorProps> = ({
         syntaxHighlighting(dark ? darkHighlightStyle : lightHighlightStyle),
         dark ? darkTheme : lightTheme,
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            onChange(update.state.doc.toString());
+          if (update.docChanged && !isChangingRef.current) {
+            const newValue = update.state.doc.toString();
+            lastKnownValueRef.current = newValue;
+            onChange(newValue);
           }
         }),
         EditorState.readOnly.of(readOnly),
@@ -220,32 +260,60 @@ const Editor: React.FC<EditorProps> = ({
 
       viewRef.current = view;
 
-      // Expose API methods through ref if provided
+      // 提供API方法
       if (editorInstanceRef) {
         editorInstanceRef.current = {
           setValue: (value: string) => {
+            if (value === view.state.doc.toString()) return;
+            
+            isChangingRef.current = true;
+            
+            // 保存状态
+            const hasFocus = document.activeElement === view.contentDOM;
+            const scrollInfo = {
+              top: view.scrollDOM.scrollTop,
+              left: view.scrollDOM.scrollLeft
+            };
+            
+            // 更新内容
             const transaction = view.state.update({
               changes: { from: 0, to: view.state.doc.length, insert: value }
             });
             view.dispatch(transaction);
+            lastKnownValueRef.current = value;
+            
+            // 恢复状态
+            if (hasFocus) view.focus();
+            
+            setTimeout(() => {
+              view.scrollDOM.scrollTop = scrollInfo.top;
+              view.scrollDOM.scrollLeft = scrollInfo.left;
+              isChangingRef.current = false;
+            }, 0);
           }
         };
       }
     }
   };
   
-  // Listen for dark mode changes using MutationObserver
+  // 监听暗黑模式变化
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
+      for (const mutation of mutations) {
         if (
           mutation.type === 'attributes' &&
           mutation.attributeName === 'class' &&
           mutation.target === document.documentElement
         ) {
+          // 暗黑模式变化时保存编辑器状态，然后重新创建
+          const hasFocus = viewRef.current && document.activeElement === viewRef.current.contentDOM;
           createEditor();
+          if (hasFocus && viewRef.current) {
+            setTimeout(() => viewRef.current?.focus(), 10);
+          }
+          break;
         }
-      });
+      }
     });
     
     observer.observe(document.documentElement, {
