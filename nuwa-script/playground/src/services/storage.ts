@@ -9,6 +9,22 @@ export class StorageService {
     return localStorage.getItem(`${this.PREFIX}api_key`) || '';
   }
 
+  saveBaseUrl(baseUrl: string): void {
+    localStorage.setItem(`${this.PREFIX}base_url`, baseUrl);
+  }
+
+  getBaseUrl(): string | null {
+    return localStorage.getItem(`${this.PREFIX}base_url`);
+  }
+
+  saveModel(model: string): void {
+    localStorage.setItem(`${this.PREFIX}model`, model);
+  }
+
+  getModel(): string | null {
+    return localStorage.getItem(`${this.PREFIX}model`);
+  }
+
   saveCustomScript(id: string, script: string): void {
     const customScripts = this.getCustomScripts();
     customScripts[id] = script;
