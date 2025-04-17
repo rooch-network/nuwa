@@ -12,7 +12,41 @@ import type {
 import type { DrawableShape } from '../components/DrawingCanvas';
 
 // Define the shared description string as a constant
-const CANVAS_JSON_DESCRIPTION = `JSON representation of the canvas for better spatial understanding.\nThis contains detailed information about all shapes and their positions on the canvas.\nFormat:\n- canvas dimensions (width: 500, height: 400)\n- shapes array containing all objects with their precise coordinates\n- each shape has properties like:\n  * x, y: position coordinates (origin is top-left)\n  * width, height: dimensions of rectangles\n  * radius: size of circles\n  * points: coordinates for lines [x1,y1,x2,y2]\n  * color: stroke color\n  * fill: fill color if present\n\nSpatial Guidelines:\n- x increases from left to right (0 at left edge, 500 at right edge)\n- y increases from top to bottom (0 at top edge, 400 at bottom edge)\n- shapes may overlap if their coordinates and dimensions intersect\n- to place objects "next to" others, ensure their boundaries don't overlap\n- typically, maintain at least 20-50 pixels spacing between objects\n- center of canvas is approximately at x: 250, y: 200`;
+// Updated description reflecting the actual nested JSON structure, removing escapes
+const CANVAS_JSON_DESCRIPTION = `JSON representation of the canvas using a nested structure.
+  Structure Overview:
+    - Top level object: Represents the Stage (canvas).
+    - attrs: Contains stage attributes like 'width' (500) and 'height' (400).
+    - className: "Stage"
+    - children: An array containing Layer objects.
+
+    - Layer object: Represents a drawing layer within the stage.
+      - attrs: Layer specific attributes (usually empty).
+      - className: "Layer"
+      - children: An array containing the actual Shape objects drawn on this layer.
+
+    - Shape object: Represents a single shape (Rect, Path, Circle, etc.).
+      - className: Specifies the shape type (e.g., "Rect", "Path", "Circle").
+      - attrs: Shape specific attributes.
+        - For Rect:
+          - x: Top-left X coordinate
+          - y: Top-left Y coordinate
+          - width: Rectangle width
+          - height: Rectangle height
+          - color: Border color
+          - fill: Fill color
+        - For Circle:
+          - x: Center X coordinate
+          - y: Center Y coordinate
+          - radius: Circle radius
+          - color: Border color
+          - fill: Fill color
+        - For Path:
+          - d: SVG path data string
+          - color: Path color
+          - fill: Fill color
+          - width: Path stroke width
+`;
 
 // --- Canvas State Interface ---
 export interface CanvasState {
