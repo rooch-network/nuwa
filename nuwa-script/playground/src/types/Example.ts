@@ -1,7 +1,7 @@
 import { ToolSchema } from '../services/interpreter';
 
 // Component state management interfaces
-export interface ComponentStateManager<T = any> {
+export interface ComponentStateManager<T = unknown> {
   // Get current state
   getState(): T;
   
@@ -9,7 +9,7 @@ export interface ComponentStateManager<T = any> {
   subscribe(listener: () => void): () => void;
   
   // Update state in registry for AI
-  updateStateInRegistry(context?: any): void;
+  updateStateInRegistry(context?: unknown): void;
 }
 
 export interface ExampleConfig {

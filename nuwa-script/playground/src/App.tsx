@@ -90,28 +90,7 @@ function App() {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null); // Keep ref if Editor needs it
   const [editorContent, setEditorContent] = useState(''); // Editor content state
 
-  // Initialization
-  useEffect(() => {
-    const lastExampleId = storageService.getLastSelectedExample() || examples[0]?.id;
-    if (lastExampleId && examplesById[lastExampleId]) {
-      handleSelectExample(examplesById[lastExampleId]);
-    } else if (examples.length > 0) {
-      handleSelectExample(examples[0]);
-    }
 
-    // Subscribe to canvas shape changes 
-    const unsubscribe = subscribeToCanvasChanges(() => {
-      console.log('[App.tsx] Syncing shapes via subscription. Global state:', JSON.stringify(canvasShapes)); 
-      // Force state update to trigger re-rendering
-      setShapes(() => {
-        // Ensure it's a new reference to trigger rendering
-        return [...canvasShapes];
-      });
-    });
-
-    // Cleanup subscription 
-    return () => unsubscribe();
-  }, []); // Runs once on mount
 
   // Memoize the onCanvasChange callback to prevent unnecessary re-renders
   const handleCanvasChange = useCallback((json: object) => {
@@ -137,6 +116,30 @@ function App() {
     // Setup interpreter AFTER potentially clearing state
     setupInterpreter(example);
   }, []);
+
+  // Initialization
+  useEffect(() => {
+    const lastExampleId = storageService.getLastSelectedExample() || examples[0]?.id;
+    if (lastExampleId && examplesById[lastExampleId]) {
+      handleSelectExample(examplesById[lastExampleId]);
+    } else if (examples.length > 0) {
+      handleSelectExample(examples[0]);
+    }
+
+    // Subscribe to canvas shape changes 
+    const unsubscribe = subscribeToCanvasChanges(() => {
+      console.log('[App.tsx] Syncing shapes via subscription. Global state:', JSON.stringify(canvasShapes)); 
+      // Force state update to trigger re-rendering
+      setShapes(() => {
+        // Ensure it's a new reference to trigger rendering
+        return [...canvasShapes];
+      });
+    });
+
+    // Cleanup subscription 
+    return () => unsubscribe();
+  }, [handleSelectExample]); // Runs once on mount
+
 
   // Setup interpreter and tools
   const setupInterpreter = (example: ExampleConfig) => {
@@ -268,9 +271,14 @@ function App() {
     setExecutionError(undefined); // Clear errors
 
     try {
-      // Create AIService instance with apiKey, baseUrl, and modelName
-      const aiService = new AIService({ apiKey, baseUrl, model: modelName });
-      const toolRegistry = nuwaInterface.toolRegistry;
+      // Create AIService instance with apiKey, baseUrl, modelName, and appSpecificGuidance
+      const aiService = new AIService({
+        apiKey: apiKey,
+        baseUrl: baseUrl,
+        model: modelName,
+        appSpecificGuidance: selectedExample?.aiPrompt,
+      });
+      const toolRegistry = nuwaInterface!.toolRegistry;
       const generatedScript = await aiService.generateNuwaScript(message, toolRegistry);
 
       setEditorContent(generatedScript);
@@ -285,7 +293,7 @@ function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [apiKey, baseUrl, modelName, nuwaInterface, handleRun, setApiKey, setMessages, setIsGenerating, setOutput, setExecutionError, setEditorContent]);
+  }, [apiKey, nuwaInterface, baseUrl, modelName, selectedExample?.aiPrompt, handleRun]);
 
   // Handle API Key change from input - Wrap in useCallback
   const handleApiKeyChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
