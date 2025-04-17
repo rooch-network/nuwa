@@ -42,6 +42,8 @@ export class AIService {
     console.log(`Constructed API URL: ${fullUrl}`);
 
     try {
+      const final_prompt = buildPrompt(toolRegistry, prompt, { appSpecificGuidance: this.options.appSpecificGuidance });
+      console.log(`Final prompt: ${final_prompt}`);
       const response = await fetch(fullUrl, {
         method: 'POST',
         headers: {
@@ -51,7 +53,7 @@ export class AIService {
         body: JSON.stringify({
           model: this.options.model,
           messages: [
-            { role: "system", content: buildPrompt(toolRegistry, prompt, { appSpecificGuidance: this.options.appSpecificGuidance })},
+            { role: "system", content: final_prompt},
           ],
           max_tokens: this.options.maxTokens,
           temperature: this.options.temperature,

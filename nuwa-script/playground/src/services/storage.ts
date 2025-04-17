@@ -25,6 +25,17 @@ export class StorageService {
     return localStorage.getItem(`${this.PREFIX}model`);
   }
 
+  saveTemperature(temperature: number): void {
+    localStorage.setItem(`${this.PREFIX}temperature`, temperature.toString());
+  }
+
+  getTemperature(): number | null {
+    const tempStr = localStorage.getItem(`${this.PREFIX}temperature`);
+    if (tempStr === null) return null;
+    const tempNum = parseFloat(tempStr);
+    return isNaN(tempNum) ? null : tempNum;
+  }
+
   saveCustomScript(id: string, script: string): void {
     const customScripts = this.getCustomScripts();
     customScripts[id] = script;

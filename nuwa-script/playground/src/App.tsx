@@ -80,6 +80,7 @@ function App() {
   const [apiKey, setApiKey] = useState(storageService.getApiKey());
   const [baseUrl, setBaseUrl] = useState(storageService.getBaseUrl() || 'https://api.openai.com');
   const [modelName, setModelName] = useState(storageService.getModel() || 'gpt-4o');
+  const [temperature, setTemperature] = useState<number>(storageService.getTemperature() ?? 0.3);
   const [isRunning, setIsRunning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   // State moved to Layout: activeSidePanel, scriptPanelHeight, isDragging
@@ -271,12 +272,13 @@ function App() {
     setExecutionError(undefined); // Clear errors
 
     try {
-      // Create AIService instance with apiKey, baseUrl, modelName, and appSpecificGuidance
+      // Create AIService instance with apiKey, baseUrl, modelName, appSpecificGuidance, and temperature
       const aiService = new AIService({
         apiKey: apiKey,
         baseUrl: baseUrl,
         model: modelName,
         appSpecificGuidance: selectedExample?.aiPrompt,
+        temperature: temperature,
       });
       const toolRegistry = nuwaInterface!.toolRegistry;
       const generatedScript = await aiService.generateNuwaScript(message, toolRegistry);
@@ -293,7 +295,7 @@ function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [apiKey, nuwaInterface, baseUrl, modelName, selectedExample?.aiPrompt, handleRun]);
+  }, [apiKey, nuwaInterface, baseUrl, modelName, selectedExample?.aiPrompt, temperature, handleRun]);
 
   // Handle API Key change from input - Wrap in useCallback
   const handleApiKeyChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -318,6 +320,16 @@ function App() {
     storageService.saveModel(newModel); // Save on change
     // Dependency: setModelName
   }, [setModelName]);
+
+  // Add handler for Temperature change - Wrap in useCallback
+  const handleTemperatureChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const newTempStr = event.target.value;
+    const newTempNum = parseFloat(newTempStr);
+    if (!isNaN(newTempNum) && newTempNum >= 0 && newTempNum <= 2) { // Basic validation
+      setTemperature(newTempNum);
+      storageService.saveTemperature(newTempNum); // Save on change
+    }
+  }, [setTemperature]);
 
   // Clear output
   const handleClearOutput = useCallback(() => {
@@ -448,6 +460,20 @@ function App() {
             className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           />
         </div>
+        <div>
+          <label htmlFor="temperatureInput" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Temperature:</label>
+          <input 
+            id="temperatureInput" 
+            type="number" 
+            value={temperature}
+            onChange={handleTemperatureChange}
+            min="0"
+            max="2"
+            step="0.1"
+            placeholder="e.g., 0.7"
+            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+        </div>
       </div>
       <AIChat 
         messages={messages} 
@@ -456,7 +482,7 @@ function App() {
         apiKeySet={!!apiKey}
       />
     </div>
-  ), [handleAIChatMessage, messages, isGenerating, apiKey, baseUrl, modelName, handleApiKeyChange, handleBaseUrlChange, handleModelChange]);
+  ), [handleAIChatMessage, messages, isGenerating, apiKey, baseUrl, modelName, temperature, handleApiKeyChange, handleBaseUrlChange, handleModelChange, handleTemperatureChange]);
 
   // Build dynamic title for main panel based on selected example
   const getMainPanelTitle = () => {
