@@ -2,7 +2,7 @@ import { Token, TokenType, tokenize } from './lexer';
 import * as AST from './ast';
 import { JsonValue } from './values'; // For literal parsing
 
-class ParserError extends Error {
+export class ParserError extends Error {
     constructor(message: string, public token?: Token) {
         const position = token ? ` at ${token.line}:${token.column}` : '';
         super(`${message}${position}`);
