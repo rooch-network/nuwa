@@ -1,10 +1,7 @@
 import { ToolRegistry, ToolSchema } from './tools';
 
 // Keep the template definition here
-export const GENERATION_PROMPT_TEMPLATE = `You are an AI assistant that generates NuwaScript code to fulfill user requests.
-NuwaScript is a simple, safe scripting language.
-
-# NuwaScript Syntax Rules:
+export const GENERATION_PROMPT_TEMPLATE = `# NuwaScript Syntax Rules:
 - Keywords MUST be UPPERCASE: LET, CALL, IF, THEN, ELSE, END, FOR, IN, DO, AND, OR, NOT. (PRINT, NOW, FORMAT are built-in functions, not keywords)
 - Built-in function names MUST be UPPERCASE: PRINT, NOW, FORMAT.
 - Boolean literals MUST be lowercase: true, false.
@@ -54,9 +51,6 @@ This represents the current state of the system. You can use this information to
 
 {app_specific_guidance}
 
-# User Task:
-{user_task}
-
 # Instructions:
 
 - Generate *only* the NuwaScript code required to complete the user task using the defined syntax and available tools.
@@ -69,7 +63,6 @@ This represents the current state of the system. You can use this information to
   - **Example:** To print a message like "Placing the tree trunk at x=100, y=200", DO NOT generate code like \`// PRINT("Placing... x=" + trunkX + ... )\`. INSTEAD, generate this code: \`PRINT(FORMAT("Placing the tree trunk at x={tx}, y={ty}", {tx: trunkX, ty: trunkY}))\`.
 - **IMPORTANT: When assigning the result of a tool call to a variable, the \`CALL\` keyword is mandatory. Use the format: \`LET variable = CALL tool_name { ... }\`. Never omit the \`CALL\` keyword in this context.**
 - Consider the "# Current System State:" information when generating the code.
-# NuwaScript Code (provide raw code with no markdown formatting or code blocks):
 `;
 
 
@@ -93,13 +86,11 @@ function formatToolSchemasForPrompt(registry: ToolRegistry): string {
 /**
  * Builds the complete prompt string for the LLM.
  * @param registry The ToolRegistry containing available tools.
- * @param userTask The user's request.
  * @param options Optional parameters including application-specific guidance and state inclusion.
  * @returns The formatted prompt string.
  */
 export function buildPrompt(
     registry: ToolRegistry, 
-    userTask: string, 
     options: {
         includeState?: boolean;
         appSpecificGuidance?: string;
@@ -114,8 +105,7 @@ export function buildPrompt(
     const prompt = GENERATION_PROMPT_TEMPLATE
         .replace('{tools_schema}', toolSchemasString)
         .replace('{state_info}', stateInfo)
-        .replace('{app_specific_guidance}', appSpecificGuidance)
-        .replace('{user_task}', userTask);
+        .replace('{app_specific_guidance}', appSpecificGuidance);
     
     return prompt;
 }

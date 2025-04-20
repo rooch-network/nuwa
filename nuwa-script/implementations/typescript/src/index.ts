@@ -35,3 +35,19 @@ export * as AST from './ast';
 
 // Re-export additional types
 export type { Scope, OutputHandler } from './interpreter';
+
+export {
+    InterpreterError,
+    RuntimeError,
+    TypeError,
+    UndefinedVariableError,
+    MemberAccessError,
+    ToolNotFoundError,
+    ToolArgumentError,
+    ToolExecutionError,
+    UnsupportedOperationError,
+    DivisionByZeroError,
+    InvalidConditionError,
+    InvalidIterableError,
+    IndexOutOfBoundsError,
+} from './errors';
