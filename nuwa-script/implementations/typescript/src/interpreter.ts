@@ -12,6 +12,7 @@ import {
     IndexOutOfBoundsError
 } from './errors';
 import { isArrayIndexExpression, isMemberAccessExpression, isListLiteralExpr, isObjectLiteralExpr } from './ast';
+import { parse } from './parser';
 
 // --- Scope Class Definition ---
 export class Scope {
@@ -113,6 +114,22 @@ export class Interpreter {
 
         // Add future built-ins here, e.g.:
         // this.builtinFunctions.set('LENGTH', this.evaluateLengthFunction);
+    }
+
+    /**
+     * Parses and executes a NuwaScript string directly.
+     * @param scriptText The NuwaScript code string.
+     * @param initialScopeData Optional initial variable scope data.
+     * @returns A Promise resolving to the final variable scope.
+     * @throws LexerError or ParserError if parsing fails.
+     * @throws InterpreterError or subclasses if execution fails.
+     */
+    async executeScript(scriptText: string, initialScopeData?: Record<string, JsonValue>): Promise<Scope> {
+        // 1. Parse the script text into an AST
+        const ast = parse(scriptText);
+
+        // 2. Call the existing execute method with the parsed AST
+        return this.execute(ast, initialScopeData);
     }
 
     /**

@@ -87,8 +87,7 @@ export async function runScript(
     initialScope?: Record<string, JsonValue>
 ): Promise<Scope> {
     const interpreter = new Interpreter(toolRegistry, outputHandler);
-    const ast = parse(scriptText);
-    return await interpreter.execute(ast, initialScope);
+    return await interpreter.executeScript(scriptText, initialScope);
 }
 
 // --- Setup Helper (Optional but recommended) ---
