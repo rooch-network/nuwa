@@ -274,7 +274,30 @@ export function addTrade(trade: TradeHistory): void {
 export const tradingStateManager: ComponentStateManager<TradingState> = {
   getState: () => ({ ...tradingState }),
   subscribe: subscribeToTradingChanges,
-  updateStateInRegistry: updateTradingState
+  updateStateInRegistry: updateTradingState,
+  resetState: () => {
+    console.log('[trading.ts] Resetting trading state...');
+    // Reset assets to initial state (deep copy needed for nested objects)
+    tradingState.assets = [
+      { symbol: 'USDC', balance: 10000, price: 1.0, change24h: 0 },
+      { symbol: 'BTC', balance: 0.5, price: 67500.42, change24h: 2.3 },
+      { symbol: 'ETH', balance: 5.0, price: 3250.18, change24h: -1.2 },
+      { symbol: 'SOL', balance: 100.0, price: 142.87, change24h: 5.7 },
+    ];
+    // Reset trade history to initial state (deep copy)
+    tradingState.tradeHistory = [
+      { id: '1', fromSymbol: 'USDC', toSymbol: 'BTC', fromAmount: 1000, toAmount: 0.01478, timestamp: Date.now() - 3600000 * 2 },
+      { id: '2', fromSymbol: 'USDC', toSymbol: 'ETH', fromAmount: 500, toAmount: 0.1525, timestamp: Date.now() - 3600000 * 24 },
+      { id: '3', fromSymbol: 'ETH', toSymbol: 'SOL', fromAmount: 0.5, toAmount: 11.26, timestamp: Date.now() - 3600000 * 48 },
+    ];
+    // Recalculate total value and update timestamp
+    tradingState.totalValue = calculateTotalValue(tradingState.assets);
+    tradingState.lastUpdated = Date.now();
+
+    // Notify listeners and update registry
+    notifyTradingChange();
+    updateTradingState(); // Update registry with reset state
+  }
 };
 
 // --- End Trading State Management ---

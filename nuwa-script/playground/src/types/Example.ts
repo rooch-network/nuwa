@@ -10,6 +10,9 @@ export interface ComponentStateManager<T = unknown> {
   
   // Update state in registry for AI
   updateStateInRegistry(context?: unknown): void;
+  
+  // Reset state
+  resetState?: () => void;
 }
 
 export interface ExampleConfig {

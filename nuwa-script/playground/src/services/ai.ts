@@ -1,6 +1,12 @@
 import { ToolRegistry } from 'nuwa-script';
 import { buildPrompt } from 'nuwa-script';
 
+// Define a type for message history
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface AIServiceOptions {
   apiKey: string;
   model?: string;
@@ -26,7 +32,11 @@ export class AIService {
     }
   }
 
-  async generateNuwaScript(prompt: string, toolRegistry: ToolRegistry): Promise<string> {
+  async generateNuwaScript(
+    prompt: string, 
+    toolRegistry: ToolRegistry,
+    history: Message[] = [] // Add optional history parameter
+  ): Promise<string> {
     if (!this.options.apiKey) {
       throw new Error('API key is required');
     }
@@ -73,8 +83,9 @@ ${nuwaScriptInstructions}`;
         body: JSON.stringify({
           model: this.options.model,
           messages: [
-            { role: "system", content: finalSystemPrompt }, // Use the combined prompt
-            { role: "user", content: prompt } // User task is now a separate user message
+            { role: "system", content: finalSystemPrompt }, 
+            ...history, // Spread the history messages
+            { role: "user", content: prompt } // Current user prompt at the end
           ],
           max_tokens: this.options.maxTokens,
           temperature: this.options.temperature,

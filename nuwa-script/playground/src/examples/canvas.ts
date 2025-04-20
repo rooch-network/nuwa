@@ -242,7 +242,15 @@ export const canvasStateManager: ComponentStateManager<CanvasState> = {
     lastModified: canvasState.lastModified
   }),
   subscribe: subscribeToCanvasChanges,
-  updateStateInRegistry: updateCanvasState
+  updateStateInRegistry: updateCanvasState,
+  resetState: () => {
+    console.log('[canvas.ts] Resetting canvas state...');
+    canvasShapes.length = 0; // Clear the global shapes array
+    canvasJSON = {}; // Reset the global JSON object
+    notifyCanvasChange(); // Notify subscribers (like the UI component)
+    updateCanvasJSON({}); // Ensure the registry state is updated with empty JSON
+    updateCanvasState(); // Update other canvas-related state in the registry
+  }
 };
 
 // --- End State Management ---

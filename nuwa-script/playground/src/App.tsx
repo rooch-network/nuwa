@@ -27,7 +27,7 @@ import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
 // Define some types to supplement original component interfaces
 interface CustomMessage {
-  role: string;
+  role: 'user' | 'assistant'; // Align with Message type in ai.ts
   content: string;
 }
 
@@ -105,14 +105,12 @@ function App() {
     setEditorContent(example.script);
     setOutput('');
     setExecutionError(undefined);
+    setMessages([]); // Clear chat history when changing examples
     storageService.saveLastSelectedExample(example.id);
     
-    // Reset canvas state for canvas example
-    if (example.id === 'canvas') {
-      console.log('[App.tsx] Canvas example selected. Clearing shapes.');
-      canvasShapes.length = 0; // Clear global array
-      updateCanvasJSON({}); // Notify registry about empty canvas
-    }
+    // Call the example's resetState method if it exists
+    console.log(`[App.tsx] Calling resetState for ${example.id}...`);
+    example.stateManager?.resetState?.();
 
     // Setup interpreter AFTER potentially clearing state
     setupInterpreter(example);
@@ -281,7 +279,11 @@ function App() {
         temperature: temperature,
       });
       const toolRegistry = nuwaInterface!.toolRegistry;
-      const generatedScript = await aiService.generateNuwaScript(message, toolRegistry);
+      const generatedScript = await aiService.generateNuwaScript(
+        message,
+        toolRegistry,
+        messages
+      );
 
       setEditorContent(generatedScript);
 
@@ -295,7 +297,7 @@ function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [apiKey, nuwaInterface, baseUrl, modelName, selectedExample?.aiPrompt, temperature, handleRun]);
+  }, [apiKey, nuwaInterface, baseUrl, modelName, selectedExample?.aiPrompt, temperature, handleRun, messages]);
 
   // Handle API Key change from input - Wrap in useCallback
   const handleApiKeyChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
