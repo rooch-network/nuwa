@@ -460,6 +460,16 @@ export function startServer(port: number = 3000) {
 }
 
 // Example: Start the server if this script is run directly
-if (require.main === module) {
+// Use ESM equivalent to check if this is the main module
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+// process.argv[1] is the path to the script being executed
+// Use path.resolve to handle relative paths
+const mainScriptPath = path.resolve(process.argv[1]);
+
+if (__filename === mainScriptPath) {
+    console.log("[Server] Running as main module. Starting server...");
     startServer();
 } 

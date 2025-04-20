@@ -1,5 +1,5 @@
-import { Interpreter, OutputHandler, ToolRegistry } from "nuwa-script";
-import { AIService, AIResponse } from './aiService.js';
+import { Interpreter, OutputHandler, ToolRegistry, parse } from "nuwa-script";
+import { AIService } from './aiService.js';
 import OpenAI from 'openai';
 
 // --- Locally Defined Types --- 
@@ -48,7 +48,7 @@ class AgentOutputHandler implements OutputHandler {
 
     handlePrint(value: any): void {
         const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-        this.buffer.push(`PRINT: ${stringValue}`);
+        this.buffer.push(`${stringValue}`);
     }
 
     getBufferedOutput(): string {
@@ -57,6 +57,11 @@ class AgentOutputHandler implements OutputHandler {
 
     clearBuffer(): void {
         this.buffer = [];
+    }
+    
+    // Method to get the bound handler function, similar to playground
+    getHandler(): (value: any) => void {
+        return this.handlePrint.bind(this);
     }
 }
 
@@ -68,9 +73,9 @@ export class Agent {
 
     constructor(private participant: Participant) {
         this.toolRegistry = new ToolRegistry(); // Initialize ToolRegistry
-        this.interpreter = new Interpreter(this.toolRegistry); // Pass registry to Interpreter
         this.outputHandler = new AgentOutputHandler();
-        this.interpreter.registerOutputHandler(this.outputHandler);
+        // Pass the handler function to the Interpreter constructor
+        this.interpreter = new Interpreter(this.toolRegistry, this.outputHandler.getHandler()); 
         
         // TODO: Register actual tools into this.toolRegistry based on participant or config
         // Example registration (replace with actual tools):
@@ -80,15 +85,14 @@ export class Agent {
         const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) {
              console.error("FATAL: OPENAI_API_KEY environment variable is not set.");
-             // Decide how to handle this - throw error, exit, or run in a limited mode?
-             // For now, let's throw an error to make it clear.
              throw new Error("OPENAI_API_KEY environment variable is not set.");
         }
         this.aiService = new AIService({
             apiKey: apiKey,
             baseUrl: process.env.OPENAI_API_BASE, // Optional: read from env
             model: process.env.OPENAI_MODEL, // Optional: read from env
-            // You could also add a base system prompt here if desired
+            // Pass the participant's specific system prompt if available
+            systemPrompt: (participant as any).systemPrompt || undefined // Example, adjust based on actual Participant definition
         });
     }
 
@@ -99,16 +103,12 @@ export class Agent {
         // Use reduce for more controlled type handling during history mapping
         const history = message.history.reduce((acc: OpenAI.Chat.Completions.ChatCompletionMessageParam[], msg: HistoryMessage) => {
             if (msg.role === 'user') {
-                // Ensure content is string for user role
                 acc.push({ role: 'user', content: msg.content ?? "" });
             } else if (msg.role === 'assistant') {
-                // Assistant content can be null
                 acc.push({ role: 'assistant', content: msg.content }); 
             } else if (msg.role === 'system') {
-                 // Ensure content is string for system role
                 acc.push({ role: 'system', content: msg.content ?? "" });
             }
-            // Ignore other roles like 'tool'
             return acc;
         }, [] as OpenAI.Chat.Completions.ChatCompletionMessageParam[]); // Initialize with typed empty array
 
@@ -119,78 +119,61 @@ export class Agent {
         };
         history.push(currentUserMessage);
 
+        let scriptToExecute: string | null = null; // Initialize as null
+        let finalContent = ""; // Initialize final content
+
         try {
-            // Call AIService - it now expects history including the latest message
-            const aiResponse: AIResponse = await this.aiService.generateOrGetResponse(
+            // Call AIService - it now directly returns the script string or throws an error
+            scriptToExecute = await this.aiService.generateOrGetResponse(
                 history,
-                this.toolRegistry // Pass the registry for prompt generation
+                this.toolRegistry 
             );
+            console.log("[Agent] Received script from AIService.");
+            
+            // --- Script Execution --- 
+            // This block now only runs if AIService successfully returned a script
+            console.log(`[Agent] Executing script:\n--- Script Start ---\n${scriptToExecute}\n--- Script End ---`);
+            try {
+                // Parse the script string into an AST
+                const ast = parse(scriptToExecute); 
+                console.log("[Agent] Script parsed successfully.");
+                
+                // Execute the AST
+                const exec_scope = await this.interpreter.execute(ast);
+                console.log("[Agent] Script execution successful. Scope:", exec_scope);
+                const bufferedOutput = this.outputHandler.getBufferedOutput();
+                finalContent = bufferedOutput || "(Script executed successfully, no output)";
+                console.log("[Agent] Script execution successful.");
+                
+                // TODO: Decide how to represent script execution in history.
 
-            let scriptToExecute: string | null = null;
-            let finalContent = "";
-
-            // Check the type of response from AIService
-            if (aiResponse.type === 'script') {
-                scriptToExecute = aiResponse.script;
-                console.log("[Agent] Received script from AIService.");
-                // Optional: Add the assistant's raw response (the script block) to history? 
-                // history.push({ role: 'assistant', content: `\`\`\`nuwa\n${scriptToExecute}\n\`\`\`` });
-            } else { // aiResponse.type === 'text'
-                finalContent = aiResponse.content;
-                console.log("[Agent] Received text response from AIService.");
-                // Add the assistant's text response to history
-                // history.push({ role: 'assistant', content: finalContent });
-            }
-
-            // --- Script Execution (if script was received) ---
-            if (scriptToExecute) {
-                console.log(`[Agent] Executing script:\n--- Script Start ---\n${scriptToExecute}\n--- Script End ---`);
-                try {
-                    // Use interpreter.execute (or execute if you parse AST elsewhere)
-                    const exec_scope = await this.interpreter.execute(scriptToExecute);
-                    console.log("[Agent] Script execution successful. Scope:", exec_scope);
-                    const bufferedOutput = this.outputHandler.getBufferedOutput();
-                    
-                    finalContent = bufferedOutput || "(Script executed successfully, no output)";
-                    console.log("[Agent] Script execution successful.");
-                    
-                    // TODO: Decide how to represent script execution in history. 
-                    // Maybe add a 'tool' role message with the script result?
-                    // history.push({ 
-                    //     role: 'tool', // Or a custom role?
-                    //     content: finalContent, // The result of the execution
-                    //     // We don't have a tool_call_id anymore
-                    // });
-
-                } catch (execError: any) {
-                    console.error("[Agent] Script execution error:", execError);
-                    const bufferedOutput = this.outputHandler.getBufferedOutput();
-                    finalContent = bufferedOutput ? `Partial Output:\n${bufferedOutput}\n\n` : ''; // Show partial output first
-                    finalContent += `Error executing script: ${execError.message || execError}`;
-                    // TODO: Add tool execution error to history?
-                }
+            } catch (execError: any) {
+                // Handle script parsing or execution errors separately
+                console.error("[Agent] Script parsing or execution error:", execError);
+                const bufferedOutput = this.outputHandler.getBufferedOutput();
+                finalContent = bufferedOutput ? `Partial Output:\n${bufferedOutput}\n\n` : ''; 
+                finalContent += `Error parsing or executing script: ${execError.message || execError}`;
             }
             // --- End Script Execution ---
             
-            // Ensure history doesn't grow indefinitely (implement strategy if needed)
-
-            console.log("[Agent] Sending final response:", finalContent);
-            return {
-                response: {
-                    from: this.participant.name,
-                    text: finalContent,
-                    // Pass potentially updated history back if A2A requires it
-                    // history: history 
-                }
-            };
         } catch (error) {
-            console.error("[Agent] Error in handleMessage:", error);
-            return {
-                response: {
-                    from: this.participant.name,
-                    text: "An error occurred while processing your request."
-                }
-            };
+            // This catches errors from AIService (e.g., empty response, format error) 
+            // or other errors during the process before script execution.
+            console.error("[Agent] Error getting script from AIService or processing message:", error);
+            let errorMessage = "An error occurred while processing your request.";
+            if (error instanceof Error && error.message.startsWith('AIServiceError:')) {
+                errorMessage = `Failed to get valid response from AI: ${error.message.substring('AIServiceError: '.length)}`;
+            }
+            finalContent = errorMessage;
         }
+        
+        // Always return a response object
+        console.log("[Agent] Sending final response:", finalContent);
+        return {
+            response: {
+                from: this.participant.name,
+                text: finalContent,
+            }
+        };
     }
 }

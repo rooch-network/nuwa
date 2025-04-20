@@ -1,3 +1,7 @@
+// Load environment variables from .env file
+import dotenv from 'dotenv';
+dotenv.config();
+
 // Main entry point for the Nuwa Agent
 import { runCli } from './cli.js';
 import { NuwaA2AServer } from './server.js';
