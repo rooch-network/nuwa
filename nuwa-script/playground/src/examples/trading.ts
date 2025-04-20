@@ -445,7 +445,7 @@ const swapFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<Jso
   const fee = toAmount * 0.01;
   
   // Create trade record
-  const tradeId = `trade_${Date.now()}`;
+  const tradeId = `trade_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const trade: TradeHistory = {
     id: tradeId,
     fromSymbol,

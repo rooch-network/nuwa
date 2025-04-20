@@ -62,7 +62,8 @@ export class AIService {
 --- NuwaScript Generation Rules ---
 ${nuwaScriptInstructions}`;
       }
-
+      console.log(`Final System Prompt: ${finalSystemPrompt}`);
+      
       const response = await fetch(fullUrl, {
         method: 'POST',
         headers: {
