@@ -219,14 +219,7 @@ function App() {
       }
 
       const capturedOutput = bufferingHandler.flush();
-      // Add output to messages state - MOVED TO handleAIChatMessage based on return value
-      // if (capturedOutput !== null) { 
-      //   setMessages(prev => [...prev, {
-      //     role: 'assistant',
-      //     content: capturedOutput
-      //   }]);
-      // }
-
+      console.log("[App.tsx] Captured output:", capturedOutput);
       return { success: true, capturedOutput: capturedOutput };
 
     } catch (err) {
@@ -245,10 +238,17 @@ function App() {
   }, []);
 
   // Handle run button click
-  const handleRunClick = useCallback(() => {
+  const handleRunClick = useCallback(async () => {
     // Execute using the latest editor content
-    handleRun(editorContent);
-  }, [editorContent, handleRun]);
+    const runResult = await handleRun(editorContent);
+
+    // Check if run was successful and there was output
+    if (runResult.success && runResult.capturedOutput !== null && runResult.capturedOutput !== undefined) {
+        // Add the captured output to messages state
+        // Use the same logic as in handleAIChatMessage for consistency
+        setMessages(prev => [...prev, { role: 'assistant', content: runResult.capturedOutput || '' }]);
+    }
+  }, [editorContent, handleRun, setMessages]);
 
   // AI chat message handling - Wrap in useCallback
   const handleAIChatMessage = useCallback(async (message: string) => {
@@ -302,11 +302,12 @@ function App() {
       if (runResult.success) {
         // Process successful run output
         const outputContent = runResult.capturedOutput;
-        if (typeof outputContent === 'string' && outputContent.trim() !== '') {
-          setMessages(prev => [...prev, { role: 'assistant', content: outputContent }]);
+        // Check if capturedOutput is not null (meaning there was output)
+        if (outputContent !== null && outputContent !== undefined) {
+            // Add the captured output directly as assistant message content
+            setMessages(prev => [...prev, { role: 'assistant', content: outputContent || '' }]);
         }
-        // Optionally add a generic success message if no output?
-        // else { setMessages(prev => [...prev, { role: 'assistant', content: "Script executed successfully." }]) }
+        // No generic success message if no output
       } else {
         // Add error message to history for AI feedback
         const errorMessageContent = `Execution failed with error:\\n\`\`\`\\n${runResult.errorMessage}\\n\`\`\`\``;
