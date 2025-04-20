@@ -333,8 +333,9 @@ export class Interpreter {
             case '-':
             case '*':
             case '/':
+            case '%': // Add case for modulo
                  if (!isNumber(left) || !isNumber(right)) {
-                    throw new TypeError(`Arithmetic operator '${op}' requires number operands, got ${typeof left} and ${typeof right}.`, {leftValue: left, rightValue: right, operator: op, node: expr});
+                    throw new TypeError(`Arithmetic operator '${op}' requires number operands, got ${typeof left} and ${typeof right}.`, { leftValue: left, rightValue: right, operator: op, node: expr });
                 }
                 if (op === '+') return left + right;
                 if (op === '-') return left - right;
@@ -344,6 +345,12 @@ export class Interpreter {
                         throw new DivisionByZeroError(expr);
                     }
                     return left / right;
+                }
+                if (op === '%') { // Add modulo logic
+                    if (right === 0) {
+                        throw new DivisionByZeroError(expr); // Cannot perform modulo by zero
+                    }
+                    return left % right;
                 }
                 break; // Should not be reached
         }

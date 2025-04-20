@@ -52,6 +52,9 @@ export enum TokenType {
     STAR = '*',
     SLASH = '/',
 
+    // Modulo
+    PERCENT = '%',
+
     // Control
     COMMENT = 'COMMENT', // Usually ignored, but tokenized first
     WHITESPACE = 'WHITESPACE', // Usually ignored
@@ -122,6 +125,7 @@ const tokenPatterns: Array<[TokenType, RegExp]> = [
     [TokenType.MINUS, /^-/],
     [TokenType.STAR, /^\*/],
     [TokenType.SLASH, /^\//],
+    [TokenType.PERCENT, /^%/],
 
     // Literals
     [TokenType.NUMBER, /^\d+(\.\d+)?/], // Integer or float

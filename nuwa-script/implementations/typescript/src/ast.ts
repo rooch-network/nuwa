@@ -50,7 +50,7 @@ export interface VariableExpr extends BaseNode {
 export type BinaryOperator =
   | '==' | '!=' | '>' | '<' | '>=' | '<='
   | 'AND' | 'OR'
-  | '+' | '-' | '*' | '/'; // Add arithmetic
+  | '+' | '-' | '*' | '/' | '%'; // Add arithmetic and modulo
 
 export interface BinaryOpExpr extends BaseNode {
   kind: 'BinaryOpExpr';

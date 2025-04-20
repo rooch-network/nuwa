@@ -200,8 +200,9 @@ export class Parser {
     private parseFactor(): AST.Expression {
         // Factor now calls parseUnary, which handles postfix operations
         let expr = this.parseUnary();
-        while (this.match(TokenType.STAR, TokenType.SLASH)) {
-            const operator = this.previous().type as AST.BinaryOperator; // '*' or '/'
+        // Loop for multiplicative operators: *, /, %
+        while (this.match(TokenType.STAR, TokenType.SLASH, TokenType.PERCENT)) {
+            const operator = this.previous().type as AST.BinaryOperator; // '*' or '/' or '%'
             // Note: The right operand should also potentially handle postfix ops
             const right = this.parseUnary();
             expr = { kind: 'BinaryOpExpr', operator, left: expr, right };

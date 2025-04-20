@@ -11,7 +11,7 @@ export const GENERATION_PROMPT_TEMPLATE = `# NuwaScript Syntax Rules:
 - List literals use square brackets: [1, "a", TRUE, [nested_list]]. Elements are comma-separated.
 - Object literals use curly braces: { key1: "value", "key-2": 123, key3: [1, 2] }. Keys can be identifiers or strings (double-quoted). Values can be any expression. Pairs are comma-separated.
 - Comments start with //
-- Basic arithmetic and comparison operators are supported: +, -, *, /, ==, !=, >, <, >=, <=.
+- Basic arithmetic and comparison operators are supported: +, -, *, /, %, ==, !=, >, <, >=, <=.
 - The '+' operator is ONLY for number addition, NOT string concatenation.
 - Logical operators: AND, OR, NOT. Operator precedence follows standard rules.
 - Member access uses dot notation: object.property.

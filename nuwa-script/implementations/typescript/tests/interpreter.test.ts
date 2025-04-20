@@ -91,9 +91,10 @@ describe('NuwaScript Interpreter', () => {
         });
     });
 
+    // --- RE-ADD HELPER FUNCTION INSIDE DESCRIBE ---
     // Helper function to run script and return final scope
     async function runScript(scriptText: string, initialScope?: Record<string, JsonValue>): Promise<Scope> {
-        const interpreter = new Interpreter(toolRegistry, mockOutputHandler);
+        const interpreter = new Interpreter(toolRegistry, mockOutputHandler); // Accesses context via closure
         const ast = parse(scriptText); // Use combined parse function
         const initialMap = initialScope ? new Map(Object.entries(initialScope)) : undefined;
         return await interpreter.execute(ast, initialMap);
@@ -109,7 +110,7 @@ describe('NuwaScript Interpreter', () => {
             LET pi = 3.14
             LET n = null
         `;
-        const finalScope = await runScript(script);
+        const finalScope = await runScript(script); // Should work now
         expect(finalScope.get('count')).toBe(100);
         expect(finalScope.get('name')).toBe('Nuwa');
         expect(finalScope.get('flag')).toBe(true);
@@ -158,7 +159,43 @@ describe('NuwaScript Interpreter', () => {
         expect(finalScope.get('num3')).toBe(5);
     });
 
-     test('should evaluate unary NOT operator', async () => {
+    test('should evaluate basic arithmetic operations', async () => {
+        let scope = await runScript('LET r = 10 + 5');
+        expect(scope.get('r')).toBe(15);
+        scope = await runScript('LET r = 10 - 5');
+        expect(scope.get('r')).toBe(5);
+        scope = await runScript('LET r = 10 * 5');
+        expect(scope.get('r')).toBe(50);
+        scope = await runScript('LET r = -5 + 8'); // Mix with negative
+        expect(scope.get('r')).toBe(3);
+    });
+
+    test('should evaluate operator precedence correctly', async () => {
+        let scope = await runScript('LET r = 10 + 6 / 2'); // 10 + 3 = 13
+        expect(scope.get('r')).toBe(13);
+        scope = await runScript('LET r = 10 - 4 * 2'); // 10 - 8 = 2
+        expect(scope.get('r')).toBe(2);
+        scope = await runScript('LET r = 10 * 2 + 6 / 3'); // 20 + 2 = 22
+        expect(scope.get('r')).toBe(22);
+    });
+
+    test('should evaluate parentheses overriding precedence', async () => {
+        let scope = await runScript('LET r = (10 + 5) * 2'); // 15 * 2 = 30
+        expect(scope.get('r')).toBe(30);
+        scope = await runScript('LET r = 10 / (2 + 3)'); // 10 / 5 = 2
+        expect(scope.get('r')).toBe(2);
+    });
+
+    test('should evaluate associativity (left-to-right)', async () => {
+        let scope = await runScript('LET r = 10 - 5 + 2'); // (10 - 5) + 2 = 7
+        expect(scope.get('r')).toBe(7);
+        scope = await runScript('LET r = 10 * 6 / 3'); // (10 * 6) / 3 = 20
+        expect(scope.get('r')).toBe(20);
+        scope = await runScript('LET r = 10 / 2 * 5'); // (10 / 2) * 5 = 25
+        expect(scope.get('r')).toBe(25);
+    });
+
+    test('should evaluate unary NOT operator', async () => {
         const script = `
             LET flagT = true
             LET flagF = false
@@ -170,7 +207,32 @@ describe('NuwaScript Interpreter', () => {
         expect(finalScope.get('notF')).toBe(true);
     });
 
-     test('should handle type errors in operations', async () => {
+    test('should evaluate unary PLUS and MINUS operators', async () => {
+        let scope = await runScript('LET r = -5');
+        expect(scope.get('r')).toBe(-5);
+        scope = await runScript('LET r = +10');
+        expect(scope.get('r')).toBe(10);
+        scope = await runScript('LET x = 5 LET r = -x');
+        expect(scope.get('r')).toBe(-5);
+        scope = await runScript('LET r = 10 + -5'); // Binary + with Unary -
+        expect(scope.get('r')).toBe(5);
+        scope = await runScript('LET r = -(-5)'); // Double unary minus
+        expect(scope.get('r')).toBe(5);
+    });
+
+    test('should handle type errors for arithmetic and unary +/- operators', async () => {
+        // Arithmetic
+        await expect(runScript('LET x = 10 + "5"')).rejects.toThrow(Errors.TypeError);
+        await expect(runScript('LET x = "10" + 5')).rejects.toThrow(Errors.TypeError);
+        await expect(runScript('LET x = true - 1')).rejects.toThrow(Errors.TypeError);
+        await expect(runScript('LET x = 5 * null')).rejects.toThrow(Errors.TypeError);
+        await expect(runScript('LET x = [1] / 2')).rejects.toThrow(Errors.TypeError);
+        // Unary +/-
+        await expect(runScript('LET x = -"5"')).rejects.toThrow(Errors.TypeError);
+        await expect(runScript('LET x = +true')).rejects.toThrow(Errors.TypeError);
+    });
+
+    test('should handle type errors in operations', async () => {
         await expect(runScript('LET x = 10 > "hello"')).rejects.toThrow(Errors.TypeError);
         await expect(runScript('LET x = "true" AND false')).rejects.toThrow(Errors.TypeError);
         await expect(runScript('LET x = NOT 123')).rejects.toThrow(Errors.TypeError);
@@ -525,6 +587,50 @@ describe('NuwaScript Interpreter', () => {
         await expect(runScript(`PRINT(1, 2)`)).rejects.toThrow(/expects exactly 1 argument, got 2/);
     });
 
+    // --- Modulo Operator Tests ---
+    describe('Modulo Operator (%)', () => {
+        // Helper function specific to these tests, calling outer runScript
+        async function runScriptAndCheckResult(script: string, varName: string, expectedValue: JsonValue) {
+            const finalScope = await runScript(script); // Should work now as it's in the same scope
+            expect(finalScope.get(varName)).toBe(expectedValue);
+        }
+
+        test('should perform basic modulo operations', async () => {
+            await runScriptAndCheckResult('LET r = 10 % 3', 'r', 1);
+            await runScriptAndCheckResult('LET r = 10 % 2', 'r', 0);
+            await runScriptAndCheckResult('LET r = 5 % 8', 'r', 5);
+            await runScriptAndCheckResult('LET r = 123 % 45', 'r', 33);
+        });
+
+        test('should handle negative operands correctly', async () => {
+            await runScriptAndCheckResult('LET r = -10 % 3', 'r', -1);
+            await runScriptAndCheckResult('LET r = 10 % -3', 'r', 1);
+            await runScriptAndCheckResult('LET r = -10 % -3', 'r', -1);
+        });
+
+        test('should handle floating point numbers (like JS %)', async () => {
+             await runScriptAndCheckResult('LET r = 5.5 % 2', 'r', 1.5);
+             await runScriptAndCheckResult('LET r = 10 % 3.5', 'r', 3);
+        });
+
+        test('should throw DivisionByZeroError for modulo by zero', async () => {
+            await expect(runScript('LET r = 10 % 0')).rejects.toThrow(Errors.DivisionByZeroError); // Direct call
+        });
+
+        test('should throw TypeError for non-number operands', async () => {
+            await expect(runScript('LET r = "10" % 3')).rejects.toThrow(Errors.TypeError); // Direct call
+            await expect(runScript('LET r = 10 % "3"')).rejects.toThrow(Errors.TypeError); // Direct call
+            await expect(runScript('LET r = true % 2')).rejects.toThrow(Errors.TypeError); // Direct call
+            await expect(runScript('LET r = 10 % null')).rejects.toThrow(Errors.TypeError); // Direct call
+        });
+
+        test('should respect operator precedence', async () => {
+            await runScriptAndCheckResult('LET r = 10 + 5 % 3', 'r', 12); 
+            await runScriptAndCheckResult('LET r = 10 * 5 % 3', 'r', 2); 
+            await runScriptAndCheckResult('LET r = 10 % 3 * 2', 'r', 2); 
+        });
+    });
+
 });
 
 describe('Interpreter - Array Indexing', () => {
@@ -533,14 +639,14 @@ describe('Interpreter - Array Indexing', () => {
     // For now, let's assume lists are provided via initial scope.
 
     async function runScriptAndCheckArrayIndexing(script: string, initialScope: Scope, expectedVar: string, expectedValue: JsonValue) {
-        const interpreter = new Interpreter();
+        const interpreter = new Interpreter(); // Uses clean registry
         const ast = parse(script);
         const finalScope = await interpreter.execute(ast, initialScope);
         expect(finalScope.get(expectedVar)).toEqual(expectedValue);
     }
 
     async function runScriptAndExpectError(script: string, initialScope: Scope, errorType: any, errorMessagePart?: string) {
-        const interpreter = new Interpreter();
+        const interpreter = new Interpreter(); // Uses clean registry
         const ast = parse(script);
         await expect(interpreter.execute(ast, initialScope)).rejects.toThrow(errorType);
         if (errorMessagePart) {
