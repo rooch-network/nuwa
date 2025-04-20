@@ -182,8 +182,12 @@ function App() {
   };
 
   // Run script - improved execution process - Wrap in useCallback
-  const handleRun = useCallback(async (scriptToRun: string) => {
-    if (!nuwaInterface) return;
+  const handleRun = useCallback(async (scriptToRun: string): Promise<{ 
+    success: boolean; 
+    errorMessage?: string; 
+    capturedOutput?: string | null 
+  }> => {
+    if (!nuwaInterface) return { success: false, errorMessage: "Interpreter not initialized." };
 
     setIsRunning(true);
     setOutput(''); // Clear Output panel before run
@@ -215,21 +219,25 @@ function App() {
       }
 
       const capturedOutput = bufferingHandler.flush();
-      if (capturedOutput !== null) { 
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: capturedOutput
-        }]);
-      }
+      // Add output to messages state - MOVED TO handleAIChatMessage based on return value
+      // if (capturedOutput !== null) { 
+      //   setMessages(prev => [...prev, {
+      //     role: 'assistant',
+      //     content: capturedOutput
+      //   }]);
+      // }
+
+      return { success: true, capturedOutput: capturedOutput };
 
     } catch (err) {
       console.error("Execution or Parsing error:", err);
       const errorMsg = err instanceof Error ? err.message : String(err);
       setExecutionError(errorMsg);
+      return { success: false, errorMessage: errorMsg };
     } finally {
       setIsRunning(false);
     }
-  }, [nuwaInterface, selectedExample, setIsRunning, setOutput, setExecutionError, setEditorContent, setShapes, setMessages]);
+  }, [nuwaInterface, selectedExample, setIsRunning, setOutput, setExecutionError, setEditorContent, setShapes]); // Removed setMessages dependency
 
   // Handle script changes
   const handleScriptChange = useCallback((newCode = '') => {
@@ -287,7 +295,23 @@ function App() {
 
       setEditorContent(generatedScript);
 
-      await handleRun(generatedScript);
+      // Run the generated script and get the result
+      const runResult = await handleRun(generatedScript);
+
+      // Add output or error to chat history based on run result
+      if (runResult.success) {
+        // Process successful run output
+        const outputContent = runResult.capturedOutput;
+        if (typeof outputContent === 'string' && outputContent.trim() !== '') {
+          setMessages(prev => [...prev, { role: 'assistant', content: outputContent }]);
+        }
+        // Optionally add a generic success message if no output?
+        // else { setMessages(prev => [...prev, { role: 'assistant', content: "Script executed successfully." }]) }
+      } else {
+        // Add error message to history for AI feedback
+        const errorMessageContent = `Execution failed with error:\\n\`\`\`\\n${runResult.errorMessage}\\n\`\`\`\``;
+        setMessages(prev => [...prev, { role: 'assistant', content: errorMessageContent }]);
+      }
 
     } catch (error) {
       console.error("AI Generation error:", error);
