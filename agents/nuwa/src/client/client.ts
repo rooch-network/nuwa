@@ -33,8 +33,8 @@ import {
   // Streaming Payload types (used in public method yield signatures)
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
-} from "../a2a-schema";
-import { RpcError } from './error'; // Import RpcError from separate file
+} from "../a2a-schema.js";
+import { RpcError } from './error.js'; // Add .js extension
 
 /**
  * A client implementation for the A2A protocol that communicates

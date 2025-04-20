@@ -1,6 +1,6 @@
 // Main entry point for the Nuwa Agent
-import { runCli } from './cli';
-import { NuwaA2AServer } from './server';
+import { runCli } from './cli.js';
+import { NuwaA2AServer } from './server.js';
 
 console.log("Initializing Nuwa Agent...");
 

@@ -1,9 +1,9 @@
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 // import { handleMessage } from './agent'; // No longer call agent directly
-import * as schema from './a2a-schema'; // Import A2A types
-import { A2AClient } from './client/client'; // Import the new client class
-import { RpcError } from './client/error'; // Import the client error class
+import * as schema from './a2a-schema.js'; // Add .js
+import { A2AClient } from './client/client.js'; // Add .js
+import { RpcError } from './client/error.js'; // Add .js
 import { randomUUID } from 'node:crypto'; // For generating Task IDs
 
 // Define the server URL (base URL for the A2A server)
@@ -53,7 +53,7 @@ export async function runCli() {
             // 3. Process the result
             if (taskResult?.status?.message?.role === 'agent') {
                 const agentMessage = taskResult.status.message;
-                const agentTextPart = agentMessage.parts.find((part): part is schema.TextPart => part.type === 'text');
+                const agentTextPart = agentMessage.parts.find((part: schema.Part): part is schema.TextPart => part.type === 'text');
                 if (agentTextPart?.text) {
                     console.log(`Agent: ${agentTextPart.text}`);
                 } else {

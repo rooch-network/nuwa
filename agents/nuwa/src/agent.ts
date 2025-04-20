@@ -1,133 +1,196 @@
+import { Interpreter, OutputHandler, ToolRegistry } from "nuwa-script";
+import { AIService, AIResponse } from './aiService.js';
 import OpenAI from 'openai';
-import dotenv from 'dotenv';
-import { Message as A2AMessage, TextPart } from './a2a-schema'; // Import A2A types for history
-import {
-    ChatCompletionMessageParam,
-    ChatCompletionUserMessageParam,
-    ChatCompletionAssistantMessageParam,
-    ChatCompletionSystemMessageParam // Import system type as well
-} from 'openai/resources/chat/completions'; // Import specific OpenAI message types
 
-// Load environment variables from .env file
-dotenv.config();
+// --- Locally Defined Types --- 
 
-// --- OpenAI Client Initialization ---
-let openaiClient: OpenAI | null = null;
-let initError: Error | null = null;
-
-try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const apiBase = process.env.OPENAI_API_BASE;
-    console.log(`[Agent Init] Attempting to initialize OpenAI client.`);
-    console.log(`[Agent Init] Found API Key: ${apiKey ? 'Yes' : 'No'}`);
-    console.log(`[Agent Init] Found API Base from env: ${apiBase || 'Not set (will use default)'}`);
-
-    if (!apiKey) {
-        throw new Error('OPENAI_API_KEY is not set in the environment variables.');
-    }
-
-    // Directly define options for the constructor
-    const options: { apiKey: string; baseURL?: string } = {
-        apiKey: apiKey,
-    };
-
-    if (apiBase) {
-        options.baseURL = apiBase;
-        console.log(`[Agent Init] Using custom baseURL: ${apiBase}`);
-    } else {
-        console.log(`[Agent Init] Using default OpenAI baseURL.`);
-    }
-
-    openaiClient = new OpenAI(options); // Pass the options object directly
-    console.log('[Agent Init] OpenAI client initialized successfully.');
-
-} catch (error) {
-    initError = error instanceof Error ? error : new Error(String(error));
-    console.error('[Agent Init] Failed to initialize OpenAI client:', initError);
+// Define Participant based on usage in Agent constructor
+interface Participant {
+    id: string; // Added id based on server.ts usage
+    name: string;
+    // Add other fields if needed by Agent
 }
 
-const defaultModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
-console.log(`[Agent Init] Using model: ${defaultModel}`);
-// --- End OpenAI Initialization ---
+// Define AgentMessage based on usage in handleMessage and server.ts
+interface AgentMessage {
+    text: string;
+    history: { // Structure based on server.ts mapping
+        role: string;
+        content: string | null;
+    }[];
+}
 
-// Define a type for the messages we actually create (User or Assistant with string content)
-type SimpleChatCompletionMessageParam = 
-    | { role: "user"; content: string; name?: string | undefined }
-    | { role: "assistant"; content: string; name?: string | undefined; tool_calls?: any; function_call?: any; };
+// Define AgentResponse based on usage in handleMessage return type
+interface AgentResponse {
+    response: {
+        from: string;
+        text: string;
+        // history?: any[]; // Optional: if history needs to be passed back
+    };
+    // stream?: any; // Add if streaming is implemented
+}
 
-/**
- * Handles an incoming message using OpenAI and returns the agent's response.
- * Incorporates message history for contextual conversation.
- * @param currentMessageText The user's current message text.
- * @param history An array of previous A2A Message objects for this task.
- * @returns A promise resolving to the agent's response string.
- */
-export async function handleMessage(currentMessageText: string, history: A2AMessage[] = []): Promise<string> {
-    console.log(`[Agent] Received message: ${currentMessageText}`);
-    console.log(`[Agent] Received history length: ${history.length}`);
+// Optional: Define AgentStreamEvent if streaming is needed later
+// interface AgentStreamEvent { ... }
 
-    if (initError || !openaiClient) {
-        console.error('[Agent] OpenAI client is not available.', initError);
-        throw new Error(`OpenAI client is not initialized. ${initError?.message || 'Unknown initialization error.'}`);
+// --- End Locally Defined Types ---
+
+// Define a simple type for history messages used in the map
+interface HistoryMessage {
+    role: string;
+    content: string | null;
+    // Add other potential fields if needed from AgentMessage history structure
+}
+
+// Implement OutputHandler to buffer PRINT statements
+class AgentOutputHandler implements OutputHandler {
+    private buffer: string[] = [];
+
+    handlePrint(value: any): void {
+        const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+        this.buffer.push(`PRINT: ${stringValue}`);
     }
 
-    // Convert A2A history messages to OpenAI format
-    const openAIHistoryMessages: SimpleChatCompletionMessageParam[] = history.map(a2aMsg => {
-        const textPart = a2aMsg.parts.find((part): part is TextPart => part.type === 'text') as TextPart | undefined;
-        const content = textPart?.text || ''; // Ensure content is string
-        if (a2aMsg.role === 'agent') {
-            return { role: 'assistant' as const, content: content }; // Role 'assistant', content is string
-        } else {
-            return { role: 'user' as const, content: content }; // Role 'user', content is string
+    getBufferedOutput(): string {
+        return this.buffer.join('\n');
+    }
+
+    clearBuffer(): void {
+        this.buffer = [];
+    }
+}
+
+export class Agent {
+    private interpreter: Interpreter;
+    private aiService: AIService;
+    private outputHandler: AgentOutputHandler;
+    private toolRegistry: ToolRegistry; // Store ToolRegistry instance
+
+    constructor(private participant: Participant) {
+        this.toolRegistry = new ToolRegistry(); // Initialize ToolRegistry
+        this.interpreter = new Interpreter(this.toolRegistry); // Pass registry to Interpreter
+        this.outputHandler = new AgentOutputHandler();
+        this.interpreter.registerOutputHandler(this.outputHandler);
+        
+        // TODO: Register actual tools into this.toolRegistry based on participant or config
+        // Example registration (replace with actual tools):
+        // this.toolRegistry.register(calculatorSchema, calculatorExecutor);
+
+        // Initialize AIService (ensure required env vars like OPENAI_API_KEY are set)
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+             console.error("FATAL: OPENAI_API_KEY environment variable is not set.");
+             // Decide how to handle this - throw error, exit, or run in a limited mode?
+             // For now, let's throw an error to make it clear.
+             throw new Error("OPENAI_API_KEY environment variable is not set.");
         }
-    }).filter((msg): msg is SimpleChatCompletionMessageParam => !!msg.content); // Filter based on string content, type assertion
-
-    // Construct the full message list for OpenAI, ensuring type compatibility
-    const messages: ChatCompletionMessageParam[] = [
-        { role: 'system', content: 'You are a helpful assistant.' } as ChatCompletionSystemMessageParam,
-        ...openAIHistoryMessages, // These are now SimpleChatCompletionMessageParam
-        { role: 'user', content: currentMessageText } as ChatCompletionUserMessageParam // Current message
-    ];
-
-    console.log(`[Agent] Sending ${messages.length} messages to OpenAI model: ${defaultModel}.`);
-    // If using custom base URL, it might be helpful to log this again
-    if (process.env.OPENAI_API_BASE) {
-        console.log(`[Agent] Target Base URL: ${process.env.OPENAI_API_BASE}`);
-    }
-
-    try {
-        const completion = await openaiClient.chat.completions.create({
-            model: defaultModel,
-            messages: messages,
+        this.aiService = new AIService({
+            apiKey: apiKey,
+            baseUrl: process.env.OPENAI_API_BASE, // Optional: read from env
+            model: process.env.OPENAI_MODEL, // Optional: read from env
+            // You could also add a base system prompt here if desired
         });
-
-        const responseContent = completion.choices[0]?.message?.content;
-
-        if (!responseContent) {
-            console.error('[Agent] OpenAI response did not contain content:', completion);
-            throw new Error('OpenAI response did not contain valid content.');
-        }
-
-        console.log(`[Agent] Received response from OpenAI.`); // Simplified success log
-        return responseContent; // Assuming response content is string
-
-    } catch (error) {
-        console.error('[Agent] Error calling OpenAI API:');
-        // Log the full error object for more details
-        if (error instanceof Error) {
-            console.error(`[Agent] Error Name: ${error.name}`);
-            console.error(`[Agent] Error Message: ${error.message}`);
-            if ('response' in error && error.response) { // Axios-like error structure
-                console.error('[Agent] Error Response Status:', (error.response as any).status);
-                console.error('[Agent] Error Response Data:', (error.response as any).data);
-            } else if ('status' in error) { // Fetch-like error structure
-                console.error('[Agent] Error Status:', (error as any).status);
-            }
-            console.error('[Agent] Error Stack:', error.stack);
-        } else {
-            console.error('[Agent] Non-Error object thrown:', error);
-        }
-        // Re-throw a more generic error for the server
-        throw new Error(`Failed to get response from AI. Check agent logs for details.`);
     }
-} 
+
+    async handleMessage(message: AgentMessage): Promise<AgentResponse> {
+        console.log(`[Agent] Handling message:`, message.text);
+        this.outputHandler.clearBuffer();
+
+        // Use reduce for more controlled type handling during history mapping
+        const history = message.history.reduce((acc: OpenAI.Chat.Completions.ChatCompletionMessageParam[], msg: HistoryMessage) => {
+            if (msg.role === 'user') {
+                // Ensure content is string for user role
+                acc.push({ role: 'user', content: msg.content ?? "" });
+            } else if (msg.role === 'assistant') {
+                // Assistant content can be null
+                acc.push({ role: 'assistant', content: msg.content }); 
+            } else if (msg.role === 'system') {
+                 // Ensure content is string for system role
+                acc.push({ role: 'system', content: msg.content ?? "" });
+            }
+            // Ignore other roles like 'tool'
+            return acc;
+        }, [] as OpenAI.Chat.Completions.ChatCompletionMessageParam[]); // Initialize with typed empty array
+
+        // Add the current user message
+        const currentUserMessage: OpenAI.Chat.Completions.ChatCompletionUserMessageParam = {
+            role: 'user',
+            content: message.text
+        };
+        history.push(currentUserMessage);
+
+        try {
+            // Call AIService - it now expects history including the latest message
+            const aiResponse: AIResponse = await this.aiService.generateOrGetResponse(
+                history,
+                this.toolRegistry // Pass the registry for prompt generation
+            );
+
+            let scriptToExecute: string | null = null;
+            let finalContent = "";
+
+            // Check the type of response from AIService
+            if (aiResponse.type === 'script') {
+                scriptToExecute = aiResponse.script;
+                console.log("[Agent] Received script from AIService.");
+                // Optional: Add the assistant's raw response (the script block) to history? 
+                // history.push({ role: 'assistant', content: `\`\`\`nuwa\n${scriptToExecute}\n\`\`\`` });
+            } else { // aiResponse.type === 'text'
+                finalContent = aiResponse.content;
+                console.log("[Agent] Received text response from AIService.");
+                // Add the assistant's text response to history
+                // history.push({ role: 'assistant', content: finalContent });
+            }
+
+            // --- Script Execution (if script was received) ---
+            if (scriptToExecute) {
+                console.log(`[Agent] Executing script:\n--- Script Start ---\n${scriptToExecute}\n--- Script End ---`);
+                try {
+                    // Use interpreter.execute (or execute if you parse AST elsewhere)
+                    const exec_scope = await this.interpreter.execute(scriptToExecute);
+                    console.log("[Agent] Script execution successful. Scope:", exec_scope);
+                    const bufferedOutput = this.outputHandler.getBufferedOutput();
+                    
+                    finalContent = bufferedOutput || "(Script executed successfully, no output)";
+                    console.log("[Agent] Script execution successful.");
+                    
+                    // TODO: Decide how to represent script execution in history. 
+                    // Maybe add a 'tool' role message with the script result?
+                    // history.push({ 
+                    //     role: 'tool', // Or a custom role?
+                    //     content: finalContent, // The result of the execution
+                    //     // We don't have a tool_call_id anymore
+                    // });
+
+                } catch (execError: any) {
+                    console.error("[Agent] Script execution error:", execError);
+                    const bufferedOutput = this.outputHandler.getBufferedOutput();
+                    finalContent = bufferedOutput ? `Partial Output:\n${bufferedOutput}\n\n` : ''; // Show partial output first
+                    finalContent += `Error executing script: ${execError.message || execError}`;
+                    // TODO: Add tool execution error to history?
+                }
+            }
+            // --- End Script Execution ---
+            
+            // Ensure history doesn't grow indefinitely (implement strategy if needed)
+
+            console.log("[Agent] Sending final response:", finalContent);
+            return {
+                response: {
+                    from: this.participant.name,
+                    text: finalContent,
+                    // Pass potentially updated history back if A2A requires it
+                    // history: history 
+                }
+            };
+        } catch (error) {
+            console.error("[Agent] Error in handleMessage:", error);
+            return {
+                response: {
+                    from: this.participant.name,
+                    text: "An error occurred while processing your request."
+                }
+            };
+        }
+    }
+}
