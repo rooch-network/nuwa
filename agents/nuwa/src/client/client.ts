@@ -44,6 +44,7 @@ export class A2AClient {
   private baseUrl: string;
   private fetchImpl: typeof fetch;
   private cachedAgentCard: AgentCard | null = null;
+  private serverRootUrl: string;
 
   /**
    * Creates an instance of A2AClient.
@@ -51,9 +52,19 @@ export class A2AClient {
    * @param fetchImpl Optional custom fetch implementation (e.g., for Node.js environments without global fetch). Defaults to global fetch.
    */
   constructor(baseUrl: string, fetchImpl: typeof fetch = fetch) {
-    // Ensure baseUrl doesn't end with a slash for consistency
+    // baseUrl is the A2A endpoint path, e.g., http://localhost:3000/a2a
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
     this.fetchImpl = fetchImpl;
+    // Infer server root from baseUrl
+    try {
+      const urlObject = new URL(this.baseUrl);
+      this.serverRootUrl = urlObject.origin; // e.g., http://localhost:3000
+    } catch (e) {
+      console.warn(`[A2AClient] Could not parse baseUrl "${baseUrl}" to determine server root. Agent card fetch might fail.`);
+      // Fallback: try to guess or use baseUrl itself (less ideal)
+      this.serverRootUrl = this.baseUrl.split("/").slice(0, 3).join("/"); 
+    }
+    console.log(`[A2AClient] Initialized with endpoint base: ${this.baseUrl}, inferred server root: ${this.serverRootUrl}`);
   }
 
   /**
@@ -336,21 +347,17 @@ export class A2AClient {
   }
 
   /**
-   * Retrieves the AgentCard.
-   * Note: The standard A2A protocol doesn't define a JSON-RPC method for this.
-   * This implementation fetches it from a hypothetical '/agent-card' endpoint
-   * on the same server, assuming it's provided out-of-band.
+   * Retrieves the AgentCard from the standard /.well-known/agent.json path.
    * Caches the result after the first successful fetch.
    */
-  // @ts-ignore - Protocol defines sync, but client needs async fetch.
   async agentCard(): Promise<AgentCard> {
     if (this.cachedAgentCard) {
       return this.cachedAgentCard;
     }
 
-    // Assumption: Server exposes the card at a simple GET endpoint.
-    // Adjust this URL/method if the server provides the card differently.
-    const cardUrl = `${this.baseUrl}/agent-card`; // Or just this.baseUrl if served at root
+    // Fetch from the standard well-known path at the server root
+    const cardUrl = `${this.serverRootUrl}/.well-known/agent.json`;
+    console.log(`[A2AClient] Fetching agent card from: ${cardUrl}`);
 
     try {
       const response = await this.fetchImpl(cardUrl, {
@@ -369,14 +376,13 @@ export class A2AClient {
       const card = await response.json();
       // TODO: Add validation using a Zod schema or similar if available
       this.cachedAgentCard = card as AgentCard;
+      console.log(`[A2AClient] Agent card loaded and cached successfully.`);
       return this.cachedAgentCard;
     } catch (error) {
-      console.error("Failed to fetch or parse agent card:", error);
+      console.error("[A2AClient] Failed to fetch or parse agent card:", error);
       throw new RpcError(
-        -32603, // Use literal value for ErrorCodeInternalError
-        `Could not retrieve agent card: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        -32603,
+        `Could not retrieve agent card: ${error instanceof Error ? error.message : String(error)}`,
         error
       );
     }
