@@ -11,17 +11,23 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 
-// --- SDK Imports ---
-import {
+// --- SDK Imports (Using default import + destructuring) ---
+import roochSdk from '@roochnetwork/rooch-sdk';
+const {
     Secp256k1Keypair,
-    BitcoinAddress, // Removed from main import
+    BitcoinAddress, 
     RoochAddress,
-    Bytes,
+    BitcoinSignMessage,
     toB64,
     fromB64,
     toHEX,
-    fromHEX,
-    BitcoinSignMessage
+    fromHEX
+} = roochSdk;
+
+// Import types separately using 'import type'
+import type {
+    Bytes, 
+    Secp256k1Keypair as Secp256k1KeypairType 
 } from '@roochnetwork/rooch-sdk';
 
 // --- Helper Function from auth.ts (assuming it's moved or copied) ---
@@ -34,12 +40,13 @@ function createMessageHashForSigning(message: schema.Message): Buffer {
 
 // --- Configuration & Constants ---
 const DEFAULT_SERVER_URL = 'http://localhost:3000/a2a';
-const KEY_DIR = path.join(os.homedir(), '.rooch_config'); // Use home dir for slightly better persistence
+// Store key relative to the current working directory for simplified testing
+const KEY_DIR = path.join(process.cwd(), '.rooch_config'); 
 const KEY_FILE = path.join(KEY_DIR, 'active.key');
 const BITCOIN_MESSAGE_INFO = "Agent authentication:\n"; // Consistent with auth.ts
 
 // --- Key Management (Simplified) ---
-async function loadOrCreateAndSaveKeypair(): Promise<Secp256k1Keypair> {
+async function loadOrCreateAndSaveKeypair(): Promise<Secp256k1KeypairType> {
     try {
         const privateKeyHex = await fs.readFile(KEY_FILE, 'utf-8');
         if (privateKeyHex && /^[0-9a-fA-F]+$/.test(privateKeyHex)) {
@@ -85,7 +92,7 @@ async function loadOrCreateAndSaveKeypair(): Promise<Secp256k1Keypair> {
 }
 
 // --- Authentication Helper ---
-async function createAuthenticationInfo(message: schema.Message, keypair: Secp256k1Keypair): Promise<schema.AuthenticationInfo> {
+async function createAuthenticationInfo(message: schema.Message, keypair: Secp256k1KeypairType): Promise<schema.AuthenticationInfo> {
     console.debug("[CLI] Creating authentication info...");
     // 1. Prepare data to sign (must match server logic in auth.ts)
     const a2aMessageHash = createMessageHashForSigning(message);
@@ -154,7 +161,7 @@ async function handleChatCommand(options: { serverUrl: string; taskId?: string }
     console.log('Type ".exit" to end the chat.');
 
     // --- Load or Create Keypair ---
-    let keypair: Secp256k1Keypair;
+    let keypair: Secp256k1KeypairType;
     try {
         keypair = await loadOrCreateAndSaveKeypair();
     } catch (err) {

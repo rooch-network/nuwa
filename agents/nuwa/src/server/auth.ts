@@ -2,17 +2,27 @@ import * as schema from '../a2a-schema.js';
 import { A2AError as A2AErrorClass } from './error.js';
 import { createHash } from 'crypto';
 
-// --- SDK Imports (Using correct package name / direct paths) ---
-import {
+// --- SDK Imports ---
+// Import values using default import
+import roochSdk from '@roochnetwork/rooch-sdk';
+const {
     Secp256k1PublicKey,
     Ed25519PublicKey,
     BitcoinSignMessage,
-    Bytes,
+    // Bytes, // Type alias might not be on the default export
     fromB64,
     fromHEX,
     toHEX,
-    RoochAddress, 
-    BitcoinAddress 
+    RoochAddress,
+    BitcoinAddress
+} = roochSdk;
+
+// Import types separately using 'import type'
+import type {
+    Bytes, // Import Bytes type
+    RoochAddress as RoochAddressType, // Use alias if needed to avoid conflict, though unlikely here
+    Secp256k1PublicKey as Secp256k1PublicKeyType,
+    Ed25519PublicKey as Ed25519PublicKeyType
 } from '@roochnetwork/rooch-sdk';
 
 // --- Credential Interfaces ---
@@ -87,7 +97,7 @@ function decodeSignature(signature: string): Bytes {
 export async function verifyRequestAuthentication(
     authentication: schema.AuthenticationInfo | null | undefined,
     messageToSignAgainst: schema.Message
-): Promise<RoochAddress> {
+): Promise<RoochAddressType> {
     // --- Basic Validation (Throws InvalidParams -32602 on failure) ---
     if (!authentication) {
         throw A2AErrorClass.invalidParams("Authentication required but not provided.");
@@ -111,8 +121,8 @@ export async function verifyRequestAuthentication(
 
     // --- Scheme Specific Validation & SDK Interaction --- 
     let isValid = false;
-    let identity: RoochAddress | undefined;
-    let publicKey: Secp256k1PublicKey | Ed25519PublicKey | undefined;
+    let identity: RoochAddressType | undefined;
+    let publicKey: Secp256k1PublicKeyType | Ed25519PublicKeyType | undefined;
 
     try { // Try block focuses on SDK object construction and verification call
         switch (scheme) {
@@ -152,7 +162,7 @@ export async function verifyRequestAuthentication(
                      throw A2AErrorClass.invalidParams("sessionPublicKey missing in credentials for rooch-sessionkey-signature."); // -32602
                 }
                 // Construct SDK object (might throw format errors)
-                let derivedAuthKey: RoochAddress;
+                let derivedAuthKey: RoochAddressType;
                 try {
                     const pkBytes = fromB64(skCreds.sessionPublicKey);
                     // Add explicit length check for Ed25519 public key

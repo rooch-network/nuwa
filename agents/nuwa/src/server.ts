@@ -20,10 +20,21 @@ import { getCurrentTimestamp, isTaskStatusUpdate, isArtifactUpdate } from './ser
 import { AgentCard } from './a2a-schema.js'; 
 import { A2AError as A2AErrorClass } from './server/error.js';
 import type { A2AError as A2AErrorType } from './server/error.js';
-// Import RoochAddress from SDK main export (assuming this works)
-import { RoochAddress } from '@roochnetwork/rooch-sdk'; 
-// Import BitcoinAddress directly
-import { BitcoinAddress } from '@roochnetwork/rooch-sdk/src/address/bitcoin.js';
+// --- SDK Imports (Using default import + destructuring) ---
+import roochSdk from '@roochnetwork/rooch-sdk';
+const {
+    // RoochAddress, // Value
+    // BitcoinAddress // Value
+} = roochSdk;
+// Need to destructure the *values* if they are used as constructors later
+const { RoochAddress, BitcoinAddress } = roochSdk;
+
+// Import types separately
+import type {
+    RoochAddress as RoochAddressType, 
+    BitcoinAddress as BitcoinAddressType 
+} from '@roochnetwork/rooch-sdk';
+
 // Import the new authentication verifier
 import { verifyRequestAuthentication } from './server/auth.js';
 
@@ -270,7 +281,7 @@ __NUWA_SCRIPT_INSTRUCTIONS_PLACEHOLDER__`;
     private async handleTaskSend(req: schema.SendTaskRequest, res: express.Response): Promise<void> {
         const { id: reqId, params } = req;
         let taskId: string | undefined;
-        let authenticatedIdentity: RoochAddress | null = null;
+        let authenticatedIdentity: RoochAddressType | null = null;
 
         try {
             taskId = params?.id;

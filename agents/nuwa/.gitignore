@@ -4,3 +4,4 @@
 
 # Environment variables
 .env 
+.rooch_config
