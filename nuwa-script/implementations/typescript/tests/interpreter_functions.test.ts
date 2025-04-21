@@ -26,9 +26,9 @@ describe('Interpreter - Built-in Functions', () => {
     // --- NOW Function --- 
     test('should evaluate NOW() function', async () => {
         const script = 'LET time = NOW()';
-        const start = Math.floor(Date.now());
+        const start = Date.now();
         const finalScope = await runScriptInContext(script);
-        const end = Math.floor(Date.now());
+        const end = Date.now();
         const timeVal = finalScope.get('time');
         expect(typeof timeVal).toBe('number');
         expect(timeVal).toBeGreaterThanOrEqual(start);
