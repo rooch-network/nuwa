@@ -20,6 +20,12 @@ import { getCurrentTimestamp, isTaskStatusUpdate, isArtifactUpdate } from './ser
 import { AgentCard } from './a2a-schema.js'; 
 import { A2AError as A2AErrorClass } from './server/error.js';
 import type { A2AError as A2AErrorType } from './server/error.js';
+// Import RoochAddress from SDK main export (assuming this works)
+import { RoochAddress } from '@roochnetwork/rooch-sdk'; 
+// Import BitcoinAddress directly
+import { BitcoinAddress } from '@roochnetwork/rooch-sdk/src/address/bitcoin.js';
+// Import the new authentication verifier
+import { verifyRequestAuthentication } from './server/auth.js';
 
 // --- In-memory storage for task message history ---
 const taskHistories = new Map<string, Message[]>();
@@ -128,7 +134,10 @@ export class NuwaA2AServer {
                 pushNotifications: false,
                 stateTransitionHistory: false
             },
-            authentication: null,
+            authentication: {
+                schemes: ["btc-signature", "rooch-sessionkey-signature"],
+                credentials: null 
+            },
             defaultInputModes: ["text"],
             defaultOutputModes: ["text"],
             skills: [{ id: "chat", name: "General Chat", description: "Have a general conversation." }]
@@ -255,44 +264,139 @@ __NUWA_SCRIPT_INSTRUCTIONS_PLACEHOLDER__`;
 
     // --- Request Handlers (Adapted from sample) ---
 
+    /**
+     * Handles the 'tasks/send' A2A request.
+     */
     private async handleTaskSend(req: schema.SendTaskRequest, res: express.Response): Promise<void> {
-        this.validateTaskSendParams(req.params);
-        const { id: taskId, message, sessionId, metadata } = req.params;
-
-        let currentData = await this.loadOrCreateTaskAndHistory(taskId, message, sessionId, metadata);
-        const context = this.createTaskContext(currentData.task, message, currentData.history);
-        const generator = this.taskHandler(context);
+        const { id: reqId, params } = req;
+        let taskId: string | undefined;
+        let authenticatedIdentity: RoochAddress | null = null;
 
         try {
-            for await (const yieldValue of generator) {
-                currentData = this.applyUpdateToTaskAndHistory(currentData, yieldValue);
-                await this.taskStore.save(currentData);
-            }
-        } catch (handlerError) {
-            // Assuming TaskState includes 'failed' string literal
-            const failureStatusUpdate: Omit<schema.TaskStatus, "timestamp"> = {
-                 state: "failed" as any, // Cast state to any to bypass strict check for now
-                 message: { role: "agent", parts: [{ type: "text", text: `Handler failed: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}` }] }
-            };
-            currentData = this.applyUpdateToTaskAndHistory(currentData, failureStatusUpdate);
-            try { await this.taskStore.save(currentData); } catch (saveError) {
-                 console.error(`[A2AServer ${taskId}] Failed to save task after handler error:`, saveError); 
-            }
-            let errorToThrow: Error;
-            if (handlerError instanceof A2AErrorClass) {
-                errorToThrow = handlerError;
-            } else if (handlerError instanceof Error) {
-                errorToThrow = A2AErrorClass.internalError(handlerError.message, { stack: handlerError.stack });
+            taskId = params?.id;
+            this.validateTaskSendParams(params);
+
+            // --- Use Refactored Authentication Logic ---
+            if (params.authentication) {
+                 // Call the verification function from auth.ts
+                 // It will throw A2AErrorClass on failure
+                authenticatedIdentity = await verifyRequestAuthentication(params.authentication, params.message);
+                
+                // Add verified identity STRING to metadata
+                params.metadata = { 
+                    ...(params.metadata || {}), 
+                    authenticatedIdentity: authenticatedIdentity.toStr()
+                };
+                 console.log(`[A2AServer ${taskId}] Authentication successful. Identity: ${authenticatedIdentity.toStr()} added to metadata.`);
             } else {
-                errorToThrow = A2AErrorClass.internalError("Unknown handler error.", handlerError);
+                console.log(`[A2AServer ${taskId}] No authentication provided.`);
+                // Handle requests without authentication (e.g., allow, reject, or require specific schemes)
+                 // Decide if unauthenticated requests should be allowed or rejected.
+                 // For now, allowing to proceed, but you might want to:
+                 // throw A2AErrorClass.invalidParams("Authentication required.");
             }
-             if (errorToThrow instanceof A2AErrorClass && !errorToThrow.taskId) {
-                errorToThrow.taskId = taskId;
+             // --- End Authentication Logic ---
+
+            const userMessage = params.message;
+
+            // Load existing task and history. If not found, initial task/history is created within loadOrCreateTaskAndHistory
+            const taskAndHistory = await this.loadOrCreateTaskAndHistory(
+                params.id,
+                userMessage,        // Initial message if task is new
+                params.sessionId,
+                params.metadata     // Pass potentially updated metadata
+            );
+
+            let currentTask = taskAndHistory.task;
+            let history = taskAndHistory.history;
+
+            // Check if the loaded task was ALREADY in a final state before this request
+            // loadOrCreateTaskAndHistory returns the state *before* adding the current userMessage
+            if (currentTask && ['completed', 'canceled', 'failed'].includes(currentTask.status.state)) {
+                 console.log(`[A2AServer ${taskId}] Task was already in final state: ${currentTask.status.state}. Sending current state.`);
+                this.sendJsonResponse(res, reqId ?? null, currentTask);
+                return;
             }
-            throw errorToThrow;
+
+            // If the task was just created by loadOrCreateTaskAndHistory, history will only contain the userMessage.
+            // If it existed, history includes previous messages + the new userMessage.
+
+            // Create context for the task handler (history includes the current userMessage)
+            const context = this.createTaskContext(currentTask, userMessage, history);
+
+            // Update task state to 'working' before starting handler
+            const workingUpdate: Omit<schema.TaskStatus, 'timestamp'> = { state: 'working' };
+            const updatedWorking = this.applyUpdateToTaskAndHistory({ task: currentTask, history }, workingUpdate); // Pass TaskAndHistory directly
+            await this.taskStore.save(updatedWorking); // Use .save() method
+            currentTask = updatedWorking.task; // Update local task state
+            history = updatedWorking.history; // Update local history state
+
+            console.log(`[A2AServer ${taskId}] Invoking task handler...`);
+            let finalTaskState: Task | null = null;
+
+            try {
+                // Run the task handler generator
+                for await (const update of this.taskHandler(context)) {
+                     console.log(`[A2AServer ${taskId}] Received update from handler:`, update);
+                    const updatedTaskAndHistory = this.applyUpdateToTaskAndHistory({ task: currentTask, history }, update); // Pass TaskAndHistory
+                    await this.taskStore.save(updatedTaskAndHistory); // Use .save()
+                    currentTask = updatedTaskAndHistory.task;
+                    history = updatedTaskAndHistory.history;
+
+                    if (['completed', 'canceled', 'failed'].includes(currentTask.status.state)) {
+                        finalTaskState = currentTask;
+                    }
+
+                    if (this.activeCancellations.has(currentTask.id)) {
+                        console.log(`[A2AServer ${taskId}] Cancellation requested during handling.`);
+                        this.activeCancellations.delete(currentTask.id);
+                        const canceledUpdate: Omit<schema.TaskStatus, 'timestamp'> = { state: 'canceled' };
+                        const updatedCanceled = this.applyUpdateToTaskAndHistory({ task: currentTask, history }, canceledUpdate);
+                        await this.taskStore.save(updatedCanceled); // Use .save()
+                        finalTaskState = updatedCanceled.task;
+                        break;
+                    }
+                }
+                 console.log(`[A2AServer ${taskId}] Task handler finished.`);
+                 if (!finalTaskState) {
+                     console.error(`[A2AServer ${taskId}] Task handler finished without yielding a final state.`);
+                    throw A2AErrorClass.internalError("Task handler did not produce a final state.");
+                 }
+
+            } catch (handlerError) {
+                 console.error(`[A2AServer ${taskId}] Error during task handling:`, handlerError);
+                const errorUpdate: Omit<schema.TaskStatus, 'timestamp'> = {
+                    state: 'failed',
+                    message: { role: 'agent', parts: [{ type: 'text', text: `Handler failed: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}` }] }
+                };
+                const updatedError = this.applyUpdateToTaskAndHistory({ task: currentTask, history }, errorUpdate); // Pass TaskAndHistory
+                await this.taskStore.save(updatedError); // Use .save()
+                finalTaskState = updatedError.task;
+            }
+
+            this.sendJsonResponse(res, reqId ?? null, finalTaskState);
+
+        } catch (error) {
+            let normalizedErrorResponse = this.normalizeError(error, reqId ?? null, taskId);
+            let statusCode = 500; // Default to 500
+            if (error instanceof A2AErrorClass) {
+                switch (error.code) {
+                    case -32700: // ParseError
+                    case -32600: // InvalidRequest
+                    case -32601: // MethodNotFound
+                    case -32602: // InvalidParams
+                        statusCode = 400;
+                        break;
+                    case -32000: // TaskNotFound (Adjusted code based on error.ts)
+                        statusCode = 404;
+                        break;
+                    // Add other specific codes if needed
+                    default: // InternalError and other A2A errors
+                        statusCode = 500;
+                }
+            }
+            res.status(statusCode).json(normalizedErrorResponse);
         }
-        // Use ?? null for req.id
-        this.sendJsonResponse(res, req.id ?? null, currentData.task);
     }
 
     private async handleTaskGet(req: schema.GetTaskRequest, res: express.Response): Promise<void> {

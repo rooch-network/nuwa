@@ -1,9 +1,17 @@
+#!/usr/bin/env node
+
+// This file likely serves as the main entry point when the package is executed.
+// It decides whether to start the server or run the CLI.
+
+// import './cli.js'; // Remove direct import causing immediate execution
+
 // Load environment variables from .env file
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Main entry point for the Nuwa Agent
-import { runCli } from './cli.js';
+// // Import the exported runCli function
+// import { runCli } from './cli.js';
+// Main entry point for the Nuwa Agent server
 import { NuwaA2AServer } from './server.js';
 
 console.log("Initializing Nuwa Agent...");
@@ -35,7 +43,8 @@ async function main() {
     } else {
         // Default to CLI mode
         console.log("Starting Nuwa Agent in CLI mode.");
-        await runCli();
+        // Call the imported runCli function which handles command parsing
+        // runCli();
     }
 }
 

@@ -7,7 +7,8 @@
   "scripts": {
     "build": "cd ../../nuwa-script/implementations/typescript && npm run build && cd ../../../agents/nuwa && tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon --watch src --ext ts --exec \"tsx src/index.ts\""
+    "dev": "nodemon --watch src --ext ts --exec \"tsx src/index.ts\"",
+    "test": "vitest run"
   },
   "keywords": [
     "ai",
@@ -26,11 +27,16 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@roochnetwork/rooch-sdk": "0.3.4",
+    "@roochnetwork/rooch-sdk-kit": "0.3.4",
+    "axios": "^1.8.4",
     "body-parser": "^1.19.0",
+    "commander": "^13.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
     "express": "^4.17.1",
+    "nuwa-script": "file:../../nuwa-script/implementations/typescript",
     "openai": "^4.0.0",
-    "nuwa-script": "file:../../nuwa-script/implementations/typescript"
+    "vitest": "^3.1.2"
   }
 }

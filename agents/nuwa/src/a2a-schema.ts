@@ -695,6 +695,12 @@ export interface TaskSendParams {
    * @default null
    */
   metadata?: Record<string, unknown> | null;
+
+  /**
+   * Optional authentication information for the request.
+   * @default null
+   */
+  authentication?: AuthenticationInfo | null;
 }
 
 /**
