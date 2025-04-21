@@ -92,7 +92,7 @@ export class Interpreter {
             if (args.length !== 0) {
                 throw new RuntimeError(`Function NOW() expects no arguments, got ${args.length}`, callExpr);
             }
-            return Math.floor(Date.now() / 1000);
+            return Date.now(); // Return milliseconds directly
         });
 
         // Register FORMAT
