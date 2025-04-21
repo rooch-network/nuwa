@@ -4,10 +4,11 @@ import OpenAI from 'openai';
 
 // --- Locally Defined Types --- 
 
-// Define Participant based on usage in Agent constructor
-interface Participant {
-    id: string; // Added id based on server.ts usage
+// Rename Participant to AgentConfig
+interface AgentConfig {
+    id: string; 
     name: string;
+    systemPrompt?: string; // Optional: Add system prompt here if it's part of the config
     // Add other fields if needed by Agent
 }
 
@@ -23,7 +24,7 @@ interface AgentMessage {
 // Define AgentResponse based on usage in handleMessage return type
 interface AgentResponse {
     response: {
-        from: string;
+        from: string; // Agent's name
         text: string;
         // history?: any[]; // Optional: if history needs to be passed back
     };
@@ -70,8 +71,10 @@ export class Agent {
     private aiService: AIService;
     private outputHandler: AgentOutputHandler;
     private toolRegistry: ToolRegistry; // Store ToolRegistry instance
+    private agentConfig: AgentConfig; // Rename participant to agentConfig
 
-    constructor(private participant: Participant) {
+    constructor(agentConfig: AgentConfig) {
+        this.agentConfig = agentConfig; // Store config
         this.toolRegistry = new ToolRegistry(); // Initialize ToolRegistry
         this.outputHandler = new AgentOutputHandler();
         // Pass the handler function to the Interpreter constructor
@@ -91,8 +94,8 @@ export class Agent {
             apiKey: apiKey,
             baseUrl: process.env.OPENAI_API_BASE, // Optional: read from env
             model: process.env.OPENAI_MODEL, // Optional: read from env
-            // Pass the participant's specific system prompt if available
-            systemPrompt: (participant as any).systemPrompt || undefined // Example, adjust based on actual Participant definition
+            // Use systemPrompt directly from agentConfig
+            systemPrompt: this.agentConfig.systemPrompt 
         });
     }
 
@@ -100,7 +103,7 @@ export class Agent {
         console.log(`[Agent] Handling message:`, message.text);
         this.outputHandler.clearBuffer();
 
-        // Use reduce for more controlled type handling during history mapping
+        // Map history
         const history = message.history.reduce((acc: OpenAI.Chat.Completions.ChatCompletionMessageParam[], msg: HistoryMessage) => {
             if (msg.role === 'user') {
                 acc.push({ role: 'user', content: msg.content ?? "" });
@@ -110,35 +113,31 @@ export class Agent {
                 acc.push({ role: 'system', content: msg.content ?? "" });
             }
             return acc;
-        }, [] as OpenAI.Chat.Completions.ChatCompletionMessageParam[]); // Initialize with typed empty array
+        }, [] as OpenAI.Chat.Completions.ChatCompletionMessageParam[]); 
 
-        // Add the current user message
+        // Add current user message
         const currentUserMessage: OpenAI.Chat.Completions.ChatCompletionUserMessageParam = {
             role: 'user',
             content: message.text
         };
         history.push(currentUserMessage);
 
-        let scriptToExecute: string | null = null; // Initialize as null
-        let finalContent = ""; // Initialize final content
+        let scriptToExecute: string | null = null;
+        let finalContent = ""; 
 
         try {
-            // Call AIService - it now directly returns the script string or throws an error
+            // Get script from AI
             scriptToExecute = await this.aiService.generateOrGetResponse(
                 history,
                 this.toolRegistry 
             );
             console.log("[Agent] Received script from AIService.");
             
-            // --- Script Execution --- 
-            // This block now only runs if AIService successfully returned a script
+            // Execute script
             console.log(`[Agent] Executing script:\n--- Script Start ---\n${scriptToExecute}\n--- Script End ---`);
             try {
-                // Parse the script string into an AST
                 const ast = parse(scriptToExecute); 
                 console.log("[Agent] Script parsed successfully.");
-                
-                // Execute the AST
                 const exec_scope = await this.interpreter.execute(ast);
                 console.log("[Agent] Script execution successful. Scope:", exec_scope);
                 const bufferedOutput = this.outputHandler.getBufferedOutput();
@@ -167,11 +166,11 @@ export class Agent {
             finalContent = errorMessage;
         }
         
-        // Always return a response object
+        // Return response
         console.log("[Agent] Sending final response:", finalContent);
         return {
             response: {
-                from: this.participant.name,
+                from: this.agentConfig.name,
                 text: finalContent,
             }
         };

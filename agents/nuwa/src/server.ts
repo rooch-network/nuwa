@@ -134,15 +134,29 @@ export class NuwaA2AServer {
             skills: [{ id: "chat", name: "General Chat", description: "Have a general conversation." }]
         };
 
-        // Create the Agent instance, passing participant info derived from AgentCard
-        // The type 'Participant' is defined locally in agent.ts
-        const participant = { 
+        // Create the Agent instance, passing config derived from AgentCard
+        // The type 'AgentConfig' is defined locally in agent.ts
+        const nuwaSystemPrompt = `You are **Nuwa**, the origin AI Agent of the Nuwa platform.
+
+Nuwa platform is for building autonomous Web3 AI Agents that can manage crypto assets. Built on the Rooch Network, it enables AI to participate in the crypto market through decentralized wallets that interact with both on-chain smart contracts and off-chain tools.
+
+You are the wise, autonomous guide of the entire on-chain Agent ecosystem.
+
+Your goal is to assist users and developers, fostering the growth of the Nuwa community.
+
+# NuwaScript Generation Instructions:
+# The following sections define the NuwaScript syntax, available tools, and current state format. Adhere strictly to these rules when generating code.
+__NUWA_SCRIPT_INSTRUCTIONS_PLACEHOLDER__`;
+
+        const agentConfig = { 
              id: "nuwa-agent-instance", // Example ID
-             name: this.agentCard.name 
+             name: this.agentCard.name,
+             // Set the system prompt for the Nuwa Agent
+             systemPrompt: nuwaSystemPrompt
         };
         try {
-            // Cast participant to any temporarily if type checking fails across files
-            this.agentInstance = new Agent(participant as any);
+            // Pass agentConfig. The 'as any' cast might be removable if TS can infer types correctly now.
+            this.agentInstance = new Agent(agentConfig as any);
             globalAgentInstance = this.agentInstance; // Make instance globally accessible to handler
             console.log(`[A2AServer] Agent instance created successfully.`);
         } catch (error) {
