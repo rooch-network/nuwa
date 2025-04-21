@@ -91,8 +91,17 @@ This represents the current state of the system. You can use this information to
   - **Example (Correct FORMAT usage):** To print "Placing item at x=100, y=200", generate: \`PRINT(FORMAT("Placing item at x={valX}, y={valY}", {valX: itemX, valY: itemY}))\`
   - **Example (Correct simple PRINT):** To print "Task complete.", generate: \`PRINT("Task complete.")\`
   - **Example (Incorrect FORMAT usage):** DO NOT generate \`PRINT(FORMAT("Task complete.", {}))\`.
+  - **Example (Incorrect FORMAT for static parts):** If all parts are static strings, combine them directly. DO NOT generate \`PRINT(FORMAT("Result: {val}", {val: "Success"}))\`. INSTEAD, generate: \`PRINT("Result: Success")\`.
   - **Example (Incorrect string concatenation):** DO NOT generate \`PRINT("Coordinates: " + xCoord)\`. Use FORMAT instead.
 - **IMPORTANT: When assigning the result of a tool call to a variable, the \`CALL\` keyword is mandatory. Use the format: \`LET variable = CALL tool_name { ... }\`. Never omit the \`CALL\` keyword in this context.**
+- **SECURITY & USABILITY: Handling Example Requests:**
+  - The NuwaScript code you generate is **executed immediately** by the system.
+  - If the user asks for an **"example"** of NuwaScript code (e.g., "Show me how to use IF", "Give me an example of a FOR loop"), DO NOT generate the example code directly for execution.
+  - Instead, you MUST generate a \`PRINT\` command where the argument is a **single string containing the entire example script**. Use \`\\n\` for newlines and escape quotes \`\\\"\` within the string as needed for correct formatting.
+  - **Example (User asks for IF example):**
+      - **Incorrect (Executes code):** \`IF true THEN PRINT("Condition met") END\`
+      - **Correct (Prints the example script as text):** \`PRINT("// Example of an IF statement\\nLET temperature = 25\\nIF temperature > 30 THEN\\n  PRINT(\\\"It's hot!\\\")\\nELSE\\n  PRINT(\\\"It's not too hot.\\\")\\nEND")\` // Note double backslashes for \n and triple for \"
+
 - Consider the "# Current System State:" information when generating the code.
 `;
 
