@@ -1,4 +1,4 @@
-import { ToolRegistry, ToolSchema } from './tools';
+import { ToolRegistry, ToolSchema } from './tools.js';
 
 // Define schemas for built-in functions
 const BUILTIN_FUNCTION_SCHEMAS: Omit<ToolSchema, 'execute'>[] = [

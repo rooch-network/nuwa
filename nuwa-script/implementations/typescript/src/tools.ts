@@ -1,6 +1,6 @@
-// import { NuwaValue } from './values'; // Import the runtime value type
-import { Scope } from './interpreter'; // For ToolContext potentially
-import { JsonValue } from './values'; // Import JsonValue
+// import { NuwaValue } from './values.js'; // Import the runtime value type
+import { Scope } from './interpreter.js'; // For ToolContext potentially
+import { JsonValue } from './values.js'; // Import JsonValue
 
 /**
  * Defines the expected type of a tool parameter or return value.

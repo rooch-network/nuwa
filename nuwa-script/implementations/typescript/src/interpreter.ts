@@ -1,18 +1,18 @@
-import * as AST from './ast';
-import { ToolRegistry, RegisteredTool, EvaluatedToolArguments, ToolContext } from './tools';
+import * as AST from './ast.js';
+import { ToolRegistry, RegisteredTool, EvaluatedToolArguments, ToolContext } from './tools.js';
 import {
     JsonValue, isJsonObject, jsonValuesAreEqual, isBoolean, isJsonArray,
     isNumber, isString, jsonValueToString, isNull
-} from './values';
+} from './values.js';
 import {
     InterpreterError, RuntimeError, TypeError, UndefinedVariableError,
     MemberAccessError, ToolNotFoundError, ToolArgumentError, ToolExecutionError,
     UnsupportedOperationError, DivisionByZeroError, InvalidConditionError,
     InvalidIterableError,
     IndexOutOfBoundsError
-} from './errors';
-import { isArrayIndexExpression, isMemberAccessExpression, isListLiteralExpr, isObjectLiteralExpr } from './ast';
-import { parse } from './parser';
+} from './errors.js';
+import { isArrayIndexExpression, isMemberAccessExpression, isListLiteralExpr, isObjectLiteralExpr } from './ast.js';
+import { parse } from './parser.js';
 
 // --- Scope Class Definition ---
 export class Scope {
@@ -513,7 +513,7 @@ export class Interpreter {
                     const valueToFormat = valuesObject[key];
                     // Remove the explicit undefined check as hasOwnProperty confirms presence
                     // Use non-null assertion (!) to satisfy TypeScript since JsonValue doesn't include undefined
-                    // Ensure jsonValueToString is imported from './values'
+                    // Ensure jsonValueToString is imported from './values.js'
                     result += jsonValueToString(valueToFormat!); // Use existing helper from values.ts
                 } else {
                     // Provide context in error message

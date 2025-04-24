@@ -1,4 +1,4 @@
-import { JsonValue } from './values'; // Import JsonValue
+import { JsonValue } from './values.js'; // Import JsonValue
 
 /**
  * Represents the different types of runtime values NuwaScript deals with.

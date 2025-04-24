@@ -1,5 +1,5 @@
-import { BaseNode } from './ast'; // Optional: include node for location info
-import { JsonValue } from './values'; // Optional: include value details
+import { BaseNode } from './ast.js'; // Optional: include node for location info
+import { JsonValue } from './values.js'; // Optional: include value details
 
 /**
  * Base class for all NuwaScript interpreter errors.

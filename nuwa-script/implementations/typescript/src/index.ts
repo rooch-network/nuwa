@@ -1,8 +1,8 @@
 // Re-export core classes
-export { Interpreter } from './interpreter';
-export { ToolRegistry } from './tools';
-export { parse } from './parser';
-export { buildPrompt } from './prompts';
+export { Interpreter } from './interpreter.js';
+export { ToolRegistry } from './tools.js';
+export { parse } from './parser.js';
+export { buildPrompt } from './prompts.js';
 
 // Re-export types from tools.ts
 export type { 
@@ -15,10 +15,10 @@ export type {
     StateMetadata,
     StateValueWithMetadata,
     ToolContext
-} from './tools';
+} from './tools.js';
 
 // Re-export types and functions from values.ts
-export type { JsonValue } from './values';
+export type { JsonValue } from './values.js';
 export { 
     isJsonObject, 
     isJsonArray, 
@@ -28,13 +28,13 @@ export {
     isNull, 
     jsonValuesAreEqual, 
     jsonValueToString 
-} from './values';
+} from './values.js';
 
 // Re-export AST namespace
-export * as AST from './ast';
+export * as AST from './ast.js';
 
 // Re-export additional types
-export type { Scope, OutputHandler } from './interpreter';
+export type { Scope, OutputHandler } from './interpreter.js';
 
 export {
     InterpreterError,
@@ -50,4 +50,4 @@ export {
     InvalidConditionError,
     InvalidIterableError,
     IndexOutOfBoundsError,
-} from './errors';
+} from './errors.js';

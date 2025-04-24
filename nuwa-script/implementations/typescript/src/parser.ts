@@ -1,6 +1,6 @@
-import { Token, TokenType, tokenize } from './lexer';
-import * as AST from './ast';
-import { JsonValue } from './values'; // For literal parsing
+import { Token, TokenType, tokenize } from './lexer.js';
+import * as AST from './ast.js';
+import { JsonValue } from './values.js'; // For literal parsing
 
 export class ParserError extends Error {
     constructor(message: string, public token?: Token) {
