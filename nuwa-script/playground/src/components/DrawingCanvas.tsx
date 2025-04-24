@@ -1,13 +1,17 @@
 import React, { useRef, useEffect, memo, useState } from 'react';
-import { Stage, Layer, Line, Rect, Circle, Path } from 'react-konva';
+import { Stage, Layer, Line, Rect, Circle, Path, Ellipse, RegularPolygon, Star, Text } from 'react-konva';
 import Konva from 'konva';
 
 // Define the possible shapes AI can draw
 export type DrawableShape = 
-  | { type: 'line', points: number[], color: string, strokeWidth: number }
-  | { type: 'rect', x: number, y: number, width: number, height: number, color: string, fill?: string }
-  | { type: 'circle', x: number, y: number, radius: number, color: string, fill?: string }
-  | { type: 'path', d: string, color: string, fill?: string, strokeWidth: number };
+  | { type: 'line', id: string, points: number[], color: string, strokeWidth: number }
+  | { type: 'rect', id: string, x: number, y: number, width: number, height: number, color: string, fill?: string }
+  | { type: 'circle', id: string, x: number, y: number, radius: number, color: string, fill?: string }
+  | { type: 'path', id: string, d: string, color: string, fill?: string, strokeWidth: number }
+  | { type: 'ellipse', id: string, x: number, y: number, radiusX: number, radiusY: number, color: string, fill?: string }
+  | { type: 'regularPolygon', id: string, x: number, y: number, sides: number, radius: number, color: string, fill?: string }
+  | { type: 'star', id: string, x: number, y: number, numPoints: number, innerRadius: number, outerRadius: number, color: string, fill?: string }
+  | { type: 'text', id: string, x: number, y: number, text: string, fontSize: number, color: string, fill?: string };
 
 interface DrawingCanvasProps {
   width: number;
@@ -98,12 +102,12 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = memo(({ width, height, shape
       key={`canvas-stage-${forceUpdateKey}`} // Add key to support forced re-renders
     >
       <Layer>
-        {shapes.map((shape, index) => {
+        {shapes.map((shape) => {
           switch (shape.type) {
             case 'line':
               return (
                 <Line
-                  key={`${index}-${forceUpdateKey}`}
+                  key={shape.id}
                   points={shape.points}
                   stroke={shape.color}
                   strokeWidth={shape.strokeWidth}
@@ -114,7 +118,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = memo(({ width, height, shape
             case 'rect':
               return (
                 <Rect
-                  key={`${index}-${forceUpdateKey}`}
+                  key={shape.id}
                   x={shape.x}
                   y={shape.y}
                   width={shape.width}
@@ -127,7 +131,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = memo(({ width, height, shape
             case 'circle':
               return (
                 <Circle
-                  key={`${index}-${forceUpdateKey}`}
+                  key={shape.id}
                   x={shape.x}
                   y={shape.y}
                   radius={shape.radius}
@@ -139,11 +143,64 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = memo(({ width, height, shape
             case 'path':
               return (
                 <Path
-                  key={`${index}-${forceUpdateKey}`}
+                  key={shape.id}
                   data={shape.d}
                   stroke={shape.color}
                   strokeWidth={shape.strokeWidth}
                   fill={shape.fill}
+                />
+              );
+            case 'ellipse':
+              return (
+                <Ellipse
+                  key={shape.id}
+                  x={shape.x}
+                  y={shape.y}
+                  radiusX={shape.radiusX}
+                  radiusY={shape.radiusY}
+                  stroke={shape.color}
+                  fill={shape.fill}
+                  strokeWidth={1}
+                />
+              );
+            case 'regularPolygon':
+              return (
+                <RegularPolygon
+                  key={shape.id}
+                  x={shape.x}
+                  y={shape.y}
+                  sides={shape.sides}
+                  radius={shape.radius}
+                  stroke={shape.color}
+                  fill={shape.fill}
+                  strokeWidth={1}
+                />
+              );
+            case 'star':
+              return (
+                <Star
+                  key={shape.id}
+                  x={shape.x}
+                  y={shape.y}
+                  numPoints={shape.numPoints}
+                  innerRadius={shape.innerRadius}
+                  outerRadius={shape.outerRadius}
+                  stroke={shape.color}
+                  fill={shape.fill}
+                  strokeWidth={1}
+                />
+              );
+            case 'text':
+              return (
+                <Text
+                  key={shape.id}
+                  x={shape.x}
+                  y={shape.y}
+                  text={shape.text}
+                  fontSize={shape.fontSize}
+                  stroke={shape.color}
+                  fill={shape.fill ?? shape.color}
+                  strokeWidth={0.5}
                 />
               );
             default:

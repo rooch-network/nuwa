@@ -1,6 +1,6 @@
 import { ExampleConfig, ComponentStateManager } from '../types/Example';
 // Import z for schema definition
-import { z } from 'zod';
+// import { z } from 'zod';
 // Keep JsonValue and StateValueWithMetadata if createState helper uses them
 import type { 
   // ToolSchema, // No longer needed directly for definitions here
@@ -12,6 +12,9 @@ import type {
   // NormalizedToolSchema // Remove unused import
 } from '../services/interpreter';
 import type { DrawableShape } from '../components/DrawingCanvas';
+
+// Remove the unused import
+// import { registerCanvasTools } from './canvas-tools';
 
 // Define the shared description string as a constant
 // Updated description reflecting the actual nested JSON structure, removing escapes
@@ -84,7 +87,7 @@ export const subscribeToCanvasChanges = (listener: () => void): () => void => {
     canvasChangeSubscribers.delete(listener);
   };
 };
-const notifyCanvasChange = () => {
+export const notifyCanvasChange = () => {
   // Update lastModified timestamp
   canvasState.lastModified = Date.now();
   // Notify all listeners
@@ -244,136 +247,6 @@ export const canvasStateManager: ComponentStateManager<CanvasState> = {
 };
 
 // --- End State Management ---
-
-// --- Canvas Tool Definitions (Using Zod) ---
-
-// Define Zod schemas for parameters and return types
-const drawLineParams = z.object({
-  x1: z.number().describe('Starting X coordinate'),
-  y1: z.number().describe('Starting Y coordinate'),
-  x2: z.number().describe('Ending X coordinate'),
-  y2: z.number().describe('Ending Y coordinate'),
-  color: z.string().optional().default('black').describe('Line color (e.g., "red", "#00ff00")'),
-  width: z.number().optional().default(2).describe('Line width')
-});
-
-const drawRectParams = z.object({
-    x: z.number().describe('Top-left X coordinate'),
-    y: z.number().describe('Top-left Y coordinate'),
-    width: z.number().describe('Rectangle width'),
-    height: z.number().describe('Rectangle height'),
-    color: z.string().optional().default('black').describe('Border color'),
-    fill: z.string().optional().describe('Fill color (optional)')
-});
-
-const drawCircleParams = z.object({
-    x: z.number().describe('Center X coordinate'),
-    y: z.number().describe('Center Y coordinate'),
-    radius: z.number().describe('Circle radius'),
-    color: z.string().optional().default('black').describe('Border color'),
-    fill: z.string().optional().describe('Fill color (optional)')
-});
-
-const drawPathParams = z.object({
-    d: z.string().describe('SVG path data string (e.g., "M10 10 H 90 V 90 H 10 Z")'),
-    color: z.string().optional().default('black').describe('Path color'),
-    fill: z.string().optional().describe('Fill color (optional)'),
-    width: z.number().optional().default(2).describe('Path stroke width')
-});
-
-const clearCanvasParams = z.object({}); // Empty object for no parameters
-
-// Define a common return type (null)
-const nullReturn = z.null();
-
-// --- Tool Implementations are now INLINED in registerCanvasTools ---
-
-// Function to register these tools (example - should be called where registry exists)
-export function registerCanvasTools(registry: ToolRegistry) {
-    // Register drawLine with inline implementation
-    registry.register({
-        name: 'drawLine',
-        description: 'Draws a line on the canvas.',
-        parameters: drawLineParams,
-        returns: { description: 'Always returns null', schema: nullReturn },
-        execute: async (args) => { // Type for args is inferred
-            const { x1, y1, x2, y2, color, width } = args;
-            const newShape: DrawableShape = { type: 'line', points: [x1, y1, x2, y2], color: color, strokeWidth: width };
-            console.log('[canvas.ts] Adding Line:', JSON.stringify(newShape));
-            canvasShapes.push(newShape);
-            notifyCanvasChange();
-            return null;
-        }
-    });
-
-    // Register drawRect with inline implementation
-    registry.register({
-        name: 'drawRect',
-        description: 'Draws a rectangle on the canvas.',
-        parameters: drawRectParams,
-        returns: { description: 'Always returns null', schema: nullReturn },
-        execute: async (args) => { // Type for args is inferred
-            const { x, y, width, height, color, fill } = args;
-            const newShape: DrawableShape = { type: 'rect', x, y, width, height, color, fill: fill || undefined };
-            console.log('[canvas.ts] Adding Rect:', JSON.stringify(newShape));
-            canvasShapes.push(newShape);
-            notifyCanvasChange();
-            return null;
-        }
-    });
-
-    // Register drawCircle with inline implementation
-    registry.register({
-        name: 'drawCircle',
-        description: 'Draws a circle on the canvas.',
-        parameters: drawCircleParams,
-        returns: { description: 'Always returns null', schema: nullReturn },
-        execute: async (args) => { // Type for args is inferred
-            const { x, y, radius, color, fill } = args;
-            const newShape: DrawableShape = { type: 'circle', x, y, radius, color, fill: fill || undefined };
-            console.log('[canvas.ts] Adding Circle:', JSON.stringify(newShape));
-            canvasShapes.push(newShape);
-            notifyCanvasChange();
-            return null;
-        }
-    });
-
-    // Register drawPath with inline implementation
-    registry.register({
-        name: 'drawPath',
-        description: 'Draws a path on the canvas using an SVG path data string (d attribute).',
-        parameters: drawPathParams,
-        returns: { description: 'Always returns null', schema: nullReturn },
-        execute: async (args) => { // Type for args is inferred
-            const { d, color, fill, width } = args;
-            if (!d || d.trim() === '') {
-                console.warn("drawPath called with empty or invalid 'd' string.");
-                return null;
-            }
-            const newShape: DrawableShape = { type: 'path', d: d.trim(), color, fill: fill || undefined, strokeWidth: width };
-            console.log('[canvas.ts] Adding Path:', JSON.stringify(newShape));
-            canvasShapes.push(newShape);
-            notifyCanvasChange();
-            return null;
-        }
-    });
-
-    // Register clearCanvas with inline implementation
-    registry.register({
-        name: 'clearCanvas',
-        description: 'Clears the entire canvas.',
-        parameters: clearCanvasParams,
-        returns: { description: 'Always returns null', schema: nullReturn },
-        execute: async () => { // Remove unused args parameter
-            console.log('[canvas.ts] Clearing canvas shapes.');
-            canvasShapes.length = 0;
-            canvasJSON = {}; // Also reset JSON object
-            notifyCanvasChange();
-            updateCanvasJSON({}); // Ensure registry state reflects cleared JSON
-            return null;
-        }
-    });
-}
 
 // --- Canvas Example Config --- 
 // REMOVE the unused generateNormalizedSchema function
