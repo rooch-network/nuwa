@@ -11,16 +11,14 @@ import { renderExampleComponent } from './components/ExampleComponents';
 import { 
   Interpreter, 
   ToolRegistry,
-  ToolSchema,
-  ToolFunction,
-  NuwaInterface,
-  OutputHandler
+  OutputHandler,
+  NormalizedToolSchema
 } from './services/interpreter';
 import { parse } from 'nuwa-script';
 import { AIService } from './services/ai';
 import { storageService } from './services/storage';
-import { tradingTools } from './examples/trading';
-import { canvasTools, canvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas';
+import { registerTradingTools } from './examples/trading'; 
+import { registerCanvasTools, canvasShapes, subscribeToCanvasChanges, updateCanvasJSON } from './examples/canvas'; 
 import { ExampleConfig } from './types/Example';
 import type { DrawableShape } from './components/DrawingCanvas';
 import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
@@ -64,8 +62,10 @@ class BufferingOutputHandler {
     }
 }
 
-// Extend NuwaInterface to include the buffering handler
-interface ExtendedNuwaInterface extends NuwaInterface {
+// Define a simplified interface for what App needs from the interpreter setup
+interface NuwaSetup {
+  interpreter: Interpreter;
+  toolRegistry: ToolRegistry;
   bufferingOutputHandler: BufferingOutputHandler;
 }
 
@@ -76,7 +76,7 @@ function App() {
   const [selectedExample, setSelectedExample] = useState<ExampleConfig | null>(null);
   const [output, setOutput] = useState('');
   const [executionError, setExecutionError] = useState<string | undefined>(undefined);
-  const [nuwaInterface, setNuwaInterface] = useState<ExtendedNuwaInterface | null>(null);
+  const [nuwaSetup, setNuwaSetup] = useState<NuwaSetup | null>(null);
   const [apiKey, setApiKey] = useState(storageService.getApiKey());
   const [baseUrl, setBaseUrl] = useState(storageService.getBaseUrl() || 'https://api.openai.com');
   const [modelName, setModelName] = useState(storageService.getModel() || 'gpt-4o');
@@ -86,7 +86,7 @@ function App() {
   // State moved to Layout: activeSidePanel, scriptPanelHeight, isDragging
   const [activeSidePanel, setActiveSidePanel] = useState<ActiveSidePanel>('examples'); // Keep state here, pass down initial value and handler
   const [messages, setMessages] = useState<CustomMessage[]>([]);
-  const [currentToolSchemas, setCurrentToolSchemas] = useState<ToolSchema[]>([]);
+  const [currentToolSchemas, setCurrentToolSchemas] = useState<NormalizedToolSchema[]>([]);
   const [shapes, setShapes] = useState<DrawableShape[]>(canvasShapes);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null); // Keep ref if Editor needs it
   const [editorContent, setEditorContent] = useState(''); // Editor content state
@@ -140,45 +140,61 @@ function App() {
   }, [handleSelectExample]); // Runs once on mount
 
 
-  // Setup interpreter and tools
+  // Setup interpreter and tools (MODIFIED)
   const setupInterpreter = (example: ExampleConfig) => {
+    console.log(`[App.tsx] Setting up interpreter for example: ${example.id}`);
     const toolRegistry = new ToolRegistry();
     
-    // Store registry in global object (browser-compatible way)
+    // Store registry globally (remains the same)
     const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
     (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry = toolRegistry;
     
     const bufferingHandler = new BufferingOutputHandler(); 
-
-    // Pass the buffering handler's bound function to the Interpreter
     const interpreter = new Interpreter(toolRegistry, bufferingHandler.getHandler());
     
-    let exampleTools: { schema: ToolSchema, execute: ToolFunction }[] = []; 
-    
-    if (example.id === 'trading') exampleTools = tradingTools;
-    else if (example.id === 'canvas') {
-      exampleTools = canvasTools;
+    // --- Register tools based on example ID using the new functions --- 
+    try {
+      if (example.id === 'trading') {
+        console.log("[App.tsx] Registering trading tools...");
+        registerTradingTools(toolRegistry);
+      } else if (example.id === 'canvas') {
+        console.log("[App.tsx] Registering canvas tools...");
+        registerCanvasTools(toolRegistry);
+      }
+      // Add other examples here if needed
+      console.log("[App.tsx] Tools registered successfully.");
+    } catch (error) {
+      console.error("[App.tsx] Error registering tools:", error);
+      setExecutionError(`Failed to register tools for ${example.name}: ${error instanceof Error ? error.message : String(error)}`);
+      // Set setup to null or handle partially initialized state?
+      setNuwaSetup(null);
+      setCurrentToolSchemas([]);
+      return; // Stop setup if tools fail to register
     }
+    // ---------------------------------------------------------------------
     
-    exampleTools.forEach(tool => {
-      toolRegistry.register(tool.schema.name, tool.schema, tool.execute);
-    });
-    
-    // If example has a state manager, use it to initialize the state
+    // If example has a state manager, initialize state (remains the same)
     if (example.stateManager) {
       console.log(`[App.tsx] Initializing state for ${example.id} using state manager`);
       example.stateManager.updateStateInRegistry();
     }
     
-    // Set the interpreter and registry in state
-    setNuwaInterface({ 
+    // Set the interpreter and registry in state (remains the same)
+    setNuwaSetup({ 
       interpreter, 
-      outputBuffer: [], 
       toolRegistry,
       bufferingOutputHandler: bufferingHandler 
     }); 
     
-    setCurrentToolSchemas(toolRegistry.getAllSchemas());
+    // Get and set the normalized schemas for the ToolPanel (remains the same)
+    try {
+        const schemas = toolRegistry.getAllSchemas();
+        console.log("[App.tsx] Retrieved normalized schemas for ToolPanel:", schemas);
+        setCurrentToolSchemas(schemas);
+    } catch (error) { 
+        console.error("[App.tsx] Error getting tool schemas:", error);
+        setCurrentToolSchemas([]); // Set empty if error occurs
+    }
   };
 
   // Run script - improved execution process - Wrap in useCallback
@@ -187,13 +203,13 @@ function App() {
     errorMessage?: string; 
     capturedOutput?: string | null 
   }> => {
-    if (!nuwaInterface) return { success: false, errorMessage: "Interpreter not initialized." };
+    if (!nuwaSetup) return { success: false, errorMessage: "Interpreter not initialized." };
 
     setIsRunning(true);
     setOutput(''); // Clear Output panel before run
     setExecutionError(undefined); // Clear previous errors
 
-    const bufferingHandler = nuwaInterface.bufferingOutputHandler;
+    const bufferingHandler = nuwaSetup.bufferingOutputHandler;
     bufferingHandler.clear();
 
     try {
@@ -208,7 +224,7 @@ function App() {
       setEditorContent(scriptToRun);
       
       // Execute script
-      const scope = await nuwaInterface.interpreter.execute(scriptAST);
+      const scope = await nuwaSetup.interpreter.execute(scriptAST);
       console.log("Execution finished. Final scope:", scope);
       
       // If it's a Canvas example, ensure refresh
@@ -237,7 +253,7 @@ function App() {
     } finally {
       setIsRunning(false);
     }
-  }, [nuwaInterface, selectedExample, setIsRunning, setOutput, setExecutionError, setEditorContent, setShapes]); // Removed setMessages dependency
+  }, [nuwaSetup, selectedExample, setIsRunning, setOutput, setExecutionError, setEditorContent, setShapes]); // Removed setMessages dependency
 
   // Handle script changes
   const handleScriptChange = useCallback((newCode = '') => {
@@ -266,7 +282,7 @@ function App() {
       return;
     }
 
-    if (!nuwaInterface) {
+    if (!nuwaSetup) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Interpreter not initialized. Please select an example first.' }]);
       return;
     }
@@ -286,7 +302,7 @@ function App() {
         appSpecificGuidance: selectedExample?.aiPrompt,
         temperature: temperature,
       });
-      const toolRegistry = nuwaInterface!.toolRegistry;
+      const toolRegistry = nuwaSetup.toolRegistry;
       const generatedScript = await aiService.generateNuwaScript(
         message,
         toolRegistry,
@@ -309,7 +325,7 @@ function App() {
         // else { setMessages(prev => [...prev, { role: 'assistant', content: "Script executed successfully." }]) }
       } else {
         // Add error message to history for AI feedback
-        const errorMessageContent = `Execution failed with error:\\n\`\`\`\\n${runResult.errorMessage}\\n\`\`\`\``;
+        const errorMessageContent = `Execution failed with error:\\n\`\`\`\\n${runResult.errorMessage}\\n\`\`\``;
         setMessages(prev => [...prev, { role: 'assistant', content: errorMessageContent }]);
       }
 
@@ -321,7 +337,7 @@ function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [apiKey, nuwaInterface, baseUrl, modelName, selectedExample?.aiPrompt, temperature, handleRun, messages]);
+  }, [apiKey, nuwaSetup, baseUrl, modelName, selectedExample?.aiPrompt, temperature, handleRun, messages]);
 
   // Handle API Key change from input - Wrap in useCallback
   const handleApiKeyChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -367,7 +383,7 @@ function App() {
   const headerProps = {
     onRunClick: handleRunClick,
     isRunning,
-    isRunDisabled: isRunning || !editorContent.trim() || !nuwaInterface
+    isRunDisabled: isRunning || !editorContent.trim() || !nuwaSetup
   };
 
   const sidebarContent = activeSidePanel === 'examples' ? (

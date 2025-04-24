@@ -2,9 +2,7 @@
 import { 
     Interpreter, 
     ToolRegistry, 
-    ToolSchema, 
-    ToolParameter, 
-    ToolFunction, 
+    ToolSchema,
     JsonValue, 
     EvaluatedToolArguments,
     OutputHandler,
@@ -14,7 +12,7 @@ import {
     StateMetadata,
     StateValueWithMetadata,
     ToolContext,
-    NuwaType
+    NormalizedToolSchema
 } from 'nuwa-script';
 
 // Define the Interpreter instance type - Removed as not needed
@@ -54,9 +52,7 @@ export {
 
 // Re-export types
 export type { 
-    ToolSchema, 
-    ToolParameter, 
-    ToolFunction, 
+    ToolSchema,
     JsonValue, 
     EvaluatedToolArguments, 
     OutputHandler, 
@@ -67,7 +63,8 @@ export type {
     StateMetadata,
     StateValueWithMetadata,
     ToolContext,
-    NuwaType
+    // NuwaType,
+    NormalizedToolSchema
 }; 
 
 // Remove debug logs

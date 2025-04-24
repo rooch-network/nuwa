@@ -1,9 +1,36 @@
 import React, { useState } from 'react';
-import type { ToolSchema, ToolParameter } from '../services/interpreter';
+import type { NormalizedToolSchema } from '../services/interpreter';
+import type { JSONSchema7Definition, JSONSchema7Type } from 'json-schema';
 
 interface ToolPanelProps {
-  tools: ToolSchema[];
+  tools: NormalizedToolSchema[];
 }
+
+const renderSchema = (schema: JSONSchema7Definition | undefined): string => {
+  if (typeof schema === 'boolean') {
+    return schema ? 'any' : 'never';
+  }
+  if (!schema) return 'unknown';
+  if (schema.type) {
+    if (Array.isArray(schema.type)) {
+        return schema.type.join(' | ');
+    }
+    return schema.type;
+  }
+  if (schema.$ref) return schema.$ref;
+  if (schema.enum) return schema.enum.map((e: JSONSchema7Type) => JSON.stringify(e)).join(' | ');
+  if (schema.properties) return 'object';
+  if (schema.items) return `array (${renderSchema(schema.items as JSONSchema7Definition)})`;
+  if (schema.anyOf) return schema.anyOf.map((s: JSONSchema7Definition) => renderSchema(s as JSONSchema7Definition)).join(' | ');
+  if (schema.allOf) return schema.allOf.map((s: JSONSchema7Definition) => renderSchema(s as JSONSchema7Definition)).join(' & ');
+  if (schema.oneOf) return schema.oneOf.map((s: JSONSchema7Definition) => renderSchema(s as JSONSchema7Definition)).join(' | ');
+
+  if (schema.const !== undefined) {
+    return JSON.stringify(schema.const);
+  }
+  
+  return 'unknown';
+};
 
 const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
@@ -52,7 +79,7 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
             {filteredTools.map((tool) => (
               <div key={tool.name} className="overflow-hidden">
                 <button
-                  className={`sidebar-item w-full text-left mx-3 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                  className={`sidebar-item w-full text-left p-3 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
                     expandedTool === tool.name ? 'bg-gray-100 dark:bg-gray-700' : ''
                   }`}
                   onClick={() => toggleTool(tool.name)}
@@ -64,11 +91,11 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
                         </svg>
                       </div>
-                      <div className="min-w-0 ml-3">
+                      <div className="min-w-0">
                         <h3 className="text-sm font-medium text-gray-900 dark:text-gray-200 truncate">
                           {tool.name}
                         </h3>
-                        <p className="sidebar-item-description text-gray-500 dark:text-gray-400 truncate">
+                        <p className="sidebar-item-description text-xs text-gray-500 dark:text-gray-400 truncate">
                           {tool.description}
                         </p>
                       </div>
@@ -91,7 +118,7 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                         Description
                       </h4>
-                      <p className="text-gray-700 dark:text-gray-300 whitespace-normal break-all">
+                      <p className="text-gray-700 dark:text-gray-300 whitespace-normal break-words">
                         {tool.description}
                       </p>
                     </div>
@@ -100,31 +127,37 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                         Parameters
                       </h4>
-                      {tool.parameters && tool.parameters.length > 0 ? (
+                      {tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0 ? (
                         <div className="space-y-2">
-                          {tool.parameters.map((param: ToolParameter) => (
-                            <div key={param.name} className="p-2 rounded-md bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 overflow-hidden">
-                              <div className="flex items-center justify-between">
-                                <span className="font-mono text-xs text-purple-600 dark:text-purple-400">{param.name}</span>
-                                <span className="text-xs bg-gray-200 dark:bg-gray-800 rounded px-2 py-0.5 text-gray-600 dark:text-gray-400">
-                                  {param.type}
-                                </span>
-                              </div>
-                              {param.description && (
-                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-500 whitespace-normal break-all">
-                                  {param.description}
-                                </p>
-                              )}
-                              {param.required && (
-                                <div className="mt-1 text-xs text-amber-500 dark:text-amber-400 flex items-center">
-                                  <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                  </svg>
-                                  Required
+                          {Object.entries(tool.parameters.properties).map(([paramName, paramSchema]: [string, JSONSchema7Definition]) => {
+                            const isRequired = tool.parameters.required?.includes(paramName) ?? false;
+                            const description = typeof paramSchema === 'object' ? paramSchema.description : undefined;
+                            const paramType = renderSchema(paramSchema);
+
+                            return (
+                              <div key={paramName} className="p-2 rounded-md bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-mono text-xs text-purple-600 dark:text-purple-400">{paramName}</span>
+                                  <span className="text-xs bg-gray-200 dark:bg-gray-800 rounded px-2 py-0.5 text-gray-600 dark:text-gray-400">
+                                    {paramType}
+                                  </span>
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                {description && (
+                                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-500 whitespace-normal break-all">
+                                    {description}
+                                  </p>
+                                )}
+                                {isRequired && (
+                                  <div className="mt-1 text-xs text-amber-500 dark:text-amber-400 flex items-center">
+                                    <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                    Required
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-gray-500 dark:text-gray-500 italic">No parameters</p>
@@ -132,12 +165,17 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                     </div>
                     
                     {tool.returns && (
-                      <div>
+                      <div className="mb-3">
                         <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                          Return Type
+                          Returns
                         </h4>
+                        {tool.returns.description && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 italic">
+                              {tool.returns.description}
+                          </p>
+                        )}
                         <div className="inline-block bg-gray-200 dark:bg-gray-800 rounded px-2 py-1 text-xs font-mono text-gray-700 dark:text-gray-300">
-                          {tool.returns}
+                          {renderSchema(tool.returns.schema)}
                         </div>
                       </div>
                     )}
@@ -146,12 +184,12 @@ const ToolPanel: React.FC<ToolPanelProps> = ({ tools }) => {
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                         Example Usage
                       </h4>
-                      <pre className="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md text-xs overflow-x-auto max-w-full !max-w-full">
-                        {`CALL ${tool.name}(${
-                          tool.parameters && tool.parameters.length > 0
-                            ? tool.parameters.map(param => `${param.name}=value`).join(', ')
+                      <pre className="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md text-xs overflow-x-auto">
+                        {`CALL ${tool.name} {${
+                          tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0
+                            ? Object.keys(tool.parameters.properties).map(paramName => `${paramName}=value`).join(', ')
                             : ''
-                        })`}
+                        }}`}
                       </pre>
                     </div>
                   </div>

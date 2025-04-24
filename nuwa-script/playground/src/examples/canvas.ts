@@ -1,13 +1,15 @@
 import { ExampleConfig, ComponentStateManager } from '../types/Example';
+// Import z for schema definition
+import { z } from 'zod';
+// Keep JsonValue and StateValueWithMetadata if createState helper uses them
 import type { 
-  ToolSchema, 
-  ToolFunction, 
-  EvaluatedToolArguments,
+  // ToolSchema, // No longer needed directly for definitions here
+  // ToolFunction, // User functions won't directly use this type now
+  // EvaluatedToolArguments, // Not needed for user functions
   StateValueWithMetadata,
   ToolRegistry,
-  ToolContext,
-  NuwaType,
-  JsonValue
+  JsonValue,
+  // NormalizedToolSchema // Remove unused import
 } from '../services/interpreter';
 import type { DrawableShape } from '../components/DrawingCanvas';
 
@@ -118,25 +120,13 @@ function createState<T>(value: T, description: string, formatter?: (value: unkno
   };
 }
 
-// Update state with canvas information
-export function updateCanvasState(context?: ToolContext): void {
-  // If no context or state, try to get registry from global object
-  let registry: ToolRegistry | undefined;
+// Update state with canvas information - Context no longer passed
+export function updateCanvasState(): void {
+  // Initialize registry directly with const
+  const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
+  const registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
   
-  if (context) {
-    registry = (context as unknown as { registry?: ToolRegistry }).registry;
-  }
-  
-  if (!registry) {
-    // Get global registry if not from context
-    const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
-    registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
-  }
-  
-  // Return if registry not found
-  if (!registry) return;
-  
-  // Update canvas state values
+  if (!registry) return; // Return if registry not found
   updateCanvasStateWithRegistry(registry);
 }
 
@@ -255,212 +245,157 @@ export const canvasStateManager: ComponentStateManager<CanvasState> = {
 
 // --- End State Management ---
 
+// --- Canvas Tool Definitions (Using Zod) ---
 
-// --- Canvas Tool Definitions ---
+// Define Zod schemas for parameters and return types
+const drawLineParams = z.object({
+  x1: z.number().describe('Starting X coordinate'),
+  y1: z.number().describe('Starting Y coordinate'),
+  x2: z.number().describe('Ending X coordinate'),
+  y2: z.number().describe('Ending Y coordinate'),
+  color: z.string().optional().default('black').describe('Line color (e.g., "red", "#00ff00")'),
+  width: z.number().optional().default(2).describe('Line width')
+});
 
-// Helper function to determine the Nuwa type string from a JavaScript value
-const getActualNuwaType = (value: unknown): NuwaType => {
-    if (value === null) return 'null';
-    const jsType = typeof value;
-    if (jsType === 'object') {
-        return Array.isArray(value) ? 'array' : 'object';
-    }
-    // Handles string, number, boolean, undefined, bigint, symbol, function
-    return jsType as NuwaType; 
-};
+const drawRectParams = z.object({
+    x: z.number().describe('Top-left X coordinate'),
+    y: z.number().describe('Top-left Y coordinate'),
+    width: z.number().describe('Rectangle width'),
+    height: z.number().describe('Rectangle height'),
+    color: z.string().optional().default('black').describe('Border color'),
+    fill: z.string().optional().describe('Fill color (optional)')
+});
 
-// Helper function to get value from EvaluatedToolArguments
-const getArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: NuwaType, defaultVal: T): T => {
-    const value = args[name];
+const drawCircleParams = z.object({
+    x: z.number().describe('Center X coordinate'),
+    y: z.number().describe('Center Y coordinate'),
+    radius: z.number().describe('Circle radius'),
+    color: z.string().optional().default('black').describe('Border color'),
+    fill: z.string().optional().describe('Fill color (optional)')
+});
 
-    if (value === undefined) {
-        return defaultVal;
-    }
+const drawPathParams = z.object({
+    d: z.string().describe('SVG path data string (e.g., "M10 10 H 90 V 90 H 10 Z")'),
+    color: z.string().optional().default('black').describe('Path color'),
+    fill: z.string().optional().describe('Fill color (optional)'),
+    width: z.number().optional().default(2).describe('Path stroke width')
+});
+
+const clearCanvasParams = z.object({}); // Empty object for no parameters
+
+// Define a common return type (null)
+const nullReturn = z.null();
+
+// --- Tool Implementations are now INLINED in registerCanvasTools ---
+
+// Function to register these tools (example - should be called where registry exists)
+export function registerCanvasTools(registry: ToolRegistry) {
+    // Register drawLine with inline implementation
+    registry.register({
+        name: 'drawLine',
+        description: 'Draws a line on the canvas.',
+        parameters: drawLineParams,
+        returns: { description: 'Always returns null', schema: nullReturn },
+        execute: async (args) => { // Type for args is inferred
+            const { x1, y1, x2, y2, color, width } = args;
+            const newShape: DrawableShape = { type: 'line', points: [x1, y1, x2, y2], color: color, strokeWidth: width };
+            console.log('[canvas.ts] Adding Line:', JSON.stringify(newShape));
+            canvasShapes.push(newShape);
+            notifyCanvasChange();
+            return null;
+        }
+    });
+
+    // Register drawRect with inline implementation
+    registry.register({
+        name: 'drawRect',
+        description: 'Draws a rectangle on the canvas.',
+        parameters: drawRectParams,
+        returns: { description: 'Always returns null', schema: nullReturn },
+        execute: async (args) => { // Type for args is inferred
+            const { x, y, width, height, color, fill } = args;
+            const newShape: DrawableShape = { type: 'rect', x, y, width, height, color, fill: fill || undefined };
+            console.log('[canvas.ts] Adding Rect:', JSON.stringify(newShape));
+            canvasShapes.push(newShape);
+            notifyCanvasChange();
+            return null;
+        }
+    });
+
+    // Register drawCircle with inline implementation
+    registry.register({
+        name: 'drawCircle',
+        description: 'Draws a circle on the canvas.',
+        parameters: drawCircleParams,
+        returns: { description: 'Always returns null', schema: nullReturn },
+        execute: async (args) => { // Type for args is inferred
+            const { x, y, radius, color, fill } = args;
+            const newShape: DrawableShape = { type: 'circle', x, y, radius, color, fill: fill || undefined };
+            console.log('[canvas.ts] Adding Circle:', JSON.stringify(newShape));
+            canvasShapes.push(newShape);
+            notifyCanvasChange();
+            return null;
+        }
+    });
+
+    // Register drawPath with inline implementation
+    registry.register({
+        name: 'drawPath',
+        description: 'Draws a path on the canvas using an SVG path data string (d attribute).',
+        parameters: drawPathParams,
+        returns: { description: 'Always returns null', schema: nullReturn },
+        execute: async (args) => { // Type for args is inferred
+            const { d, color, fill, width } = args;
+            if (!d || d.trim() === '') {
+                console.warn("drawPath called with empty or invalid 'd' string.");
+                return null;
+            }
+            const newShape: DrawableShape = { type: 'path', d: d.trim(), color, fill: fill || undefined, strokeWidth: width };
+            console.log('[canvas.ts] Adding Path:', JSON.stringify(newShape));
+            canvasShapes.push(newShape);
+            notifyCanvasChange();
+            return null;
+        }
+    });
+
+    // Register clearCanvas with inline implementation
+    registry.register({
+        name: 'clearCanvas',
+        description: 'Clears the entire canvas.',
+        parameters: clearCanvasParams,
+        returns: { description: 'Always returns null', schema: nullReturn },
+        execute: async () => { // Remove unused args parameter
+            console.log('[canvas.ts] Clearing canvas shapes.');
+            canvasShapes.length = 0;
+            canvasJSON = {}; // Also reset JSON object
+            notifyCanvasChange();
+            updateCanvasJSON({}); // Ensure registry state reflects cleared JSON
+            return null;
+        }
+    });
+}
+
+// --- Canvas Example Config --- 
+// REMOVE the unused generateNormalizedSchema function
+/*
+const generateNormalizedSchema = (toolDef: ToolDefinition): NormalizedToolSchema => {
+    const { normalizeSchemaToJsonSchema } = require('../services/interpreter'); 
     
-    const actualType = getActualNuwaType(value);
+    const normalizedParams = normalizeSchemaToJsonSchema(toolDef.parameters, 'parameters', toolDef.name, true);
+    const normalizedReturns = normalizeSchemaToJsonSchema(toolDef.returns.schema, 'returns.schema', toolDef.name, false);
 
-    if (actualType === expectedType || expectedType === 'any') {
-         if (actualType === 'null' && expectedType !== 'null' && expectedType !== 'any') {
-            return defaultVal; // Return default value for null when not expecting null
-         } else {
-            return value as T;
-         }
-    }
-
-    console.warn(`Type mismatch for argument '${name}': Expected ${expectedType}, got ${actualType}. Using default.`);
-    return defaultVal;
+    return {
+        name: toolDef.name,
+        description: toolDef.description,
+        parameters: normalizedParams as NormalizedToolSchema['parameters'],
+        returns: {
+            description: toolDef.returns.description,
+            schema: normalizedReturns,
+        }
+    };
 };
+*/
 
-// drawLine Tool
-const drawLineSchema: ToolSchema = {
-  name: 'drawLine',
-  description: 'Draws a line on the canvas.',
-  parameters: [
-    { name: 'x1', type: 'number', description: 'Starting X coordinate', required: true },
-    { name: 'y1', type: 'number', description: 'Starting Y coordinate', required: true },
-    { name: 'x2', type: 'number', description: 'Ending X coordinate', required: true },
-    { name: 'y2', type: 'number', description: 'Ending Y coordinate', required: true },
-    { name: 'color', type: 'string', description: 'Line color (e.g., "red", "#00ff00")', required: false },
-    { name: 'width', type: 'number', description: 'Line width', required: false }
-  ],
-  returns: 'null'
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawLineFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
-  const x1 = getArgValue<number>(args, 'x1', 'number', 0);
-  const y1 = getArgValue<number>(args, 'y1', 'number', 0);
-  const x2 = getArgValue<number>(args, 'x2', 'number', 0);
-  const y2 = getArgValue<number>(args, 'y2', 'number', 0);
-  const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const width = getArgValue<number>(args, 'width', 'number', 2);
-
-  const newShape = { type: 'line' as const, points: [x1, y1, x2, y2], color: color, strokeWidth: width };
-  console.log('[canvas.ts] Adding Line:', JSON.stringify(newShape)); // Log added shape
-  canvasShapes.push(newShape);
-  notifyCanvasChange();
-  
-  // Update canvas state
-  updateCanvasState(context);
-  
-  return null;
-};
-
-// drawRect Tool
-const drawRectSchema: ToolSchema = {
-  name: 'drawRect',
-  description: 'Draws a rectangle on the canvas.',
-  parameters: [
-    { name: 'x', type: 'number', description: 'Top-left X coordinate', required: true },
-    { name: 'y', type: 'number', description: 'Top-left Y coordinate', required: true },
-    { name: 'width', type: 'number', description: 'Rectangle width', required: true },
-    { name: 'height', type: 'number', description: 'Rectangle height', required: true },
-    { name: 'color', type: 'string', description: 'Border color', required: false },
-    { name: 'fill', type: 'string', description: 'Fill color (optional)', required: false }
-  ],
-  returns: 'null'
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawRectFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
-  const x = getArgValue<number>(args, 'x', 'number', 10);
-  const y = getArgValue<number>(args, 'y', 'number', 10);
-  const width = getArgValue<number>(args, 'width', 'number', 50);
-  const height = getArgValue<number>(args, 'height', 'number', 30);
-  const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const fill = getArgValue<string>(args, 'fill', 'string', '');
-
-  const newShape = { type: 'rect' as const, x, y, width, height, color, fill };
-  console.log('[canvas.ts] Adding Rect:', JSON.stringify(newShape)); // Log added shape
-  canvasShapes.push(newShape);
-  notifyCanvasChange();
-  
-  // Update canvas state
-  updateCanvasState(context);
-  
-  return null;
-};
-
-// drawCircle Tool
-const drawCircleSchema: ToolSchema = {
-  name: 'drawCircle',
-  description: 'Draws a circle on the canvas.',
-  parameters: [
-    { name: 'x', type: 'number', description: 'Center X coordinate', required: true },
-    { name: 'y', type: 'number', description: 'Center Y coordinate', required: true },
-    { name: 'radius', type: 'number', description: 'Circle radius', required: true },
-    { name: 'color', type: 'string', description: 'Border color', required: false },
-    { name: 'fill', type: 'string', description: 'Fill color (optional)', required: false }
-  ],
-  returns: 'null'
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const drawCircleFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
-  const x = getArgValue<number>(args, 'x', 'number', 50);
-  const y = getArgValue<number>(args, 'y', 'number', 50);
-  const radius = getArgValue<number>(args, 'radius', 'number', 25);
-  const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const fill = getArgValue<string>(args, 'fill', 'string', '');
-
-  const newShape = { type: 'circle' as const, x, y, radius, color, fill };
-  console.log('[canvas.ts] Adding Circle:', JSON.stringify(newShape)); // Log added shape
-  canvasShapes.push(newShape);
-  notifyCanvasChange();
-  
-  // Update canvas state
-  updateCanvasState(context);
-  
-  return null;
-};
-
-// *** drawPath Tool using SVG Path String ***
-const drawPathSchema: ToolSchema = {
-  name: 'drawPath',
-  description: 'Draws a path on the canvas using an SVG path data string (d attribute).',
-  parameters: [
-    { name: 'd', type: 'string', description: 'SVG path data string (e.g., "M10 10 H 90 V 90 H 10 Z")', required: true },
-    { name: 'color', type: 'string', description: 'Path color', required: false },
-    { name: 'fill', type: 'string', description: 'Fill color (optional)', required: false },
-    { name: 'width', type: 'number', description: 'Path stroke width', required: false }
-  ],
-  returns: 'null'
-};
-
-const drawPathFunc: ToolFunction = async (args: EvaluatedToolArguments, context?: ToolContext): Promise<JsonValue> => { 
-  // Get arguments using the updated schema
-  const d = getArgValue<string>(args, 'd', 'string', ''); 
-  const color = getArgValue<string>(args, 'color', 'string', 'black');
-  const fill = getArgValue<string>(args, 'fill', 'string', ''); // Empty string means no fill by default
-  const width = getArgValue<number>(args, 'width', 'number', 2);
-
-  if (!d || typeof d !== 'string' || d.trim() === '') {
-    console.warn("drawPath called with empty or invalid 'd' string.");
-    return null; // Return null if path data is invalid
-  }
-
-  // No need to process commands array anymore
-
-  const newShape: DrawableShape = { type: 'path', d: d.trim(), color, fill: fill || undefined, strokeWidth: width }; // Use fill only if provided
-  console.log('[canvas.ts] Adding Path:', JSON.stringify(newShape));
-  canvasShapes.push(newShape);
-  notifyCanvasChange(); // Notify UI about shape change
-
-  updateCanvasState(context); // Update tool state
-  return null; // Return null as per schema
-};
-// *** END MODIFIED TOOL ***
-
-// clearCanvas Tool
-const clearCanvasSchema: ToolSchema = {
-  name: 'clearCanvas',
-  description: 'Clears the entire canvas.',
-  parameters: [],
-  returns: 'null'
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const clearCanvasFunc: ToolFunction = async (_args: EvaluatedToolArguments, context?: ToolContext): Promise<any> => {
-  console.log('[canvas.ts] Clearing canvas shapes.'); // Log clear action
-  canvasShapes.length = 0; // Clear the global array more explicitly
-  notifyCanvasChange();
-  
-  // Update canvas state
-  updateCanvasState(context);
-  
-  return null;
-};
-
-// Export tools - ENSURE THIS LIST IS CORRECT
-export const canvasTools: { schema: ToolSchema, execute: ToolFunction }[] = [
-  { schema: drawLineSchema, execute: drawLineFunc },
-  { schema: drawRectSchema, execute: drawRectFunc },
-  { schema: drawCircleSchema, execute: drawCircleFunc },
-  { schema: drawPathSchema, execute: drawPathFunc }, // Ensure using the updated schema/func
-  { schema: clearCanvasSchema, execute: clearCanvasFunc }
-];
-
-// Canvas Example Config
 export const canvasExample: ExampleConfig = {
   id: 'canvas',
   name: 'Canvas Drawing',
@@ -491,7 +426,7 @@ CALL drawCircle {x: 250, y: 200, radius: 20, color: "blue", fill: "lightblue"}
 
 PRINT("House and path drawing complete!")
 `,
-  tools: canvasTools.map(t => t.schema),
+  tools: [], // Placeholder - Registration should happen elsewhere
   aiPrompt: `You are an AI assistant helping a user draw on a digital canvas using NuwaScript. Your primary goal is to translate the user's drawing requests into accurate NuwaScript \`CALL\` statements for the available canvas tools.
 
 # Canvas Context:

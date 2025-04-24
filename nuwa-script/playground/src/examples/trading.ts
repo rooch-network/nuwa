@@ -1,13 +1,15 @@
 import { ExampleConfig, ComponentStateManager } from '../types/Example';
+// Import z for schema definition
+import { z } from 'zod';
 // Import necessary types from nuwa-script (re-exported via services)
 import type { 
-  ToolSchema, 
-  ToolFunction, 
-  EvaluatedToolArguments,
+  // ToolSchema, // No longer needed directly for definitions here
+  // ToolFunction, // User functions won't directly use this type now
+  // EvaluatedToolArguments, // Not needed for user functions
   StateValueWithMetadata,
   ToolRegistry,
-  ToolContext,
   JsonValue,
+  // NormalizedToolSchema // This will be implicitly handled by registration
 } from '../services/interpreter';
 
 // --- Trading State Management ---
@@ -81,9 +83,6 @@ const calculateTotalValue = (assets: Asset[]): number => {
   return assets.reduce((sum, asset) => sum + asset.balance * asset.price, 0);
 };
 
-// Update total value
-tradingState.totalValue = calculateTotalValue(tradingState.assets);
-
 // Function for React components to subscribe to changes
 let tradingChangeListeners: (() => void)[] = [];
 export const subscribeToTradingChanges = (listener: () => void): (() => void) => {
@@ -111,21 +110,11 @@ function createState<T>(value: T, description: string, formatter?: (value: unkno
 }
 
 // Update trading state in the registry
-export function updateTradingState(context?: ToolContext): void {
-  if (!context) {
-    // If no context, try to get global registry
-    const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
-    const registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
-    if (!registry) return;
-    
-    updateTradingStateWithRegistry(registry);
-    return;
-  }
-  
-  // Get registry from context
-  const registry = (context as unknown as { registry?: ToolRegistry }).registry;
+export function updateTradingState(): void {
+  // Always try to get global registry now
+  const globalObj = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {});
+  const registry = (globalObj as { __toolRegistry?: ToolRegistry }).__toolRegistry;
   if (!registry) return;
-  
   updateTradingStateWithRegistry(registry);
 }
 
@@ -222,15 +211,9 @@ export function updateAsset(asset: Asset): void {
     tradingState.assets.push(asset);
   }
   
-  // Update total value
   tradingState.totalValue = calculateTotalValue(tradingState.assets);
   tradingState.lastUpdated = Date.now();
-  
-  // Notify listeners
   notifyTradingChange();
-  
-  // Update registry state
-  updateTradingState();
 }
 
 // Add trade to history
@@ -259,15 +242,9 @@ export function addTrade(trade: TradeHistory): void {
     });
   }
   
-  // Update total value
   tradingState.totalValue = calculateTotalValue(tradingState.assets);
   tradingState.lastUpdated = Date.now();
-  
-  // Notify listeners
   notifyTradingChange();
-  
-  // Update registry state
-  updateTradingState();
 }
 
 // Trading state manager that implements ComponentStateManager interface
@@ -302,244 +279,150 @@ export const tradingStateManager: ComponentStateManager<TradingState> = {
 
 // --- End Trading State Management ---
 
-// --- Helper Functions ---
+// --- Tool Definitions (Using Zod) ---
 
-// Helper function to determine the Nuwa type string from a JavaScript value
-const getActualNuwaType = (value: unknown): string => {
-  if (value === null) return 'null';
-  const jsType = typeof value;
-  if (jsType === 'object') {
-      return Array.isArray(value) ? 'list' : 'object';
-  }
-  return jsType; 
-};
+// Define Zod schemas for parameters and return types
+const symbolParam = z.object({ 
+    symbol: z.string().describe('Cryptocurrency symbol, e.g. BTC, ETH') 
+});
 
-// Helper to get value from EvaluatedToolArguments
-const getArgValue = <T>(args: EvaluatedToolArguments, name: string, expectedType: string, defaultVal: T): T => {
-  const value = args[name];
+const swapParams = z.object({
+    fromSymbol: z.string().describe('Source asset symbol to exchange'),
+    toSymbol: z.string().describe('Target asset symbol to receive'),
+    amount: z.number().positive('Amount must be positive').describe('Amount to exchange')
+});
 
-  if (value === undefined) {
-      return defaultVal;
-  }
-  
-  const actualType = getActualNuwaType(value);
+const tradeResultSchema = z.object({
+    tradeId: z.string(),
+    fromAmount: z.number(),
+    fromSymbol: z.string(),
+    toAmount: z.number(),
+    toSymbol: z.string(),
+    fee: z.number(),
+    rate: z.number(),
+    timestamp: z.number()
+});
 
-  if (actualType === expectedType || expectedType === 'any') {
-       if (actualType === 'null' && expectedType !== 'null' && expectedType !== 'any') {
-           // Fall through to mismatch warning/default value
-       } else {
-          return value as T;
-       }
-  }
+const numberReturn = z.number();
 
-  console.warn(`Type mismatch for argument '${name}': Expected ${expectedType}, got ${actualType}. Using default.`);
-  return defaultVal;
-};
+// --- Tool Implementations (using inferred types) ---
 
-// --- Tool Definitions ---
-
-// getPrice Tool
-const getPriceSchema: ToolSchema = {
-  name: 'getPrice',
-  description: 'Get the current price of a cryptocurrency',
-  parameters: [
-    { name: 'symbol', type: 'string', description: 'Cryptocurrency symbol, e.g. BTC, ETH', required: true }
-  ],
-  returns: 'number'
-};
-
-const getPriceFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
-  const symbol = getArgValue<string>(args, 'symbol', 'string', '');
-  if (!symbol) {
-    throw new Error('Symbol is required');
-  }
-  
-  // Check if we have the asset in our state
+// getPrice implementation
+async function getPrice(args: z.infer<typeof symbolParam>): Promise<z.infer<typeof numberReturn>> {
+  const { symbol } = args; // Destructure with type safety
   const asset = tradingState.assets.find(a => a.symbol === symbol);
-  if (asset) {
-    return asset.price;
-  }
+  if (asset) { return asset.price; }
   
-  // Mock price data for assets not in portfolio
-  const prices: Record<string, number> = {
-    BTC: 67500.42,
-    ETH: 3250.18,
-    SOL: 142.87,
-    AVAX: 35.62,
-    DOT: 7.81,
-    USDC: 1.0
-  };
+  // Mock prices
+  const prices: Record<string, number> = { BTC: 67500.42, ETH: 3250.18, SOL: 142.87, AVAX: 35.62, DOT: 7.81, USDC: 1.0 };
+  if (prices[symbol]) { return prices[symbol]; }
   
-  if (prices[symbol]) {
-    return prices[symbol];
-  }
-  
-  // Throw error for unavailable price, caught by interpreter
   throw new Error(`Price unavailable for symbol: ${symbol}`);
-};
+}
 
-// getBalance Tool
-const getBalanceSchema: ToolSchema = {
-  name: 'getBalance',
-  description: "Get user's asset balance",
-  parameters: [
-    { name: 'symbol', type: 'string', description: 'Asset symbol, e.g. USDC, BTC', required: true }
-  ],
-  returns: 'number'
-};
-
-const getBalanceFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
-  const symbol = getArgValue<string>(args, 'symbol', 'string', '');
-  if (!symbol) {
-    return 0;
-  }
-  
-  // Check if we have the asset in our state
+// getBalance implementation
+async function getBalance(args: z.infer<typeof symbolParam>): Promise<z.infer<typeof numberReturn>> {
+  const { symbol } = args;
   const asset = tradingState.assets.find(a => a.symbol === symbol);
-  if (asset) {
-    return asset.balance;
-  }
+  return asset ? asset.balance : 0;
+}
+
+// swap implementation
+async function swap(args: z.infer<typeof swapParams>): Promise<z.infer<typeof tradeResultSchema>> {
+  const { fromSymbol, toSymbol, amount } = args;
+
+  // Amount positivity check is now handled by Zod schema
   
-  // Return 0 if asset not found
-  return 0;
-};
-
-// swap Tool
-const swapSchema: ToolSchema = {
-  name: 'swap',
-  description: 'Execute asset exchange',
-  parameters: [
-    { name: 'fromSymbol', type: 'string', description: 'Source asset symbol to exchange', required: true },
-    { name: 'toSymbol', type: 'string', description: 'Target asset symbol to receive', required: true },
-    { name: 'amount', type: 'number', description: 'Amount to exchange', required: true }
-  ],
-  returns: 'object'
-};
-
-const swapFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
-  const fromSymbol = getArgValue<string>(args, 'fromSymbol', 'string', '');
-  const toSymbol = getArgValue<string>(args, 'toSymbol', 'string', '');
-  const amount = getArgValue<number>(args, 'amount', 'number', 0);
-
-  // Validate input
-  if (amount <= 0) {
-    throw new Error('Amount must be positive');
-  }
-  
-  // Check if fromAsset exists and has sufficient balance
   const fromAsset = tradingState.assets.find(a => a.symbol === fromSymbol);
-  if (!fromAsset) {
-    throw new Error(`Asset not found: ${fromSymbol}`);
-  }
+  if (!fromAsset) { throw new Error(`Asset not found: ${fromSymbol}`); }
+  if (fromAsset.balance < amount) { throw new Error(`Insufficient balance: ${fromAsset.balance} ${fromSymbol} available, ${amount} ${fromSymbol} requested`); }
   
-  if (fromAsset.balance < amount) {
-    throw new Error(`Insufficient balance: ${fromAsset.balance} ${fromSymbol} available, ${amount} ${fromSymbol} requested`);
-  }
-  
-  // Get toAsset if it exists, or price from mock data
   let toAssetPrice = 0;
   const toAsset = tradingState.assets.find(a => a.symbol === toSymbol);
-  if (toAsset) {
-    toAssetPrice = toAsset.price;
-  } else {
-    // Mock prices for assets not in portfolio
-    const prices: Record<string, number> = {
-      BTC: 67500.42,
-      ETH: 3250.18,
-      SOL: 142.87,
-      AVAX: 35.62,
-      DOT: 7.81,
-      USDC: 1.0
-    };
-    
-    if (!prices[toSymbol]) {
-      throw new Error(`Unsupported asset: ${toSymbol}`);
-    }
-    
-    toAssetPrice = prices[toSymbol];
+  if (toAsset) { toAssetPrice = toAsset.price; } 
+  else { 
+      const prices: Record<string, number> = { BTC: 67500.42, ETH: 3250.18, SOL: 142.87, AVAX: 35.62, DOT: 7.81, USDC: 1.0 };
+      if (!prices[toSymbol]) { throw new Error(`Unsupported asset: ${toSymbol}`); }
+      toAssetPrice = prices[toSymbol];
   }
   
-  // Calculate the exchange
   const fromValue = amount * fromAsset.price;
+  // Ensure toAssetPrice is not zero to avoid division by zero
+  if (toAssetPrice <= 0) {
+      throw new Error(`Invalid price for asset: ${toSymbol}`);
+  }
   const toAmount = fromValue / toAssetPrice;
-  
-  // Apply 1% trading fee
-  const finalAmount = toAmount * 0.99;
+  const finalAmount = toAmount * 0.99; // 1% fee
   const fee = toAmount * 0.01;
   
-  // Create trade record
   const tradeId = `trade_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const trade: TradeHistory = {
-    id: tradeId,
-    fromSymbol,
-    toSymbol,
-    fromAmount: amount,
-    toAmount: finalAmount,
-    timestamp: Date.now()
+  const trade: TradeHistory = { id: tradeId, fromSymbol, toSymbol, fromAmount: amount, toAmount: finalAmount, timestamp: Date.now() };
+  
+  addTrade(trade); // This updates state and notifies listeners
+  
+  const result = { 
+      tradeId, 
+      fromAmount: amount, 
+      fromSymbol, 
+      toAmount: finalAmount, 
+      toSymbol, 
+      fee: fee, 
+      rate: fromAsset.price / toAssetPrice, // Avoid division by zero here too if fromAsset.price could be 0
+      timestamp: trade.timestamp 
   };
-  
-  // Add trade to history and update assets
-  addTrade(trade);
-  
-  // Update state in registry
-  updateTradingState();
-  
-  // Return trade details
-  const result = {
-    tradeId,
-    fromAmount: amount,
-    fromSymbol,
-    toAmount: finalAmount,
-    toSymbol,
-    fee: fee,
-    rate: fromAsset.price / toAssetPrice,
-    timestamp: trade.timestamp
-  };
-  
+  // Zod validation of the return happens in the registry adapter
   return result;
-};
+}
 
-// getMarketSentiment Tool
-const getMarketSentimentSchema: ToolSchema = {
-  name: 'getMarketSentiment',
-  description: 'Get market sentiment index (-100 to 100)',
-  parameters: [
-    { name: 'symbol', type: 'string', description: 'Cryptocurrency symbol', required: true }
-  ],
-  returns: 'number'
-};
+// getMarketSentiment implementation
+async function getMarketSentiment(args: z.infer<typeof symbolParam>): Promise<z.infer<typeof numberReturn>> {
+  const { symbol } = args;
+  const sentiments: Record<string, number> = { BTC: 65, ETH: 48, SOL: 72, AVAX: 30, DOT: -12 };
+  return sentiments[symbol] ?? 0; // Use nullish coalescing
+}
 
-const getMarketSentimentFunc: ToolFunction = async (args: EvaluatedToolArguments): Promise<JsonValue> => {
-  const symbol = getArgValue<string>(args, 'symbol', 'string', '');
-  if (!symbol) {
-    return 0;
-  }
-  
-  // Mock market sentiment data
-  const sentiments: Record<string, number> = {
-    BTC: 65,
-    ETH: 48,
-    SOL: 72,
-    AVAX: 30,
-    DOT: -12
-  };
-  
-  // Update registry state
-  updateTradingState();
-  
-  return sentiments[symbol] || 0;
-};
+// --- Register Tools --- 
 
-// Export tools in the required structure
-export const tradingTools: { schema: ToolSchema, execute: ToolFunction }[] = [
-  { schema: getPriceSchema, execute: getPriceFunc },
-  { schema: getBalanceSchema, execute: getBalanceFunc },
-  { schema: swapSchema, execute: swapFunc },
-  { schema: getMarketSentimentSchema, execute: getMarketSentimentFunc }
-];
+// Function to register these tools, using the correct single-object signature
+export function registerTradingTools(registry: ToolRegistry) {
+    // Register getPrice
+    registry.register({
+        name: 'getPrice',
+        description: 'Get the current price of a cryptocurrency',
+        parameters: symbolParam,
+        returns: { description: 'The price as a number, or throws error if unavailable', schema: numberReturn },
+        execute: getPrice,
+    });
 
+    // Register getBalance
+    registry.register({
+        name: 'getBalance',
+        description: "Get user's asset balance",
+        parameters: symbolParam,
+        returns: { description: 'The asset balance as a number', schema: numberReturn },
+        execute: getBalance,
+    });
 
-// --- Trading Example Configuration (Keep for now) ---
+    // Register swap
+    registry.register({
+        name: 'swap',
+        description: 'Execute asset exchange',
+        parameters: swapParams,
+        returns: { description: 'Object containing details of the completed trade', schema: tradeResultSchema },
+        execute: swap,
+    });
+
+    // Register getMarketSentiment
+    registry.register({
+        name: 'getMarketSentiment',
+        description: 'Get market sentiment index (-100 to 100)',
+        parameters: symbolParam,
+        returns: { description: 'Sentiment score as a number', schema: numberReturn },
+        execute: getMarketSentiment,
+    });
+}
+
+// --- Trading Example Configuration (Update tools field) ---
 export const tradingExample: ExampleConfig = {
   id: 'trading',
   name: 'Trading Example',
@@ -586,7 +469,7 @@ ELSE
   }))
 END
 `,
-  tools: tradingTools.map(tool => tool.schema),
+  tools: [], // Placeholder - Registration should happen elsewhere
   aiPrompt: `You are an AI assistant specialized in generating NuwaScript code for a simulated cryptocurrency trading environment. 
   Your goal is to translate user requests related to portfolio management, market analysis, and trade execution into accurate NuwaScript code using the available tools.
   # Trading Environment Context:
