@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, it } from '@jest/globals';
 import { Scope, Interpreter, OutputHandler } from '../src/interpreter';
-import { ToolRegistry, ToolSchema, ToolFunction } from '../src/tools';
+import { ToolRegistry, ToolSchema, ToolFunction, EvaluatedToolArguments, SchemaInput } from '../src/tools';
 import { JsonValue } from '../src/values';
 import * as Errors from '../src/errors';
 import { setupTestContext, runScript, MockCallLog } from './test_utils'; // Import helpers
@@ -113,11 +113,32 @@ describe('Interpreter - Data Structures & Access', () => {
 
         test('should allow list/object literals as tool arguments', async () => {
             // Mock a simple tool that accepts list/object
-            const testToolSchema: ToolSchema = { name: 'processData', description: '', parameters: [{ name: 'data', type: 'any', required: true }], returns: 'any' };
+            const testToolInput = {
+                name: 'processData',
+                description: 'Processes any data structure.',
+                parameters: { // Use JSON Schema object
+                    type: 'object',
+                    properties: {
+                        data: { // Parameter name is the key
+                            description: 'The data to process (any type)',
+                            // Empty schema {} implies any type is allowed
+                        }
+                    },
+                    required: ['data'],
+                    additionalProperties: false
+                } as SchemaInput, // Explicitly cast to SchemaInput
+                returns: { // Use returns object with schema
+                    description: 'The processed data (passthrough)',
+                    schema: {} as SchemaInput // Explicitly cast to SchemaInput
+                }
+            };
             let receivedData: any = null;
-            const testToolFunc: ToolFunction = async (args) => { receivedData = args['data']; return receivedData; };
-            // Register tool specifically for this test
-            toolRegistry.register(testToolSchema.name, testToolSchema, testToolFunc);
+            const testToolFunc = async (args: EvaluatedToolArguments) => {
+                receivedData = args['data'];
+                return receivedData;
+            };
+            // Register tool specifically for this test using the corrected input
+            toolRegistry.register(testToolInput, testToolFunc);
 
             const script = `
                 LET myData = { items: [1, { active: true }], name: "test" }

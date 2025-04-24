@@ -7,11 +7,9 @@ export { buildPrompt } from './prompts.js';
 // Re-export types from tools.ts
 export type { 
     ToolSchema, 
-    ToolParameter, 
     ToolFunction, 
     EvaluatedToolArguments, 
     RegisteredTool, 
-    NuwaType,
     StateMetadata,
     StateValueWithMetadata,
     ToolContext

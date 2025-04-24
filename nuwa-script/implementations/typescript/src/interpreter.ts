@@ -1,5 +1,5 @@
 import * as AST from './ast.js';
-import { ToolRegistry, RegisteredTool, EvaluatedToolArguments, ToolContext } from './tools.js';
+import { ToolRegistry, RegisteredTool, EvaluatedToolArguments, ToolContext, NormalizedToolSchema } from './tools.js';
 import {
     JsonValue, isJsonObject, jsonValuesAreEqual, isBoolean, isJsonArray,
     isNumber, isString, jsonValueToString, isNull
@@ -13,6 +13,9 @@ import {
 } from './errors.js';
 import { isArrayIndexExpression, isMemberAccessExpression, isListLiteralExpr, isObjectLiteralExpr } from './ast.js';
 import { parse } from './parser.js';
+import { z } from 'zod';
+import zodToJsonSchema from 'zod-to-json-schema';
+import { JSONSchema7, JSONSchema7Definition } from 'json-schema';
 
 // --- Scope Class Definition ---
 export class Scope {
@@ -620,64 +623,95 @@ export class Interpreter {
     // --- Tool Execution Helper ---
 
     /**
-     * Executes a tool call with provided arguments and creates a tool context.
+     * Executes a tool call using the *normalized* JSON schema for validation.
      * @param toolName The name of the tool to call.
      * @param argsExpr The arguments to pass to the tool as expressions.
      * @param scope The current variable scope.
      * @returns The result of the tool execution.
-     * @throws ToolNotFoundError if the tool is not registered.
-     * @throws ToolArgumentError if there's an issue with the arguments.
-     * @throws ToolExecutionError if the tool execution fails.
+     * @throws ToolNotFoundError, ToolArgumentError, ToolExecutionError.
      */
     private async executeToolCall(
         toolName: string,
-        argsExpr: Record<string, AST.Expression>,
+        argsExpr: Record<string, AST.Expression>, // Arguments from the script AST
         scope: Scope
     ): Promise<JsonValue> {
+        // Lookup the tool - this now returns RegisteredTool with NormalizedToolSchema
         const tool = this.toolRegistry.lookup(toolName);
         if (!tool) {
-            throw new ToolNotFoundError(`Tool '${toolName}' not found.`, {toolName});
+            throw new ToolNotFoundError(`Tool '${toolName}' not found.`, { toolName });
         }
-            
-        const { schema, execute } = tool;
-        const parameterDefs = schema.parameters;
+
+        // Destructure the normalized schema and the execute function
+        const { schema: normalizedSchema, execute } = tool;
+        // The parameters schema is now a JSONSchema7 object
+        const paramsSchema = normalizedSchema.parameters; // Type: JSONSchema7 & { type: 'object', ... }
+
+        // --- Add Type Guard --- 
+        // Ensure paramsSchema is an object before accessing properties, despite the type definition.
+        // This acts as a runtime safety check and helps the type checker.
+        if (typeof paramsSchema !== 'object' || paramsSchema === null || Array.isArray(paramsSchema)) {
+            // This case should theoretically not happen based on NormalizedToolSchema definition,
+            // but handle it defensively.
+            // Consider using a more specific error type if available
+            throw new Error(`Internal error: Normalized parameters schema for tool '${toolName}' is not an object.`);
+        }
+        // --- End Type Guard ---
+
         const evaluatedArgs: EvaluatedToolArguments = {};
-        
-        // Evaluate each argument expression
+
+        // Evaluate each argument expression provided in the script
         for (const [argName, argExpr] of Object.entries(argsExpr)) {
             evaluatedArgs[argName] = await this.evaluateExpression(argExpr, scope);
         }
-        
-        // Validate required parameters are provided
-        for (const param of parameterDefs) {
-            if (param.required !== false && !(param.name in evaluatedArgs)) {
-                // Required parameter is missing
+
+        // --- Argument Validation using JSON Schema ---
+        // Now TypeScript knows paramsSchema is an object here.
+
+        // 1. Check for missing required parameters
+        const requiredParams = paramsSchema.required || []; // Should be safe now
+        for (const requiredParamName of requiredParams) {
+            if (!(requiredParamName in evaluatedArgs)) {
                 throw new ToolArgumentError(
-                    `Missing required parameter '${param.name}' for tool '${toolName}'.`,
-                    {toolName, parameter: param.name}
+                    `Missing required parameter '${requiredParamName}' for tool '${toolName}'.`,
+                    { toolName, parameter: requiredParamName }
                 );
             }
-            // Could add type checking here too
         }
-        
-        // Create a tool context with current state
-        const context = this.toolRegistry.createToolContext();
-        
+
+        // 2. Check for extraneous parameters (if `additionalProperties` is false or undefined)
+        // Enforce strictness unless `additionalProperties: true` is explicitly set.
+        if (paramsSchema.additionalProperties === undefined || paramsSchema.additionalProperties === false) { // Should be safe now
+            const definedParams = paramsSchema.properties ? Object.keys(paramsSchema.properties) : []; // Should be safe now
+            for (const providedArgName in evaluatedArgs) {
+                if (!definedParams.includes(providedArgName)) {
+                     throw new ToolArgumentError(
+                        `Unexpected parameter '${providedArgName}' provided for tool '${toolName}'. Allowed parameters are: ${definedParams.join(', ') || 'none'}.`,
+                        { toolName, parameter: providedArgName }
+                    );
+                }
+            }
+        }
+
         try {
-            // Pass both evaluated arguments and the context to the tool function
-            const result = await execute(evaluatedArgs, context);
-            return result;
+            // --- Call execute WITHOUT context --- 
+            const result = await execute(evaluatedArgs /* Removed: , context */);
+
+            // 4. (Optional but Recommended) Validate return value against schema
+            // Placeholder for adding library like Ajv
+
+            return result === undefined ? null : result;
+
         } catch (error) {
             // Convert any error to a ToolExecutionError
             if (error instanceof Error) {
                 throw new ToolExecutionError(
                     `Error executing tool '${toolName}': ${error.message}`,
-                    {toolName, error}
+                    { toolName, error }
                 );
             }
             throw new ToolExecutionError(
                 `Unknown error executing tool '${toolName}'.`,
-                {toolName}
+                { toolName }
             );
         }
     }

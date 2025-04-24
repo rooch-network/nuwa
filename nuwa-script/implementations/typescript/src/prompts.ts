@@ -1,29 +1,70 @@
-import { ToolRegistry, ToolSchema } from './tools.js';
+import { JSONSchema7, JSONSchema7Definition } from 'json-schema';
+// Import the necessary types AND the helper function from tools.ts
+import { z } from 'zod'; // Needed for the helper function
+import zodToJsonSchema from 'zod-to-json-schema'; // Needed for the helper function
+// Import the necessary types from tools.ts
+import { ToolRegistry, ToolSchema, NormalizedToolSchema, SchemaInput, normalizeSchemaToJsonSchema } from './tools.js'; // Use NormalizedToolSchema for getAllSchemas result
 
-// Define schemas for built-in functions
-const BUILTIN_FUNCTION_SCHEMAS: Omit<ToolSchema, 'execute'>[] = [
+// Define schemas using JSON Schema format directly, which is a valid SchemaInput
+const BUILTIN_FUNCTION_SCHEMAS: ToolSchema[] = [
   {
     name: 'PRINT',
     description: 'Outputs the string representation of an expression to the console (default adds newline). Always returns null.',
-    parameters: [
-      { name: 'expression', type: 'any', required: true, description: 'The value to print.' }
-    ],
-    returns: 'null'
+    parameters: { // Use JSON Schema object for parameters
+      type: 'object',
+      properties: {
+        expression: { // Parameter name is the key
+          description: 'The value to print.',
+          // JSON Schema doesn't have a direct 'any' type equivalent like Zod,
+          // but omitting 'type' often implies any type, or use {}
+          // Let's omit 'type' to imply any JsonValue is acceptable.
+        }
+      },
+      required: ['expression'], // List required parameter names
+      additionalProperties: false, // Be strict
+    },
+    returns: {
+      description: "Always returns null",
+      schema: { type: 'null' } // JSON Schema for the return type
+    }
   },
   {
     name: 'NOW',
     description: 'Returns the current Unix timestamp (number of milliseconds since epoch).',
-    parameters: [],
-    returns: 'number'
+    parameters: { // No parameters
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+    returns: {
+      description: "Unix timestamp in milliseconds",
+      schema: { type: 'number', format: 'int64' } // Use number type
+    }
   },
   {
     name: 'FORMAT',
     description: 'Formats a string using named placeholders ({key}) from a values object. Returns the formatted string.',
-    parameters: [
-      { name: 'template_string', type: 'string', required: true, description: 'The template string with {key} placeholders.' },
-      { name: 'values_object', type: 'object', required: true, description: 'An object containing key-value pairs for substitution.' }
-    ],
-    returns: 'string'
+    parameters: {
+      type: 'object',
+      properties: {
+        template_string: {
+          type: 'string',
+          description: 'The template string with {key} placeholders.'
+        },
+        values_object: {
+          type: 'object',
+          description: 'An object containing key-value pairs for substitution.',
+          // Allow any properties within the values object
+          additionalProperties: true // Or define expected properties if known
+        }
+      },
+      required: ['template_string', 'values_object'],
+      additionalProperties: false,
+    },
+    returns: {
+      description: "The formatted string",
+      schema: { type: 'string' }
+    }
   }
 ];
 
@@ -105,22 +146,77 @@ This represents the current state of the system. You can use this information to
 - Consider the "# Current System State:" information when generating the code.
 `;
 
-
 /**
- * Formats tool or function schemas into a string suitable for the prompt.
- * @param schemas An array of schemas (ToolSchema without execute or similar structure).
+ * Formats tool or function schemas (using NormalizedToolSchema) into a string suitable for the prompt.
+ * @param schemas An array of NormalizedToolSchema objects.
  * @param isBuiltin Flag to indicate if these are built-in functions for slightly different formatting if needed.
  * @returns A formatted string representation of the schemas.
  */
-function formatSchemasForPrompt(schemas: Omit<ToolSchema, 'execute'>[], isBuiltin: boolean = false): string {
-    if (schemas.length === 0) {
+function formatSchemasForPrompt(schemas: NormalizedToolSchema[], isBuiltin: boolean = false): string {
+    if (!schemas || schemas.length === 0) {
         return isBuiltin ? "No built-in functions defined." : "No tools available.";
     }
-    // Format schemas as simple descriptions
+
     return schemas.map(s => {
-        const params = s.parameters.map(p => `${p.name}: ${p.type}${p.required === false ? '?' : ''}`).join(', ');
-        const prefix = isBuiltin ? '' : '- '; // Optional prefix difference
-        return `${prefix}${s.name}(${params}): ${s.description} -> ${s.returns}`;
+        const paramsSchema = s.parameters;
+        const properties = paramsSchema.properties || {};
+        const requiredParams = new Set(paramsSchema.required || []);
+        let paramsString: string;
+        const paramEntries = Object.entries(properties);
+        if (paramEntries.length === 0) {
+            paramsString = "";
+        } else {
+            paramsString = paramEntries.map(([name, propSchemaDef]) => {
+                let type = 'any';
+                let description = '';
+                 if (typeof propSchemaDef === 'object' && propSchemaDef !== null) {
+                    type = propSchemaDef.type ? String(propSchemaDef.type) : 'any';
+                    description = propSchemaDef.description ? ` (${propSchemaDef.description})` : '';
+                    if (type === 'array' && typeof propSchemaDef.items === 'object' && propSchemaDef.items !== null) {
+                        const itemSchema = propSchemaDef.items as JSONSchema7;
+                        type = `${itemSchema.type ? String(itemSchema.type) : 'any'}[]`;
+                    } else if (Array.isArray(propSchemaDef.type)) {
+                         type = propSchemaDef.type.join(' | ');
+                    }
+                } else if (typeof propSchemaDef === 'boolean') {
+                     type = propSchemaDef ? 'any' : 'never';
+                 }
+                const isRequired = requiredParams.has(name);
+                return `${name}: ${type}${isRequired ? '' : '?'}${description}`;
+            }).join(', ');
+        }
+
+        // Format return type (s.returns.schema can be boolean or object)
+        const returnsSchema = s.returns.schema; // Type: JSONSchema7Definition
+        let returnsString: string = 'any'; // Default
+
+        if (typeof returnsSchema === 'object' && returnsSchema !== null) {
+            // It's an object schema
+            if (returnsSchema.type === 'array') {
+                // --- FIX TYPE GUARD for items --- 
+                 if (typeof returnsSchema.items === 'object' && returnsSchema.items !== null && !(Array.isArray(returnsSchema.items))) {
+                     // Single schema for items - Safely access type
+                     const itemSchema = returnsSchema.items as JSONSchema7;
+                     returnsString = `${itemSchema.type ? String(itemSchema.type) : 'any'}[]`;
+                 } else {
+                     // items might be boolean, array of schemas, or missing - simplify
+                     returnsString = 'any[]';
+                 }
+            } else if (Array.isArray(returnsSchema.type)) {
+                returnsString = returnsSchema.type.join(' | ');
+            } else if (returnsSchema.type) {
+                returnsString = String(returnsSchema.type);
+            } else if (Object.keys(returnsSchema).length > 0) {
+                 returnsString = 'object';
+            }
+        } else if (typeof returnsSchema === 'boolean') {
+            returnsString = returnsSchema ? 'any' : 'never';
+        }
+
+        const returnDescription = s.returns.description ? ` (${s.returns.description})` : '';
+        const prefix = isBuiltin ? '' : '- ';
+        const mainDescription = s.description ? `${s.description}` : '';
+        return `${prefix}${s.name}({${paramsString}}): ${mainDescription} -> ${returnsString}${returnDescription}`;
     }).join('\n');
 }
 
@@ -138,17 +234,49 @@ export function buildPrompt(
     } = {}
 ): string {
     const { includeState = true, appSpecificGuidance = "" } = options;
-    const toolSchemasString = formatSchemasForPrompt(registry.getAllSchemas(), false);
-    const builtinFuncSchemasString = formatSchemasForPrompt(BUILTIN_FUNCTION_SCHEMAS, true);
+
+    const toolSchemas = registry.getAllSchemas();
+
+    // Normalize BUILTIN_FUNCTION_SCHEMAS
+    const normalizedBuiltinSchemasResult = BUILTIN_FUNCTION_SCHEMAS.map(schemaDef => {
+        try {
+            // --- FIX: Add missing 4th argument (expectObject) --- 
+             const normalizedParams = normalizeSchemaToJsonSchema(schemaDef.parameters, 'parameters', schemaDef.name, true);
+             const normalizedReturns = normalizeSchemaToJsonSchema(schemaDef.returns.schema, 'returns.schema', schemaDef.name, false);
+
+            // Construct the object matching NormalizedToolSchema structure
+            const normalized: NormalizedToolSchema = {
+                name: schemaDef.name,
+                description: schemaDef.description,
+                parameters: normalizedParams as NormalizedToolSchema['parameters'], // Cast is safe
+                returns: {
+                    description: schemaDef.returns.description, // Keep as potentially undefined initially
+                    schema: normalizedReturns
+                }
+            };
+            return normalized;
+        } catch (e) {
+            console.error(`Error normalizing built-in schema '${schemaDef.name}':`, e);
+            return null; // Return null on error
+        }
+    });
     
-    // Get state information if requested
+    // --- FIX: Filter nulls and assert type --- 
+    const normalizedBuiltinSchemas = normalizedBuiltinSchemasResult.filter(
+        (s): s is NormalizedToolSchema => s !== null
+    );
+
+    // Format the schemas
+    const toolSchemasString = formatSchemasForPrompt(toolSchemas, false);
+    const builtinFuncSchemasString = formatSchemasForPrompt(normalizedBuiltinSchemas, true);
+
     const stateInfo = includeState ? registry.formatStateForPrompt() : "No state information available.";
-    
+
     const prompt = GENERATION_PROMPT_TEMPLATE
         .replace('{tools_schema}', toolSchemasString)
         .replace('{state_info}', stateInfo)
         .replace('{app_specific_guidance}', appSpecificGuidance)
         .replace('{builtin_functions_schema}', builtinFuncSchemasString);
-    
+
     return prompt;
 }

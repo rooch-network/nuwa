@@ -1,71 +1,135 @@
 import { Interpreter, OutputHandler, Scope } from '../src/interpreter';
 import { parse } from '../src/parser';
-import { ToolRegistry, ToolSchema, ToolFunction } from '../src/tools';
+// Import necessary types including Zod and JSONSchema ones
+import {
+    ToolRegistry,
+    ToolSchema, // Keep this for defining schemas before normalization
+    ToolFunction,
+    NormalizedToolSchema,
+    SchemaInput,
+    EvaluatedToolArguments
+} from '../src/tools';
 import { JsonValue } from '../src/values';
+import { JSONSchema7, JSONSchema7Definition } from 'json-schema';
 
 // --- Mock Tools Setup ---
 
 export interface MockCallLog {
     toolName: string;
-    args: Record<string, JsonValue | undefined>;
+    args: EvaluatedToolArguments; // Use EvaluatedToolArguments type
 }
 
 // Simple synchronous tool example
-export const mockGetPrice: ToolFunction = (args, context) => {
+export const mockGetPrice: ToolFunction = (args) => { // Removed context
     if (args['token'] === 'BTC') return 65000;
     if (args['token'] === 'ETH') return 3500;
     return null;
 };
-export const getPriceSchema: ToolSchema = {
-    name: 'get_price', description: 'Get crypto price',
-    parameters: [{ name: 'token', type: 'string', required: true }],
-    returns: 'number' // Can also return null
+// Update schema to use JSON Schema format and new ToolSchema structure
+export const getPriceSchemaDef: ToolSchema = {
+    name: 'get_price',
+    description: 'Get crypto price',
+    parameters: { // Use JSON Schema Object
+        type: 'object',
+        properties: {
+            token: { type: 'string', description: 'Crypto token symbol' }
+        },
+        required: ['token'],
+        additionalProperties: false
+    },
+    returns: { // Use returns object with schema
+        description: 'Price in USD or null if not found',
+        schema: { type: ['number', 'null'] } // JSON Schema definition
+    }
 };
 
 // Asynchronous tool example
-export const mockSwap: ToolFunction = async (args, context) => {
-    // Simulate async operation
-    await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
-    // Use non-null assertion assuming test args are always provided
+export const mockSwap: ToolFunction = async (args) => { // Removed context
+    await new Promise(resolve => setTimeout(resolve, 10));
     return {
         success: true,
-        from: args['from_token']!,
-        to: args['to_token']!,
-        amount: args['amount']!
-    } as JsonValue; // Assert return type is JsonValue (specifically an object)
+        from: args['from_token'],
+        to: args['to_token'],
+        amount: args['amount']
+    } as JsonValue;
 };
-export const swapSchema: ToolSchema = {
-    name: 'swap', description: 'Swap tokens',
-    parameters: [
-        { name: 'from_token', type: 'string', required: true },
-        { name: 'to_token', type: 'string', required: true },
-        { name: 'amount', type: 'number', required: true },
-    ],
-    returns: 'object'
+export const swapSchemaDef: ToolSchema = {
+    name: 'swap',
+    description: 'Swap tokens',
+    parameters: { // Use JSON Schema Object
+        type: 'object',
+        properties: {
+            from_token: { type: 'string' },
+            to_token: { type: 'string' },
+            amount: { type: 'number' }
+        },
+        required: ['from_token', 'to_token', 'amount'],
+        additionalProperties: false
+    },
+    returns: { // Use returns object with schema
+        description: 'Object indicating swap result',
+        schema: { // JSON Schema definition for the return object
+            type: 'object',
+            properties: {
+                success: { type: 'boolean' },
+                from: { type: 'string' },
+                to: { type: 'string' },
+                amount: { type: 'number' }
+            },
+            required: ['success', 'from', 'to', 'amount'],
+            additionalProperties: false
+        }
+    }
 };
 
 // Tool that intentionally throws an error
-export const mockErrorTool: ToolFunction = (args, context) => {
+export const mockErrorTool: ToolFunction = (args) => { // Removed context
     throw new Error("Tool failed intentionally");
 };
-export const errorToolSchema: ToolSchema = {
-    name: 'error_tool', description: 'This tool always fails', parameters: [], returns: 'any'
+export const errorToolSchemaDef: ToolSchema = {
+    name: 'error_tool',
+    description: 'This tool always fails',
+    parameters: { type: 'object', properties: {} }, // Empty JSON Schema object
+    returns: { // Use returns object with schema
+        description: 'Never returns successfully',
+        schema: {} // Empty schema implies any
+    }
 };
 
 // Mock list returning tool for FOR loops
-export const mockGetList: ToolFunction = (args, context) => {
-    return [10, 20, 30]; // Example list
+export const mockGetList: ToolFunction = (args) => { // Removed context
+    return [10, 20, 30];
 };
-export const getListSchema: ToolSchema = {
-    name: 'get_list', description: 'Returns a list', parameters: [], returns: 'array'
+export const getListSchemaDef: ToolSchema = {
+    name: 'get_list',
+    description: 'Returns a list',
+    parameters: { type: 'object', properties: {} },
+    returns: { // Use returns object with schema
+        description: 'A list of numbers',
+        schema: { type: 'array', items: { type: 'number' } } // JSON Schema definition
+    }
 };
 
 // Mock object returning tool for member access tests
-export const mockGetObj: ToolFunction = (args, context) => {
+export const mockGetObj: ToolFunction = (args) => { // Removed context
     return { nested: { value: 99 } };
 };
-export const getObjSchema: ToolSchema = {
-    name: 'get_obj', description: 'Returns an object', parameters: [], returns: 'object'
+export const getObjSchemaDef: ToolSchema = {
+    name: 'get_obj',
+    description: 'Returns an object',
+    parameters: { type: 'object', properties: {} },
+    returns: { // Use returns object with schema
+        description: 'An object with nested structure',
+        schema: { // JSON Schema definition
+            type: 'object',
+            properties: {
+                nested: {
+                    type: 'object',
+                    properties: { value: { type: 'number' } }
+                }
+            }
+        }
+    }
 };
 
 
@@ -109,29 +173,28 @@ export function setupTestContext(): {
         capturedOutput.push(output);
     };
 
-    // Register common mock tools needed across different test files
-    toolRegistry.register(getPriceSchema.name, getPriceSchema, (args, context) => {
-        callLog.push({ toolName: getPriceSchema.name, args });
-        return mockGetPrice(args, context);
+    // Register common mock tools using the NEW register signature
+    // Pass the schema definition object directly as the first argument
+    toolRegistry.register( getPriceSchemaDef, (args) => {
+        callLog.push({ toolName: getPriceSchemaDef.name, args });
+        return mockGetPrice(args);
     });
-    toolRegistry.register(swapSchema.name, swapSchema, async (args, context) => {
-         callLog.push({ toolName: swapSchema.name, args });
-         return await mockSwap(args, context);
+    toolRegistry.register( swapSchemaDef, async (args) => {
+         callLog.push({ toolName: swapSchemaDef.name, args });
+         return await mockSwap(args);
     });
-     toolRegistry.register(errorToolSchema.name, errorToolSchema, (args, context) => {
-         callLog.push({ toolName: errorToolSchema.name, args });
-         return mockErrorTool(args, context); // Will throw
+     toolRegistry.register( errorToolSchemaDef, (args) => {
+         callLog.push({ toolName: errorToolSchemaDef.name, args });
+         return mockErrorTool(args);
     });
-    // Register other common tools if needed (e.g., get_list, get_obj)
-    toolRegistry.register(getListSchema.name, getListSchema, (args, context) => {
-        callLog.push({ toolName: getListSchema.name, args });
-        return mockGetList(args, context);
+    toolRegistry.register( getListSchemaDef, (args) => {
+        callLog.push({ toolName: getListSchemaDef.name, args });
+        return mockGetList(args);
     });
-    toolRegistry.register(getObjSchema.name, getObjSchema, (args, context) => {
-        callLog.push({ toolName: getObjSchema.name, args });
-        return mockGetObj(args, context);
+    toolRegistry.register( getObjSchemaDef, (args) => {
+        callLog.push({ toolName: getObjSchemaDef.name, args });
+        return mockGetObj(args);
     });
-
 
     return { toolRegistry, mockOutputHandler, capturedOutput, callLog };
 } 
