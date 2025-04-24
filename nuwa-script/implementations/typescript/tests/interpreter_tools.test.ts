@@ -51,30 +51,24 @@ describe('Interpreter - Tool Calls', () => {
     test('should handle ToolNotFoundError', async () => {
         const script = `CALL unknown_tool {}`;
         await expect(runScriptInContext(script)).rejects.toThrow(Errors.ToolNotFoundError);
-        await expect(runScriptInContext(script)).rejects.toThrow(/Tool 'unknown_tool' not found/);
+        await expect(runScriptInContext(script)).rejects.toThrow("Tool 'unknown_tool' not found");
     });
 
-    test('should handle ToolExecutionError', async () => {
+    test('should handle ToolExecutionError (from within tool function)', async () => {
         const script = `CALL error_tool {}`;
         await expect(runScriptInContext(script)).rejects.toThrow(Errors.ToolExecutionError);
-        await expect(runScriptInContext(script)).rejects.toThrow(/Error executing tool 'error_tool': Tool failed intentionally/);
+        await expect(runScriptInContext(script)).rejects.toThrow("Execution failed for tool 'error_tool': Tool failed intentionally");
     });
 
-    test('should handle ToolArgumentError (Missing required)', async () => {
+    test('should handle ToolArgumentError (Zod validation - Missing required)', async () => {
         const script = `CALL get_price {}`; // Missing 'token' arg
         await expect(runScriptInContext(script)).rejects.toThrow(Errors.ToolArgumentError);
-        await expect(runScriptInContext(script)).rejects.toThrow(/Missing required parameter 'token'/);
+        await expect(runScriptInContext(script)).rejects.toThrow(/Invalid arguments for tool 'get_price': Parameter 'token': Required/);
     });
 
-    test('should handle ToolArgumentError (Wrong type - though not currently checked by default)', async () => {
-        // Note: Current interpreter doesn't do strict type checking on evaluated args *before* calling the tool function itself.
-        // The mock tool might implicitly handle it or fail. A stricter interpreter *could* check this.
-        // This test primarily ensures the call proceeds far enough.
-        const script = `CALL get_price { token: 123 }`; // Wrong arg type for mock
-        // Our mockGetPrice will return null in this case, which is a valid JsonValue
-        const finalScope = await runScriptInContext(script);
-        expect(finalScope).toBeDefined(); // Call succeeded, even if result isn't useful
-        // If type validation were added BEFORE tool execution:
-        // await expect(runScriptInContext(script)).rejects.toThrow(Errors.ToolArgumentError);
+    test('should handle ToolArgumentError (Zod validation - Wrong type)', async () => {
+        const script = `CALL get_price { token: 123 }`; // Wrong arg type
+        await expect(runScriptInContext(script)).rejects.toThrow(Errors.ToolArgumentError);
+        await expect(runScriptInContext(script)).rejects.toThrow(/Invalid arguments for tool 'get_price': Parameter 'token': Expected string, received number/);
     });
 }); 

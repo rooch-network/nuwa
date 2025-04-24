@@ -5,14 +5,15 @@ export { parse } from './parser.js';
 export { buildPrompt } from './prompts.js';
 
 // Re-export types from tools.ts
-export type { 
-    ToolSchema, 
-    ToolFunction, 
-    EvaluatedToolArguments, 
-    RegisteredTool, 
+export type {
+    ToolSchema,
     StateMetadata,
     StateValueWithMetadata,
-    ToolContext
+    ToolContext,
+    EvaluatedToolArguments,
+    RegisteredTool,
+    SchemaInput,
+    NormalizedToolSchema,
 } from './tools.js';
 
 // Re-export types and functions from values.ts

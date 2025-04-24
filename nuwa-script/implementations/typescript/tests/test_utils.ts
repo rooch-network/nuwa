@@ -1,149 +1,90 @@
 import { Interpreter, OutputHandler, Scope } from '../src/interpreter';
 import { parse } from '../src/parser';
-// Import necessary types including Zod and JSONSchema ones
+// Import Zod for schema definition
+import { z } from 'zod';
+// Remove ToolSchema, ToolFunction, SchemaInput (no longer needed here)
 import {
     ToolRegistry,
-    ToolSchema, // Keep this for defining schemas before normalization
-    ToolFunction,
+    // ToolSchema, 
+    // ToolFunction,
     NormalizedToolSchema,
-    SchemaInput,
+    // SchemaInput,
     EvaluatedToolArguments
 } from '../src/tools';
 import { JsonValue } from '../src/values';
-import { JSONSchema7, JSONSchema7Definition } from 'json-schema';
+// Remove JSONSchema types if not directly used elsewhere in this file
+// import { JSONSchema7, JSONSchema7Definition } from 'json-schema';
 
 // --- Mock Tools Setup ---
 
 export interface MockCallLog {
     toolName: string;
-    args: EvaluatedToolArguments; // Use EvaluatedToolArguments type
+    // Use unknown because args before validation could be anything
+    args: unknown; 
 }
 
-// Simple synchronous tool example
-export const mockGetPrice: ToolFunction = (args) => { // Removed context
-    if (args['token'] === 'BTC') return 65000;
-    if (args['token'] === 'ETH') return 3500;
+// --- Define Tool Schemas using Zod ---
+
+const getPriceParams = z.object({
+    token: z.string().describe('Crypto token symbol')
+});
+const getPriceReturn = z.union([z.number(), z.null()]).describe('Price in USD or null if not found');
+
+const swapParams = z.object({
+    from_token: z.string(),
+    to_token: z.string(),
+    amount: z.number().positive()
+});
+const swapReturn = z.object({
+    success: z.boolean(),
+    from: z.string(),
+    to: z.string(),
+    amount: z.number()
+}).describe('Object indicating swap result');
+
+const errorToolParams = z.object({}); // No params
+const errorToolReturn = z.any().describe('Never returns successfully'); // Can return anything theoretically before error
+
+const getListParams = z.object({});
+const getListReturn = z.array(z.number()).describe('A list of numbers');
+
+const getObjParams = z.object({});
+const getObjReturn = z.object({
+    nested: z.object({ value: z.number() })
+}).describe('An object with nested structure');
+
+
+// --- Define Tool Implementations (using inferred Zod types) ---
+
+const mockGetPrice = (args: z.infer<typeof getPriceParams>): z.infer<typeof getPriceReturn> => {
+    if (args.token === 'BTC') return 65000;
+    if (args.token === 'ETH') return 3500;
     return null;
 };
-// Update schema to use JSON Schema format and new ToolSchema structure
-export const getPriceSchemaDef: ToolSchema = {
-    name: 'get_price',
-    description: 'Get crypto price',
-    parameters: { // Use JSON Schema Object
-        type: 'object',
-        properties: {
-            token: { type: 'string', description: 'Crypto token symbol' }
-        },
-        required: ['token'],
-        additionalProperties: false
-    },
-    returns: { // Use returns object with schema
-        description: 'Price in USD or null if not found',
-        schema: { type: ['number', 'null'] } // JSON Schema definition
-    }
-};
 
-// Asynchronous tool example
-export const mockSwap: ToolFunction = async (args) => { // Removed context
+const mockSwap = async (args: z.infer<typeof swapParams>): Promise<z.infer<typeof swapReturn>> => {
     await new Promise(resolve => setTimeout(resolve, 10));
     return {
         success: true,
-        from: args['from_token'],
-        to: args['to_token'],
-        amount: args['amount']
-    } as JsonValue;
-};
-export const swapSchemaDef: ToolSchema = {
-    name: 'swap',
-    description: 'Swap tokens',
-    parameters: { // Use JSON Schema Object
-        type: 'object',
-        properties: {
-            from_token: { type: 'string' },
-            to_token: { type: 'string' },
-            amount: { type: 'number' }
-        },
-        required: ['from_token', 'to_token', 'amount'],
-        additionalProperties: false
-    },
-    returns: { // Use returns object with schema
-        description: 'Object indicating swap result',
-        schema: { // JSON Schema definition for the return object
-            type: 'object',
-            properties: {
-                success: { type: 'boolean' },
-                from: { type: 'string' },
-                to: { type: 'string' },
-                amount: { type: 'number' }
-            },
-            required: ['success', 'from', 'to', 'amount'],
-            additionalProperties: false
-        }
-    }
+        from: args.from_token,
+        to: args.to_token,
+        amount: args.amount
+    };
 };
 
-// Tool that intentionally throws an error
-export const mockErrorTool: ToolFunction = (args) => { // Removed context
+const mockErrorTool = (args: z.infer<typeof errorToolParams>): z.infer<typeof errorToolReturn> => {
     throw new Error("Tool failed intentionally");
 };
-export const errorToolSchemaDef: ToolSchema = {
-    name: 'error_tool',
-    description: 'This tool always fails',
-    parameters: { type: 'object', properties: {} }, // Empty JSON Schema object
-    returns: { // Use returns object with schema
-        description: 'Never returns successfully',
-        schema: {} // Empty schema implies any
-    }
-};
 
-// Mock list returning tool for FOR loops
-export const mockGetList: ToolFunction = (args) => { // Removed context
+const mockGetList = (args: z.infer<typeof getListParams>): z.infer<typeof getListReturn> => {
     return [10, 20, 30];
 };
-export const getListSchemaDef: ToolSchema = {
-    name: 'get_list',
-    description: 'Returns a list',
-    parameters: { type: 'object', properties: {} },
-    returns: { // Use returns object with schema
-        description: 'A list of numbers',
-        schema: { type: 'array', items: { type: 'number' } } // JSON Schema definition
-    }
-};
 
-// Mock object returning tool for member access tests
-export const mockGetObj: ToolFunction = (args) => { // Removed context
+const mockGetObj = (args: z.infer<typeof getObjParams>): z.infer<typeof getObjReturn> => {
     return { nested: { value: 99 } };
 };
-export const getObjSchemaDef: ToolSchema = {
-    name: 'get_obj',
-    description: 'Returns an object',
-    parameters: { type: 'object', properties: {} },
-    returns: { // Use returns object with schema
-        description: 'An object with nested structure',
-        schema: { // JSON Schema definition
-            type: 'object',
-            properties: {
-                nested: {
-                    type: 'object',
-                    properties: { value: { type: 'number' } }
-                }
-            }
-        }
-    }
-};
 
-
-// --- Core runScript Helper ---
-// Moved from interpreter.test.ts, now accepts context as arguments
-
-/**
- * Executes a NuwaScript string using a provided context.
- * @param scriptText The NuwaScript code.
- * @param toolRegistry The ToolRegistry instance for this run.
- * @param outputHandler The OutputHandler instance for this run.
- * * @param initialScope Optional initial variable scope as a Record.
- * @returns A Promise resolving to the final variable scope (Map).
- */
+// --- Core runScript Helper (remains the same) ---
 export async function runScript(
     scriptText: string,
     toolRegistry: ToolRegistry,
@@ -154,46 +95,88 @@ export async function runScript(
     return await interpreter.executeScript(scriptText, initialScope);
 }
 
-// --- Setup Helper (Optional but recommended) ---
+// --- Setup Helper (MODIFIED) ---
 
-/**
- * Sets up the common context for interpreter tests.
- * @returns An object containing initialized toolRegistry, mockOutputHandler, capturedOutput array, and callLog array.
- */
 export function setupTestContext(): {
     toolRegistry: ToolRegistry;
     mockOutputHandler: OutputHandler;
     capturedOutput: string[];
-    callLog: MockCallLog[];
+    callLog: MockCallLog[]; // Log remains for checking if tool was attempted
 } {
     const toolRegistry = new ToolRegistry();
     const capturedOutput: string[] = [];
-    const callLog: MockCallLog[] = [];
+    const callLog: MockCallLog[] = []; // Log raw args received by adapter
     const mockOutputHandler: OutputHandler = (output: string) => {
         capturedOutput.push(output);
     };
 
-    // Register common mock tools using the NEW register signature
-    // Pass the schema definition object directly as the first argument
-    toolRegistry.register( getPriceSchemaDef, (args) => {
-        callLog.push({ toolName: getPriceSchemaDef.name, args });
-        return mockGetPrice(args);
+    // Wrapper to log calls before execution (adapter function handles validation)
+    const logWrapper = <P extends z.ZodTypeAny, R extends z.ZodTypeAny>(
+        toolName: string, 
+        func: (args: z.infer<P>) => z.infer<R> | Promise<z.infer<R>> | JsonValue | Promise<JsonValue>
+    ) => {
+        return async (args: z.infer<P>): Promise<any> => { // Input args are already validated by internal adapter
+            // Log the validated args received by the user function
+            callLog.push({ toolName, args }); 
+            return await func(args);
+        }
+    };
+
+    // Register mock tools using the NEW register signature
+    toolRegistry.register({
+        name: 'get_price', 
+        description: 'Get crypto price', 
+        parameters: getPriceParams, 
+        returns: { schema: getPriceReturn },
+        // Define execute inline, args type is inferred!
+        execute: logWrapper('get_price', (args) => { 
+            // No need for: args: z.infer<typeof getPriceParams>
+            if (args.token === 'BTC') return 65000;
+            if (args.token === 'ETH') return 3500;
+            return null;
+        })
     });
-    toolRegistry.register( swapSchemaDef, async (args) => {
-         callLog.push({ toolName: swapSchemaDef.name, args });
-         return await mockSwap(args);
+    toolRegistry.register({
+        name: 'swap', 
+        description: 'Swap tokens', 
+        parameters: swapParams, 
+        returns: { schema: swapReturn },
+        execute: logWrapper('swap', async (args) => { 
+            await new Promise(resolve => setTimeout(resolve, 10));
+            return {
+                success: true,
+                from: args.from_token,
+                to: args.to_token,
+                amount: args.amount
+            };
+        })
     });
-     toolRegistry.register( errorToolSchemaDef, (args) => {
-         callLog.push({ toolName: errorToolSchemaDef.name, args });
-         return mockErrorTool(args);
+    toolRegistry.register({
+        name: 'error_tool', 
+        description: 'This tool always fails', 
+        parameters: errorToolParams, 
+        returns: { schema: errorToolReturn },
+        execute: logWrapper('error_tool', (args) => { 
+            throw new Error("Tool failed intentionally");
+        })
     });
-    toolRegistry.register( getListSchemaDef, (args) => {
-        callLog.push({ toolName: getListSchemaDef.name, args });
-        return mockGetList(args);
+    toolRegistry.register({
+        name: 'get_list', 
+        description: 'Returns a list', 
+        parameters: getListParams, 
+        returns: { schema: getListReturn },
+        execute: logWrapper('get_list', (args) => { 
+            return [10, 20, 30];
+        })
     });
-    toolRegistry.register( getObjSchemaDef, (args) => {
-        callLog.push({ toolName: getObjSchemaDef.name, args });
-        return mockGetObj(args);
+    toolRegistry.register({
+        name: 'get_obj', 
+        description: 'Returns an object', 
+        parameters: getObjParams, 
+        returns: { schema: getObjReturn },
+        execute: logWrapper('get_obj', (args) => { 
+            return { nested: { value: 99 } };
+        })
     });
 
     return { toolRegistry, mockOutputHandler, capturedOutput, callLog };

@@ -1,24 +1,44 @@
 import { Scope } from './interpreter.js'; // For ToolContext potentially
 import { JsonValue } from './values.js'; // Import JsonValue
 import { JSONSchema7, JSONSchema7Definition } from 'json-schema'; // Import JSON Schema types
-import { z } from 'zod'; // Import zod for SchemaInput
-import zodToJsonSchema from 'zod-to-json-schema'; // Ensure this import is present
+import { z, ZodError } from 'zod'; // Ensure z is imported from zod
+import zodToJsonSchema from 'zod-to-json-schema';
+import { ToolArgumentError } from './errors.js'; // Import error type
 
 /**
- * Describes the input interface (schema) of a callable tool, allowing definition
- * using either Zod or JSON Schema.
+ * Defines the structure for registering a tool using a single definition object.
+ */
+type ToolDefinition<ParamSchema extends z.ZodTypeAny, ReturnSchema extends z.ZodTypeAny> = {
+  name: string;
+  description: string;
+  parameters: ParamSchema;
+  returns: { 
+      description?: string; 
+      schema: ReturnSchema; 
+  };
+  // Execute function now uses inferred types directly from ParamSchema and ReturnSchema
+  execute: (args: z.infer<ParamSchema>) => 
+    | z.infer<ReturnSchema> 
+    | Promise<z.infer<ReturnSchema>>
+    | JsonValue 
+    | Promise<JsonValue>;
+};
+
+/**
+ * Describes the input interface (schema) of a callable tool.
+ * NEW: Primarily expects Zod schemas now for registration, but SchemaInput 
+ * type remains for flexibility elsewhere if needed.
  */
 export interface ToolSchema {
   name: string;
   description: string;
-  parameters: SchemaInput;
-  returns: { description?: string; schema: SchemaInput; };
+  parameters: SchemaInput; // Keep SchemaInput for broader use, register expects Zod
+  returns: { description?: string; schema: SchemaInput; }; // Keep SchemaInput here too
 }
 
 /**
- * Defines the structure of the evaluated arguments passed to a tool function.
- * Maps parameter name to its runtime JsonValue.
- * The interpreter is responsible for validating this against the NormalizedToolSchema.parameters.
+ * Defines the structure of the evaluated arguments passed to a tool function
+ * by the interpreter BEFORE validation by the specific tool's schema.
  */
 export type EvaluatedToolArguments = { [key: string]: JsonValue | undefined };
 
@@ -105,22 +125,21 @@ export interface ToolContext {
 }
 
 /**
- * Defines the signature for an actual tool implementation function.
- * Receives evaluated arguments. Tool implementations should be self-contained
- * or use external mechanisms if they need access to broader state.
+ * Internal type representing the function stored by the registry.
+ * This function receives raw arguments from the interpreter and is 
+ * responsible for validation before calling the user's typed function.
  */
-export type ToolFunction = (
+export type InternalToolFunction = (
     args: EvaluatedToolArguments
 ) => JsonValue | Promise<JsonValue>;
 
-
 /**
  * Represents a registered tool internally, pairing its *normalized* JSON schema
- * with its implementation.
+ * with its *internal* implementation (adapter function).
  */
 export interface RegisteredTool {
   schema: NormalizedToolSchema;
-  execute: ToolFunction;
+  execute: InternalToolFunction; // Use the internal function type
 }
 
 /**
@@ -132,62 +151,124 @@ export class ToolRegistry {
   private stateMetadata: Map<string, StateMetadata> = new Map();
 
   /**
-   * Registers a tool, providing type inference for the execute function's arguments
-   * when Zod schemas are used for parameters.
-   * The execute function no longer receives ToolContext.
+   * Registers a tool defined with Zod schemas using a single definition object.
+   * This allows TypeScript to infer the argument types for the `execute` function.
+   *
+   * @param definition An object matching the ToolDefinition structure.
    */
-  register<
-    ParamSchema extends SchemaInput,
-    ReturnSchema extends SchemaInput
+  register< 
+    ParamSchema extends z.ZodType<any, z.ZodTypeDef, any>, 
+    ReturnSchema extends z.ZodType<any, z.ZodTypeDef, any> 
   >(
-    toolInput: {
-      name: string;
-      description: string;
-      parameters: ParamSchema;
-      returns: {
-        description?: string;
-        schema: ReturnSchema;
-      };
-    },
-    execute: (
-      args: ParamSchema extends z.ZodTypeAny ? z.infer<ParamSchema> : EvaluatedToolArguments
-    ) =>
-      | (ReturnSchema extends z.ZodTypeAny ? z.infer<ReturnSchema> : JsonValue)
-      | Promise<ReturnSchema extends z.ZodTypeAny ? z.infer<ReturnSchema> : JsonValue>
+    definition: ToolDefinition<ParamSchema, ReturnSchema>
   ): void {
-    const toolName = toolInput.name;
-    if (this.tools.has(toolName)) { throw new Error(`Tool '${toolName}' is already registered.`); }
+    const toolName = definition.name;
+    const userExecute = definition.execute; // Extract userExecute from definition
+    
+    if (this.tools.has(toolName)) { 
+      throw new Error(`Tool '${toolName}' is already registered.`); 
+    }
 
-    const toolSchema: ToolSchema = {
-      name: toolInput.name,
-      description: toolInput.description,
-      parameters: toolInput.parameters,
-      returns: toolInput.returns,
-    };
+    // Validate that parameters is a Zod schema
+    if (!(definition.parameters instanceof z.ZodType)) {
+        throw new Error(`Tool '${toolName}' parameters must be a Zod schema.`);
+    }
+    
+    // Validate returns schema
+    if (!(definition.returns.schema instanceof z.ZodType)) {
+        throw new Error(`Tool '${toolName}' returns schema must be a Zod schema.`);
+    }
 
+    let normalizedSchema: NormalizedToolSchema;
     try {
+      // Normalize parameter schema (always expect object for LLM function calling)
       const normalizedParamsSchema = normalizeSchemaToJsonSchema(
-        toolSchema.parameters, 'parameters', toolName, true
+        definition.parameters, 'parameters', toolName, true // true: expect object
       );
+      // Normalize return schema
       const normalizedReturnsSchema = normalizeSchemaToJsonSchema(
-        toolSchema.returns.schema, 'returns.schema', toolName, false
+        definition.returns.schema, 'returns.schema', toolName, false // false: don't enforce object
       );
-      const normalizedSchema: NormalizedToolSchema = {
+
+      normalizedSchema = {
         name: toolName,
-        description: toolSchema.description,
-        parameters: normalizedParamsSchema as NormalizedToolSchema['parameters'],
+        description: definition.description,
+        parameters: normalizedParamsSchema as NormalizedToolSchema['parameters'], // Cast needed after expectObject=true
         returns: {
-          description: toolSchema.returns.description,
+          description: definition.returns.description,
           schema: normalizedReturnsSchema,
         },
       };
+    } catch (error: any) { 
+      throw new Error(`Failed to normalize schema for tool '${toolName}': ${error.message}`); 
+    }
 
-      // --- Storage ---
-      // Cast to the updated ToolFunction type (without context)
-      // Use 'unknown' intermediary cast to satisfy the type checker
-      this.tools.set(toolName, { schema: normalizedSchema, execute: execute as unknown as ToolFunction });
+    // --- Create the Adapter Function --- 
+    // This internal function will be stored and called by the interpreter.
+    // It bridges the interpreter's EvaluatedToolArguments and the user's typed function.
+    const internalExecute: InternalToolFunction = async (evaluatedArgs: EvaluatedToolArguments): Promise<JsonValue> => {
+      try {
+        // 1. Validate the raw arguments using the user's Zod schema
+        let validatedArgs: z.infer<ParamSchema>;
+        try {
+            validatedArgs = definition.parameters.parse(evaluatedArgs); // Use definition.parameters
+        } catch (validationError) {
+            // If validation fails, it must be a ZodError
+            if (validationError instanceof ZodError) {
+                const errorMessages = validationError.errors.map(e => 
+                    `Parameter '${e.path.join('.')}': ${e.message} (Expected ${e.code === 'invalid_type' ? e.expected : 'valid'}, received ${e.code === 'invalid_type' ? e.received : JSON.stringify(evaluatedArgs[e.path[0] as keyof EvaluatedToolArguments])})`
+                ).join('; ');
+                // Throw the specific ToolArgumentError
+                throw new ToolArgumentError(`Invalid arguments for tool '${toolName}': ${errorMessages}`);
+            } else {
+                // If it's not a ZodError, re-throw as an unexpected validation error
+                throw new Error(`Unexpected validation error for tool '${toolName}': ${validationError instanceof Error ? validationError.message : validationError}`);
+            }
+        }
 
-    } catch (error: any) { throw new Error(`Failed to register tool '${toolName}': ${error.message}`); }
+        // 2. Call the user's type-safe function with validated arguments
+        const result = await userExecute(validatedArgs);
+
+        // 3. (Optional but recommended) Validate the return value against the return schema
+        try {
+            definition.returns.schema.parse(result); // Use definition.returns.schema
+        } catch (returnError) {
+            if (returnError instanceof ZodError) {
+                console.warn(`Tool '${toolName}' return value validation failed: ${returnError.errors.map(e => `${e.path.join('.')} (${e.code}): ${e.message}`).join(', ')}. Returning raw result anyway.`);
+            } else {
+                console.warn(`Tool '${toolName}' return value validation failed with unknown error. Returning raw result anyway.`);
+            }
+        }
+
+        // 4. Ensure the final result is JsonValue compatible
+        if (typeof result === 'object' && result !== null) {
+            return result as JsonValue; 
+        } else if (['string', 'number', 'boolean'].includes(typeof result) || result === null) {
+            return result as JsonValue;
+        } else {
+            console.warn(`Tool '${toolName}' returned a non-JSON compatible value of type ${typeof result}. Converting to string.`);
+            return String(result);
+        }
+
+      } catch (error: any) {
+        // Catch errors specifically from userExecute or the return value check/conversion
+        // Zod validation errors are now handled and re-thrown above
+        if (error instanceof ToolArgumentError) {
+            // If it's already the specific error we want, just re-throw it
+            throw error;
+        } 
+        
+        // For any other errors (assumed to be from userExecute or internal logic after validation)
+        // Wrap in a generic error message, do not throw ToolArgumentError here
+        throw new Error(`Execution failed for tool '${toolName}': ${error.message || error}`);
+      }
+    };
+
+    // Store the normalized schema and the INTERNAL adapter function
+    this.tools.set(toolName, { 
+        schema: normalizedSchema, 
+        execute: internalExecute 
+    });
   }
 
   /**
@@ -390,7 +471,6 @@ export class ToolRegistry {
 }
 
 // --- Input Schema Definition ---
-
 /**
  * Represents a schema definition that can be either a Zod schema
  * or a standard JSON Schema definition object.
@@ -398,7 +478,6 @@ export class ToolRegistry {
 export type SchemaInput = z.ZodTypeAny | JSONSchema7Definition;
 
 // --- Normalized Internal Schema ---
-
 /**
  * Represents the tool schema after normalization, always using JSON Schema 7.
  * This is the format used internally by the registry and potentially passed to LLMs.
@@ -410,16 +489,7 @@ export interface NormalizedToolSchema {
   returns: { description?: string; schema: JSONSchema7Definition; };
 }
 
-/**
- * Normalizes a Zod schema or JSON Schema definition into a valid JSONSchema7Definition.
- * Handles boolean schemas and ensures object properties are accessed safely.
- * @param schemaInput The Zod schema or JSON Schema object/boolean.
- * @param schemaName The name of the schema (e.g., 'parameters', 'returns') for error messages.
- * @param toolName The name of the tool for error messages.
- * @param expectObject If true, ensures the output is a valid JSON Schema object.
- * @returns The normalized JSONSchema7Definition.
- * @throws Error if the input is invalid or normalization fails.
- */
+// --- normalizeSchemaToJsonSchema function remains the same --- 
 export function normalizeSchemaToJsonSchema(
     schemaInput: SchemaInput,
     schemaName: string,
@@ -430,68 +500,82 @@ export function normalizeSchemaToJsonSchema(
 
     if (schemaInput instanceof z.ZodType) {
         try {
-            const converted = zodToJsonSchema(schemaInput, { target: 'jsonSchema7', $refStrategy: 'none', definitionPath: 'definitions' }) as any;
+            // Ensure zod-to-json-schema options are suitable
+            const converted = zodToJsonSchema(schemaInput, {
+                 target: 'jsonSchema7', 
+                 $refStrategy: 'none', // Avoid internal refs for LLM compatibility
+                 definitionPath: 'definitions', // Standard path
+                 errorMessages: true // Include Zod error messages if possible
+            }) as any; // Cast needed as output structure varies
+            
+            // Handle cases where the main schema is under definitions (common for complex types)
             const { $schema, definitions, ...rest } = converted;
-
-             if (Object.keys(rest).length === 0 && definitions && typeof definitions === 'object' && Object.keys(definitions).length === 1) {
-                 const defKey = Object.keys(definitions)[0];
-                 if (defKey !== undefined) {
-                    jsonSchema = definitions[defKey];
-                 } else {
-                     jsonSchema = rest;
-                 }
-             } else {
-                 jsonSchema = rest;
-             }
-
-            if (typeof jsonSchema === 'object' && jsonSchema !== null) {
-                 if (schemaInput.description && !jsonSchema.description) {
-                    jsonSchema.description = schemaInput.description;
+            if (Object.keys(rest).length === 0 && definitions && typeof definitions === 'object' && Object.keys(definitions).length === 1) {
+                const defKey = Object.keys(definitions)[0];
+                if (defKey !== undefined) {
+                   jsonSchema = definitions[defKey];
+                } else {
+                    // Should not happen if definitions has one key
+                    jsonSchema = rest; 
                 }
-                if (!jsonSchema.type && jsonSchema.properties) {
-                    jsonSchema.type = 'object';
-                }
-            } else if (typeof jsonSchema !== 'boolean') {
-                // If it's not an object or boolean after conversion, treat as error or default?
-                // zod-to-json-schema should produce valid JSON Schema or throw.
-                 // For now, assume it's valid if no error thrown.
+            } else {
+                jsonSchema = rest;
             }
 
+            // Add description from Zod schema if missing in JSON schema
+            if (typeof jsonSchema === 'object' && jsonSchema !== null) {
+                if (schemaInput.description && !jsonSchema.description) {
+                   jsonSchema.description = schemaInput.description;
+               }
+               // Ensure top-level object has type: 'object' if properties exist
+               if (!jsonSchema.type && jsonSchema.properties) {
+                   jsonSchema.type = 'object';
+               }
+           } else if (typeof jsonSchema !== 'boolean') {
+               // zod-to-json-schema should ideally throw or return valid schema.
+               // If conversion result is unexpected, log a warning.
+               console.warn(`Unexpected output from zod-to-json-schema for tool '${toolName}' schema '${schemaName}'. Result was not an object or boolean.`);
+           }
+
         } catch (error: any) {
-             throw new Error(`Failed to convert Zod schema '${schemaName}' for tool '${toolName}': ${error.message}`);
-         }
-    } else if (typeof schemaInput === 'object' || typeof schemaInput === 'boolean') {
-         if (typeof schemaInput === 'object' && schemaInput !== null) {
-            jsonSchema = { ...schemaInput };
-            delete (jsonSchema as any).$schema;
-        } else {
-            jsonSchema = schemaInput;
+            throw new Error(`Failed to convert Zod schema '${schemaName}' for tool '${toolName}': ${error.message}`);
         }
+    } else if (typeof schemaInput === 'object' || typeof schemaInput === 'boolean') {
+        // Handle direct JSON Schema input (remove $schema keyword)
+        if (typeof schemaInput === 'object' && schemaInput !== null) {
+           jsonSchema = { ...schemaInput };
+           delete (jsonSchema as any).$schema;
+       } else {
+           jsonSchema = schemaInput; // Boolean schema
+       }
     } else {
         throw new Error(`Invalid schema format for '${schemaName}' of tool '${toolName}'. Expected Zod schema, JSON Schema object, or boolean.`);
     }
 
-    // --- Enforce object type if required (for parameters) --- 
+    // --- Enforce object type if required (specifically for parameters for LLM function calling) --- 
     if (expectObject) {
-        let finalObjectSchema: JSONSchema7 & { type: 'object'; properties?: { [key: string]: JSONSchema7Definition }; };
+        let finalObjectSchema: JSONSchema7 & { type: 'object'; properties?: { [key: string]: JSONSchema7Definition }; required?: string[] };
 
         if (typeof jsonSchema === 'object' && jsonSchema !== null && jsonSchema.type === 'object') {
-             finalObjectSchema = jsonSchema as typeof finalObjectSchema;
+            finalObjectSchema = jsonSchema as typeof finalObjectSchema;
         } else if (typeof jsonSchema === 'object' && jsonSchema !== null && !jsonSchema.type && jsonSchema.properties) {
-             finalObjectSchema = { ...jsonSchema, type: 'object' } as typeof finalObjectSchema;
+            // If type is missing but properties exist, assume object
+            finalObjectSchema = { ...jsonSchema, type: 'object' } as typeof finalObjectSchema;
         } else if (jsonSchema === true || (typeof jsonSchema === 'object' && jsonSchema !== null && Object.keys(jsonSchema).length === 0)) {
-             finalObjectSchema = { type: 'object', properties: {} };
+            // Allow `true` or empty object `{}` to mean any object (no specific props)
+            finalObjectSchema = { type: 'object', properties: {} };
         } else {
-            throw new Error(`Tool parameters schema for '${toolName}' must resolve to type 'object'. Received: ${JSON.stringify(jsonSchema)}`);
+            // If it's not clearly an object schema, reject it for parameters
+            throw new Error(`Tool parameters schema for '${toolName}' must resolve to type 'object' or boolean 'true'. Received: ${JSON.stringify(jsonSchema)}`);
         }
 
+        // Ensure properties object exists, even if empty
         if (!finalObjectSchema.properties) {
             finalObjectSchema.properties = {};
         }
         return finalObjectSchema;
     }
 
+    // Return the normalized schema if object type wasn't enforced
     return jsonSchema;
 }
-
-// ... rest of file ...

@@ -635,28 +635,16 @@ export class Interpreter {
         argsExpr: Record<string, AST.Expression>, // Arguments from the script AST
         scope: Scope
     ): Promise<JsonValue> {
-        // Lookup the tool - this now returns RegisteredTool with NormalizedToolSchema
+        // Lookup the tool
         const tool = this.toolRegistry.lookup(toolName);
         if (!tool) {
             throw new ToolNotFoundError(`Tool '${toolName}' not found.`, { toolName });
         }
 
-        // Destructure the normalized schema and the execute function
-        const { schema: normalizedSchema, execute } = tool;
-        // The parameters schema is now a JSONSchema7 object
-        const paramsSchema = normalizedSchema.parameters; // Type: JSONSchema7 & { type: 'object', ... }
-
-        // --- Add Type Guard --- 
-        // Ensure paramsSchema is an object before accessing properties, despite the type definition.
-        // This acts as a runtime safety check and helps the type checker.
-        if (typeof paramsSchema !== 'object' || paramsSchema === null || Array.isArray(paramsSchema)) {
-            // This case should theoretically not happen based on NormalizedToolSchema definition,
-            // but handle it defensively.
-            // Consider using a more specific error type if available
-            throw new Error(`Internal error: Normalized parameters schema for tool '${toolName}' is not an object.`);
-        }
-        // --- End Type Guard ---
-
+        // Destructure the internal execute function (adapter)
+        const { execute } = tool; 
+        // Schema is still available via tool.schema if needed elsewhere, but not for pre-validation
+        
         const evaluatedArgs: EvaluatedToolArguments = {};
 
         // Evaluate each argument expression provided in the script
@@ -664,11 +652,14 @@ export class Interpreter {
             evaluatedArgs[argName] = await this.evaluateExpression(argExpr, scope);
         }
 
-        // --- Argument Validation using JSON Schema ---
-        // Now TypeScript knows paramsSchema is an object here.
-
+        // REMOVE Argument Validation using JSON Schema (now handled by Zod in internalExecute)
+        /*
+        const paramsSchema = normalizedSchema.parameters;
+        if (typeof paramsSchema !== 'object' || paramsSchema === null || Array.isArray(paramsSchema)) {
+            throw new Error(`Internal error: Normalized parameters schema for tool '${toolName}' is not an object.`);
+        }
         // 1. Check for missing required parameters
-        const requiredParams = paramsSchema.required || []; // Should be safe now
+        const requiredParams = paramsSchema.required || [];
         for (const requiredParamName of requiredParams) {
             if (!(requiredParamName in evaluatedArgs)) {
                 throw new ToolArgumentError(
@@ -677,11 +668,9 @@ export class Interpreter {
                 );
             }
         }
-
-        // 2. Check for extraneous parameters (if `additionalProperties` is false or undefined)
-        // Enforce strictness unless `additionalProperties: true` is explicitly set.
-        if (paramsSchema.additionalProperties === undefined || paramsSchema.additionalProperties === false) { // Should be safe now
-            const definedParams = paramsSchema.properties ? Object.keys(paramsSchema.properties) : []; // Should be safe now
+        // 2. Check for extraneous parameters
+        if (paramsSchema.additionalProperties === undefined || paramsSchema.additionalProperties === false) {
+            const definedParams = paramsSchema.properties ? Object.keys(paramsSchema.properties) : [];
             for (const providedArgName in evaluatedArgs) {
                 if (!definedParams.includes(providedArgName)) {
                      throw new ToolArgumentError(
@@ -691,28 +680,37 @@ export class Interpreter {
                 }
             }
         }
+        */
 
         try {
-            // --- Call execute WITHOUT context --- 
-            const result = await execute(evaluatedArgs /* Removed: , context */);
+            // Call the internal execute function (adapter)
+            // This function now handles Zod validation internally
+            const result = await execute(evaluatedArgs);
 
-            // 4. (Optional but Recommended) Validate return value against schema
-            // Placeholder for adding library like Ajv
+            // Return value validation (optional) could still happen here using tool.schema.returns.schema
+            // or be left to the internalExecute function as currently implemented.
 
             return result === undefined ? null : result;
 
         } catch (error) {
-            // Convert any error to a ToolExecutionError
-            if (error instanceof Error) {
+            // Handle errors thrown from the internalExecute (adapter) function.
+            // This includes Zod validation errors (ToolArgumentError) and user function errors.
+            if (error instanceof ToolArgumentError) {
+                // Re-throw ToolArgumentError directly
+                throw error;
+            } else if (error instanceof Error) {
+                // Wrap other errors (likely from userExecute or unexpected issues) in ToolExecutionError
                 throw new ToolExecutionError(
                     `Error executing tool '${toolName}': ${error.message}`,
                     { toolName, error }
                 );
+            } else {
+                // Handle non-Error throws (less common)
+                throw new ToolExecutionError(
+                    `Unknown error executing tool '${toolName}'.`,
+                    { toolName }
+                );
             }
-            throw new ToolExecutionError(
-                `Unknown error executing tool '${toolName}'.`,
-                { toolName }
-            );
         }
     }
 }

@@ -1,6 +1,12 @@
 import { describe, test, expect, beforeEach, it } from '@jest/globals';
 import { Scope, Interpreter, OutputHandler } from '../src/interpreter';
-import { ToolRegistry, ToolSchema, ToolFunction, EvaluatedToolArguments, SchemaInput } from '../src/tools';
+import { z } from 'zod';
+import {
+    ToolRegistry,
+    ToolSchema,
+    EvaluatedToolArguments,
+    SchemaInput
+} from '../src/tools';
 import { JsonValue } from '../src/values';
 import * as Errors from '../src/errors';
 import { setupTestContext, runScript, MockCallLog } from './test_utils'; // Import helpers
@@ -12,12 +18,50 @@ describe('Interpreter - Data Structures & Access', () => {
     let callLog: MockCallLog[];
     let runScriptInContext: (scriptText: string, initialScope?: Record<string, JsonValue>) => Promise<Scope>;
 
+    // --- Tool Definition for this test suite ---
+    // Define schemas and function for processData tool
+    const processDataParams = z.object({ 
+        data: z.any().describe('The data to process (any type)') 
+    });
+    const processDataReturn = z.any().describe('The processed data (passthrough)');
+
+    let receivedDataByProcessData: any = null;
+    const mockProcessData = async (args: z.infer<typeof processDataParams>): Promise<z.infer<typeof processDataReturn>> => {
+        receivedDataByProcessData = args.data;
+        return receivedDataByProcessData;
+    };
+
     beforeEach(() => {
         const context = setupTestContext(); // Setup includes get_obj mock for member access tests
         toolRegistry = context.toolRegistry;
         capturedOutput = context.capturedOutput;
         mockOutputHandler = context.mockOutputHandler;
         callLog = context.callLog;
+        
+        // Clear received data before each test using it
+        receivedDataByProcessData = null;
+        
+        // Register processData tool here
+        try {
+            toolRegistry.register({
+                name: 'processData',
+                description: 'Processes any data structure.',
+                parameters: processDataParams,
+                returns: { 
+                    description: 'The processed data (passthrough)', 
+                    schema: processDataReturn 
+                },
+                execute: async (args) => {
+                    receivedDataByProcessData = args.data;
+                    return receivedDataByProcessData;
+                }
+            });
+        } catch(error) {
+            // Fail test if registration fails unexpectedly
+            console.error("Failed to register processData tool in test setup:", error);
+            throw error; 
+        }
+
         runScriptInContext = (scriptText, initialScope) =>
             runScript(scriptText, toolRegistry, mockOutputHandler, initialScope);
     });
@@ -111,35 +155,8 @@ describe('Interpreter - Data Structures & Access', () => {
             });
         });
 
-        test('should allow list/object literals as tool arguments', async () => {
-            // Mock a simple tool that accepts list/object
-            const testToolInput = {
-                name: 'processData',
-                description: 'Processes any data structure.',
-                parameters: { // Use JSON Schema object
-                    type: 'object',
-                    properties: {
-                        data: { // Parameter name is the key
-                            description: 'The data to process (any type)',
-                            // Empty schema {} implies any type is allowed
-                        }
-                    },
-                    required: ['data'],
-                    additionalProperties: false
-                } as SchemaInput, // Explicitly cast to SchemaInput
-                returns: { // Use returns object with schema
-                    description: 'The processed data (passthrough)',
-                    schema: {} as SchemaInput // Explicitly cast to SchemaInput
-                }
-            };
-            let receivedData: any = null;
-            const testToolFunc = async (args: EvaluatedToolArguments) => {
-                receivedData = args['data'];
-                return receivedData;
-            };
-            // Register tool specifically for this test using the corrected input
-            toolRegistry.register(testToolInput, testToolFunc);
-
+        test('should allow list/object literals as tool arguments (using Zod)', async () => {
+            // processData tool is now registered in beforeEach
             const script = `
                 LET myData = { items: [1, { active: true }], name: "test" }
                 CALL processData { data: myData }
@@ -148,8 +165,10 @@ describe('Interpreter - Data Structures & Access', () => {
             `;
             const scope = await runScriptInContext(script);
 
-            expect(receivedData).toEqual({ x: 1 }); // Data from the *last* call
-            expect(scope.get('result')).toEqual({ x: 1 }); // Value returned from last call
+            // Check the data received by the mock function in the *last* call
+            expect(receivedDataByProcessData).toEqual({ x: 1 }); 
+            // Check the value returned by the *last* tool call expression
+            expect(scope.get('result')).toEqual({ x: 1 }); 
         });
     });
 
