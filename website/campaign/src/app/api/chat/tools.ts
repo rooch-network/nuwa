@@ -3,6 +3,61 @@ import { z } from 'zod';
 import { createServiceClient } from '@/app/services/supabase';
 import { createClient } from '@/app/services/supabase';
 
+// Define interfaces for better type safety
+interface RawTweetEntities {
+    urls?: { // Assuming entities properties can be optional
+        url: {
+            start: number;
+            end: number;
+            url: string;
+            expanded_url: string;
+            display_url: string;
+        };
+    }[];
+    mentions?: {
+        start: number;
+        end: number;
+        username: string;
+        id: string;
+    }[];
+    hashtags?: {
+        start: number;
+        end: number;
+        tag: string;
+    }[];
+    cashtags?: {
+        start: number;
+        end: number;
+        tag: string;
+    }[];
+}
+
+interface RawTweet {
+    id: string;
+    author: { userName: string };
+    text: string;
+    note_tweet?: string | null; // Keep optional as per original logic
+    entities?: RawTweetEntities; // Make entities optional in raw data for safety
+    retweetCount: number;
+    replyCount: number;
+    likeCount: number;
+    quoteCount: number;
+    viewCount: number;
+}
+
+interface OptimizedTweet {
+    id: string;
+    author: string;
+    text: string;
+    entities?: RawTweetEntities; // Include entities in the optimized type
+    retweetCount: number;
+    replyCount: number;
+    likeCount: number;
+    quoteCount: number;
+    viewCount: number;
+    isPinned?: boolean; // Mark pinned tweet
+}
+
 // 通用Twitter API调用函数
 async function callTwitterApi(endpoint: string, params: Record<string, string> = {}) {
     const apiKey = process.env.TWITTER_API_KEY;
@@ -47,22 +102,14 @@ async function callTwitterApi(endpoint: string, params: Record<string, string> =
 }
 
 // 优化推文数据的工具函数
-function optimizeTweetsData(tweets: any[], pinTweet?: any) {
+function optimizeTweetsData(tweets: RawTweet[], pinTweet?: RawTweet): OptimizedTweet[] {
     if (!tweets) return [];
 
-    const optimizedTweets = tweets.map((tweet: {
-        id: string;
-        author: { userName: string };
-        text: string;
-        retweetCount: number;
-        replyCount: number;
-        likeCount: number;
-        quoteCount: number;
-        viewCount: number;
-    }) => ({
+    const optimizedTweets: OptimizedTweet[] = tweets.map((tweet: RawTweet) => ({
         id: tweet.id,
         author: tweet.author.userName,
-        text: tweet.text,
+        text: tweet.note_tweet ? tweet.note_tweet : tweet.text,
+        entities: tweet.entities,
         retweetCount: tweet.retweetCount,
         replyCount: tweet.replyCount,
         likeCount: tweet.likeCount,
@@ -72,10 +119,11 @@ function optimizeTweetsData(tweets: any[], pinTweet?: any) {
 
     // 处理可能存在的 pin_tweet 对象
     if (pinTweet) {
-        const pinTweetObj = {
+        const pinTweetObj: OptimizedTweet = {
             id: pinTweet.id,
             author: pinTweet.author.userName,
-            text: pinTweet.text,
+            text: pinTweet.note_tweet ? pinTweet.note_tweet : pinTweet.text,
+            entities: pinTweet.entities,
             retweetCount: pinTweet.retweetCount,
             replyCount: pinTweet.replyCount,
             likeCount: pinTweet.likeCount,
