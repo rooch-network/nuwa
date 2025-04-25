@@ -4,8 +4,11 @@ import {
     rewardUserPoints,
     checkUserRewardHistory,
     deductUserPoints,
-    getUserPointsByHandle
+    getUserPointsByHandle,
+    addTweetScore,      // Import function to add tweet score
+    checkTweetExists    // Import function to check tweet existence
 } from '@/app/services/supabaseService'; // Import Supabase functions
+import { getTweetScore } from './scoring-agent'; // Import the scoring agent function
 
 // Define interfaces for better type safety
 interface RawTweetEntities {
@@ -548,6 +551,77 @@ export const tools = {
                 return {
                     success: false,
                     error: `Error creating Twitter card: ${error instanceof Error ? error.message : String(error)}`
+                };
+            }
+        },
+    }),
+
+    // 18. Score a tweet using the scoring agent and save to database
+    scoreTweet: tool({
+        description: 'Fetches tweet data using the tweet ID, analyzes it based on predefined criteria, assigns a score (0-100), and saves the result. Checks if the tweet has already been scored.',
+        parameters: z.object({
+            tweetId: z.string().describe('The unique identifier of the tweet to be scored.'),
+        }),
+        execute: async function ({ tweetId }) { // Only receive tweetId
+            try {
+                // 1. Check if the tweet has already been scored
+                const exists = await checkTweetExists(tweetId);
+                if (exists) {
+                    return {
+                        success: false, 
+                        message: `Tweet ${tweetId} has already been scored. No action taken.`,
+                        score: null, 
+                        reasoning: null
+                    };
+                }
+
+                // 2. Fetch tweet data using callTwitterApi
+                let tweetDataToUse;
+                try {
+                    // Directly call the API function defined in this file
+                    const apiResponse = await callTwitterApi('tweets', { tweet_ids: tweetId });
+                    
+                    // Check for API errors
+                    if (apiResponse.error || !apiResponse.tweets || apiResponse.tweets.length === 0) {
+                        throw new Error(apiResponse.error || apiResponse.details || 'Failed to fetch tweet data or tweet not found.');
+                    }
+                    // Assuming the API returns an array and we need the first element
+                    tweetDataToUse = apiResponse.tweets[0]; 
+                } catch (fetchError) {
+                     console.error(`Failed to fetch tweet data for ${tweetId} using callTwitterApi:`, fetchError);
+                     throw new Error(`Failed to fetch necessary tweet data: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+                }
+
+                // Ensure we have data before proceeding (should be guaranteed if no error thrown)
+                if (!tweetDataToUse) {
+                    throw new Error(`Could not obtain tweet data for ${tweetId} after fetching.`);
+                }
+
+                // 3. Get the score from the scoring agent
+                const { score, reasoning } = await getTweetScore(tweetDataToUse);
+
+                // 4. Save the score to the database
+                // Ensure tweetDataToUse is passed, not the original potentially undefined variable
+                await addTweetScore(tweetId, tweetDataToUse, score);
+
+                // 5. Return the result
+                return {
+                    success: true,
+                    message: `Tweet ${tweetId} successfully scored and saved. Score: ${score}/100.`, 
+                    score: score,
+                    reasoning: reasoning
+                };
+
+            } catch (error) {
+                console.error(`Error in scoreTweet tool for tweet ID ${tweetId}:`, error);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                // Return a structured error for the main agent
+                return {
+                    success: false,
+                    message: `Failed to score or save tweet ${tweetId}: ${errorMessage}`,
+                    score: null,
+                    reasoning: null,
+                    error: errorMessage
                 };
             }
         },

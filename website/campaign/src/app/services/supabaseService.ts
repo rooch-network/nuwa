@@ -292,4 +292,73 @@ export async function deductUserPoints({ userName, points, missionId, missionDet
             message: `Error deducting points: ${error instanceof Error ? error.message : String(error)}`
         };
     }
+}
+
+// --- Tweet Scoring Table Operations --- //
+
+/**
+ * Interface for the data structure in the 'tweet' table.
+ */
+export interface TweetScore {
+    id: string;          // Tweet ID
+    tweet_data: object;  // JSON data of the tweet
+    score: number;       // Score assigned by the agent
+    created_at?: string; // Optional: Supabase automatically adds this
+}
+
+/**
+ * Adds a score record for a specific tweet to the 'tweet' table.
+ * Throws an error if the tweet ID already exists or if there is a database error.
+ * 
+ * @param tweetId The ID of the tweet.
+ * @param tweetData The JSON data of the tweet.
+ * @param score The score assigned to the tweet.
+ * @returns {Promise<void>} Resolves when the insertion is successful.
+ * @throws {Error} Throws an error with a specific message on failure.
+ */
+export async function addTweetScore(tweetId: string, tweetData: object, score: number): Promise<void> {
+    const supabase = await createServiceClient(); // Use service client for write operations
+    const { error } = await supabase
+        .from('tweet') // Ensure this table name 'tweet' is correct
+        .insert({
+            id: tweetId,
+            tweet_data: tweetData,
+            score: score
+        });
+
+    if (error) {
+        console.error(`Error adding tweet score for tweet ID ${tweetId}:`, error);
+        // Check for unique constraint violation (duplicate tweet ID)
+        if (error.code === '23505') { // PostgreSQL unique violation code
+            throw new Error(`Tweet with ID ${tweetId} already exists.`);
+        }
+        // Throw a generic error for other database issues
+        throw new Error(`Failed to add tweet score: ${error.message}`);
+    }
+
+    console.log(`Successfully added score for tweet ID ${tweetId}.`); // Optional: log success
+}
+
+/**
+ * Checks if a tweet record exists in the 'tweet' table based on its ID.
+ * 
+ * @param tweetId The ID of the tweet to check.
+ * @returns A boolean indicating whether the tweet record exists.
+ * @throws Throws an error if there is a database error during the check.
+ */
+export async function checkTweetExists(tweetId: string): Promise<boolean> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('tweet') // Ensure this table name 'tweet' is correct
+        .select('id')
+        .eq('id', tweetId)
+        .limit(1)
+        .maybeSingle();
+
+    if (error) {
+        console.error(`Error checking existence for tweet ID ${tweetId}:`, error);
+        throw new Error(`Database error checking tweet existence: ${error.message}`);
+    }
+
+    return !!data;
 } 
