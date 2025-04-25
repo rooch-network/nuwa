@@ -1,6 +1,6 @@
 import { Context } from 'telegraf';
 import { checkTwitterBinding } from './twitter-binding';
-import { getUserPoints } from '../../services/supabaseService';
+import { getUserPointsByHandle } from '../../services/supabaseService';
 
 /**
  * 处理 /my_points 命令
@@ -24,7 +24,7 @@ export async function handleMyPointsCommand(ctx: Context) {
         }
 
         // 获取用户积分
-        const points = await getUserPoints(twitterHandle);
+        const points = await getUserPointsByHandle(twitterHandle);
         await ctx.reply(`Your current points: ${points}`);
     } catch (error) {
         console.error('Error in my_points command:', error);

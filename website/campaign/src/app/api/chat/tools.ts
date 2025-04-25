@@ -1,7 +1,11 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { createServiceClient } from '@/app/services/supabase';
-import { createClient } from '@/app/services/supabase';
+import {
+    rewardUserPoints,
+    checkUserRewardHistory,
+    deductUserPoints,
+    getUserPointsByHandle
+} from '@/app/services/supabaseService'; // Import Supabase functions
 
 // Define interfaces for better type safety
 interface RawTweetEntities {
@@ -382,74 +386,8 @@ export const tools = {
             missionDetails: z.string().optional().describe('Additional details about the completed mission'),
         }),
         execute: async ({ userName, points, missionId, missionDetails }) => {
-            try {
-                const supabase = await createServiceClient();
-
-                // 开始事务
-                const { data: userData, error: userError } = await supabase
-                    .from('campaign_points')
-                    .select('id, points')
-                    .eq('handle', userName)
-                    .single();
-
-                if (userError) {
-                    console.error('Error finding user in Supabase:', userError);
-                    return {
-                        success: false,
-                        message: `Failed to find user ${userName}`
-                    };
-                }
-
-                if (!userData) {
-                    return {
-                        success: false,
-                        message: `User ${userName} not found in campaign_points table`
-                    };
-                }
-
-                // 添加奖励记录
-                const { error: rewardError } = await supabase
-                    .from('points_reward_log')
-                    .insert({
-                        reward_to: userName,
-                        points: points,
-                        mission: missionId,
-                        mission_details: missionDetails || '',
-                    });
-
-                if (rewardError) {
-                    console.error('Error adding reward record to Supabase:', rewardError);
-                    return {
-                        success: false,
-                        message: `Failed to add reward record for user ${userName}`
-                    };
-                }
-
-                // 更新用户积分
-                const newPoints = userData.points + points;
-                const { error: updateError } = await supabase
-                    .from('campaign_points')
-                    .update({ points: newPoints })
-                    .eq('id', userData.id);
-
-                if (updateError) {
-                    console.error('Error updating user points in Supabase:', updateError);
-                    return {
-                        success: false,
-                        message: `Failed to update points for user ${userName}`
-                    };
-                }
-
-                return {
-                    success: true,
-                    message: `Successfully rewarded ${points} points to user ${userName} for completing mission: ${missionId} : ${missionDetails}`
-                };
-            } catch (error) {
-                return {
-                    success: false,
-                    message: `Error rewarding points: ${error instanceof Error ? error.message : String(error)}`
-                };
-            }
+            // Call the function from supabaseService
+            return rewardUserPoints({ userName, points, missionId, missionDetails });
         },
     }),
 
@@ -461,39 +399,8 @@ export const tools = {
             mission: z.string().describe('The mission to check'),
         }),
         execute: async ({ userName, mission }) => {
-            try {
-                const supabase = await createClient();
-
-                // 查询记录
-                const { data, error } = await supabase
-                    .from('points_reward_log')
-                    .select('mission_details')
-                    .eq('reward_to', userName)
-                    .eq('mission', mission)
-                    .limit(1);
-
-                if (error) {
-                    console.error('Error checking user reward history from Supabase:', error);
-                    return {
-                        hasReceivedReward: false,
-                        message: `Error checking reward history: ${error.message}`
-                    };
-                }
-
-                const hasReceived = data && data.length > 0;
-                return {
-                    hasReceivedReward: hasReceived,
-                    missionDetails: hasReceived ? data[0].mission_details || '' : '',
-                    message: hasReceived
-                        ? `User ${userName} has already received rewards for mission: ${mission}`
-                        : `User ${userName} has not received rewards for mission: ${mission} yet`
-                };
-            } catch (error) {
-                return {
-                    hasReceivedReward: false,
-                    message: `Error checking reward history: ${error instanceof Error ? error.message : String(error)}`
-                };
-            }
+            // Call the function from supabaseService
+            return checkUserRewardHistory({ userName, mission });
         },
     }),
 
@@ -507,81 +414,8 @@ export const tools = {
             missionDetails: z.string().optional().describe('Additional details about why points are being deducted'),
         }),
         execute: async ({ userName, points, missionId, missionDetails }) => {
-            try {
-                if (points <= 0) {
-                    return {
-                        success: false,
-                        message: `Points to deduct must be a positive number`
-                    };
-                }
-
-                const supabase = await createServiceClient();
-
-                // 开始事务
-                const { data: userData, error: userError } = await supabase
-                    .from('campaign_points')
-                    .select('id, points')
-                    .eq('handle', userName)
-                    .single();
-
-                if (userError && userError.code !== 'PGRST116') {
-                    console.error('Error finding user in Supabase:', userError);
-                    return {
-                        success: false,
-                        message: `Failed to find user ${userName}`
-                    };
-                }
-
-                if (!userData || userData.points < points) {
-                    return {
-                        success: false,
-                        message: `User ${userName} does not have enough points to deduct`
-                    };
-                }
-
-                // 添加扣除记录
-                const { error: rewardError } = await supabase
-                    .from('points_reward_log')
-                    .insert({
-                        reward_to: userName,
-                        points: -points,
-                        mission: missionId,
-                        mission_details: missionDetails || '',
-                    });
-
-                if (rewardError) {
-                    console.error('Error adding deduction record to Supabase:', rewardError);
-                    return {
-                        success: false,
-                        message: `Failed to add deduction record for user ${userName}`
-                    };
-                }
-
-                // 更新用户积分
-                const newPoints = userData.points - points;
-                const { error: updateError } = await supabase
-                    .from('campaign_points')
-                    .update({ points: newPoints })
-                    .eq('id', userData.id);
-
-                if (updateError) {
-                    console.error('Error updating user points in Supabase:', updateError);
-                    return {
-                        success: false,
-                        message: `Failed to update points for user ${userName}`
-                    };
-                }
-
-                return {
-                    success: true,
-                    message: `Successfully deducted ${points} points from user ${userName} for mission: ${missionId} : ${missionDetails}`
-                };
-            } catch (error) {
-                return {
-                    success: false,
-                    message: `Error deducting points: ${error instanceof Error ? error.message : String(error)}`
-                };
-            }
+            // Call the function from supabaseService
+            return deductUserPoints({ userName, points, missionId, missionDetails });
         },
     }),
 
@@ -605,41 +439,28 @@ export const tools = {
 
     // 15. 获取用户当前积分
     getUserCurrentPoints: tool({
-        description: 'Get the current points of a user from the Campaign Points table',
+        description: 'Get the current points of a user from the Campaign Points table. Returns an object with points and potentially error/message fields.',
         parameters: z.object({
             userName: z.string().describe('The username to get points for'),
         }),
         execute: async ({ userName }) => {
             try {
-                const supabase = await createClient();
-
-                // 查找用户记录
-                const { data, error } = await supabase
-                    .from('campaign_points')
-                    .select('points')
-                    .eq('handle', userName)
-                    .single();
-
-                if (error) {
-                    if (error.code === 'PGRST116') {
-                        // 用户不存在
-                        return {
-                            error: 'User not found',
-                            points: 0
-                        };
-                    }
-                    console.error('Error fetching user points from Supabase:', error);
-                    return {
-                        error: 'Failed to fetch user points',
-                        points: 0
-                    };
-                }
-
-                return data.points;
-            } catch (error) {
+                // Call the function that might throw
+                const points = await getUserPointsByHandle(userName);
+                // If successful, return the points
                 return {
-                    error: `Error getting user points: ${error instanceof Error ? error.message : String(error)}`,
-                    points: 0
+                    points: points,
+                    message: `User ${userName} has ${points} points.`
+                 };
+            } catch (error) {
+                // If an error is caught, format it for the AI tool
+                console.error(`Tool Error: Failed to get points for ${userName}:`, error);
+                // Type assertion for error
+                const errorMessage = error instanceof Error ? error.message : String(error);
+
+                return {
+                    points: 0,
+                    error: errorMessage, // Include the raw error message
                 };
             }
         },
@@ -675,8 +496,9 @@ export const tools = {
                     }
 
                     // 检查关注列表中是否包含NuwaDev
-                    const followings = followingsResponse.followings || [""];
-                    const followsNuwaDev = followings.some((following: any) =>
+                    const followings = followingsResponse.followings || []; // Default to empty array
+                    // Provide a type for 'following' to fix the linter error
+                    const followsNuwaDev = followings.some((following: { screen_name: string }) =>
                         following.screen_name.toLowerCase() === 'nuwadev'
                     );
 
