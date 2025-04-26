@@ -392,7 +392,6 @@ async function callTwitterApi(endpoint: string, params: Record<string, string> =
 
 /**
  * Get information about multiple Twitter users by their user IDs.
- * TODO: Define a specific return type instead of any.
  */
 export async function batchGetUsers(userIds: string): Promise<BatchUsersResponse> {
     // Cast the result, assuming callTwitterApi returns data compatible with the interface
@@ -401,7 +400,6 @@ export async function batchGetUsers(userIds: string): Promise<BatchUsersResponse
 
 /**
  * Get information about a Twitter user by username.
- * TODO: Define a specific return type instead of any.
  */
 export async function getUserByUsername(userName: string): Promise<UserInfoResponse> {
     // Cast the result, assuming callTwitterApi returns data compatible with the interface
@@ -419,7 +417,6 @@ export async function getUserLastTweets(userName: string, cursor: string = ""): 
 
 /**
  * Get user followers.
- * TODO: Define a specific return type instead of any.
  */
 export async function getUserFollowers(userName: string, cursor: string = ""): Promise<FollowersResponse> {
     // Cast the result, assuming callTwitterApi returns data compatible with the interface
@@ -436,7 +433,6 @@ export async function getUserFollowings(userName: string, cursor: string = ""): 
 
 /**
  * Get tweet mentions for a user.
- * TODO: Define a specific return type instead of any.
  */
 export async function getUserMentions(userName: string, sinceTime?: number, untilTime?: number, cursor: string = ""): Promise<UserMentionsResponse> {
     const params: Record<string, string> = { userName };
@@ -448,7 +444,6 @@ export async function getUserMentions(userName: string, sinceTime?: number, unti
 
 /**
  * Get tweets by their IDs.
- * Returns the first optimized tweet data.
  */
 export async function getTweetsByIds(tweet_ids: string): Promise<TweetsByIdsResponse> {
     return callTwitterApi('tweets', { tweet_ids }) as Promise<TweetsByIdsResponse>;
@@ -456,7 +451,6 @@ export async function getTweetsByIds(tweet_ids: string): Promise<TweetsByIdsResp
 
 /**
  * Get tweet replies by tweet ID.
- * TODO: Define a specific return type instead of any.
  */
 export async function getTweetReplies(tweetId: string, sinceTime?: number, untilTime?: number, cursor: string = ""): Promise<TweetRepliesResponse> {
     const params: Record<string, string> = { tweetId };
@@ -479,23 +473,9 @@ export async function getTweetQuotes(tweetId: string, sinceTime?: number, untilT
 
 /**
  * Get tweet retweeters by tweet ID.
- * TODO: Define a specific return type instead of any.
  */
 export async function getTweetRetweeters(tweetId: string, cursor: string = ""): Promise<TweetRetweetersResponse> {
     const params: Record<string, string> = { tweetId };
     if (cursor) params.cursor = cursor;
     return callTwitterApi('tweet/retweeters', params) as Promise<TweetRetweetersResponse>;
 }
-
-// --- Remove Deprecated/Unused Optimization Structures --- 
-
-// OptimizedTweet interface (Kept for reference) - Exported
-// export interface OptimizedTweet { ... } // REMOVED
-
-// optimizeTweetsData function (Kept for reference) - Not Exported
-/**
- * @deprecated This function might not be needed if using TweetDetailed directly.
- * Optimizes raw tweet data into a cleaner format.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-// function optimizeTweetsData(tweets: RawTweet[], pinTweet?: RawTweet): OptimizedTweet[] { ... } // REMOVED
