@@ -1,71 +1,9 @@
-// Removed @ts-nocheck as specific types are now defined
-// TODO: Define specific types for API responses within callTwitterApi if possible
-
 /**
  * Twitter Service Module
  * 
  * Encapsulates logic for interacting with the Twitter API.
  */
 
-// Define interfaces for better type safety (Copied from tools.ts)
-export interface RawTweetEntities {
-    urls?: { 
-        url: {
-            start: number;
-            end: number;
-            url: string;
-            expanded_url: string;
-            display_url: string;
-        };
-    }[];
-    mentions?: {
-        start: number;
-        end: number;
-        username: string;
-        id: string;
-    }[];
-    hashtags?: {
-        start: number;
-        end: number;
-        tag: string;
-    }[];
-    cashtags?: {
-        start: number;
-        end: number;
-        tag: string;
-    }[];
-}
-
-// Non-exported RawTweet interface (only used internally by optimizeTweetsData)
-interface RawTweet {
-    id: string;
-    author: { userName: string };
-    text: string;
-    note_tweet?: string | null;
-    entities?: RawTweetEntities;
-    retweetCount: number;
-    replyCount: number;
-    likeCount: number;
-    quoteCount: number;
-    viewCount: number;
-}
-
-export interface OptimizedTweet {
-    id: string;
-    author: string;
-    text: string;
-    entities?: RawTweetEntities;
-    retweetCount: number;
-    replyCount: number;
-    likeCount: number;
-    quoteCount: number;
-    viewCount: number;
-    isPinned?: boolean;
-}
-
-// --- Base Interfaces (Entities, URLs etc. - Reusable) ---
-
-// Interfaces for nested URL structures within entities
 interface UrlDetail {
     display_url: string;
     expanded_url: string;
@@ -93,9 +31,9 @@ interface ProfileBio {
     entities: ProfileBioEntities;
 }
 
-// --- Specific User Info Structures ---
+// --- Specific User Info Structures --- Updated createdAt comments ---
 
-// 1. Detailed User Info (from user/info, user/batch_info_by_ids, tweet author)
+// 1. Detailed User Info
 export interface TwitterUserInfoDetailed {
     id: string;
     name: string;
@@ -113,7 +51,7 @@ export interface TwitterUserInfoDetailed {
     favouritesCount: number; 
     statusesCount: number; 
     mediaCount: number; 
-    createdAt: string; 
+    createdAt: string; // Twitter date string format (e.g., "Thu Feb 28 03:37:03 +0000 2008")
     coverPicture?: string | null;
     profilePicture: string; 
     canDm: boolean;
@@ -156,7 +94,7 @@ export interface TwitterUserListItem {
     favourites_count: number; // Snake case
     statuses_count: number; // Snake case
     media_tweets_count?: number; // Snake case
-    created_at: string; // Twitter date string format
+    created_at: string; // Twitter date string format (e.g., "Sat Jul 13 08:35:56 +0000 2013")
     profile_banner_url?: string | null; // Snake case
     profile_image_url_https: string; // Snake case
     can_dm: boolean; // Snake case
@@ -178,7 +116,7 @@ export interface TwitterRetweeterUser {
     favouritesCount: number; // Camel case
     statusesCount: number; // Camel case
     mediaCount: number; // Camel case
-    createdAt: string; // ISO 8601 format
+    createdAt: string; // Twitter date string format (observed non-ISO in examples)
     coverPicture?: string | null; // Camel case
     profilePicture: string; // Camel case
     canDm: boolean; // Camel case
@@ -220,33 +158,45 @@ export interface FollowingsResponse {
     code?: number; 
 }
 
-// --- Interfaces for user/mentions response ---
+// --- Unified Tweet Entities Structure --- NEW & UPDATED ---
 
-export interface TweetMentionEntityHashtag {
-    indices: number[];
+// Reusable entity types
+export interface TweetEntityHashtag {
+    indices?: number[];
     text: string;
 }
 
-export interface TweetMentionEntityUrl {
+export interface TweetEntityUrl {
     display_url: string;
     expanded_url: string;
-    indices: number[];
+    indices?: number[];
     url: string;
 }
 
-export interface TweetMentionEntityUserMention {
-    id_str: string; // Note: API uses id_str here
-    indices?: number[]; // Not shown in example, but often present
+export interface TweetEntityUserMention {
+    id_str: string;
+    indices?: number[];
     name: string;
     screen_name: string;
 }
 
-export interface TweetMentionEntities {
-    hashtags?: TweetMentionEntityHashtag[];
-    urls?: TweetMentionEntityUrl[];
-    user_mentions?: TweetMentionEntityUserMention[];
-    // Add other potential entities like media if needed
+export interface TweetEntitySymbol {
+    indices?: number[];
+    text: string;
 }
+
+// Main Entities interface used by TweetDetailed and TweetMention
+export interface TweetEntities {
+    hashtags?: TweetEntityHashtag[];
+    symbols?: TweetEntitySymbol[]; 
+    urls?: TweetEntityUrl[];
+    user_mentions?: TweetEntityUserMention[];
+    // Add other potential entities like media, polls if needed based on full API docs
+    // media?: any[]; 
+    // polls?: any[];
+}
+
+// --- Interfaces for user/mentions response ---
 
 // Define a simple stub for referenced tweets within mentions/replies/quotes
 interface ReferencedTweetStub {
@@ -266,7 +216,7 @@ export interface TweetMention {
     likeCount: number;
     quoteCount: number;
     viewCount: number;
-    createdAt: string; // Could be Date if parsed
+    createdAt: string; // Twitter date string format (e.g., "Thu Apr 24 12:54:53 +0000 2025")
     lang?: string; // Optional
     bookmarkCount?: number; // Optional
     isReply?: boolean; // Optional
@@ -274,8 +224,8 @@ export interface TweetMention {
     conversationId?: string; // Optional
     inReplyToUserId?: string | null; // Optional
     inReplyToUsername?: string | null; // Optional
-    author: TwitterUserInfoDetailed | TwitterUserListItem | { id: string, userName?: string, screen_name?: string }; // Make author flexible or decide on one type
-    entities?: TweetMentionEntities; // Use the specific mention entities
+    author: TwitterUserInfoDetailed; // Author in mentions example was detailed
+    entities?: TweetEntities; // Use unified entities type
     isQuote?: boolean;
     isRetweet?: boolean;
     quoted_tweet?: ReferencedTweetStub | null;
@@ -289,7 +239,7 @@ export interface UserMentionsResponse {
     has_next_page?: boolean; 
     next_cursor?: string;    
     status: "success" | string;
-    msg?: string; // Changed from message to msg
+    msg?: string; 
 }
 
 // Interface for the tweet/replies endpoint response
@@ -298,7 +248,7 @@ export interface TweetRepliesResponse {
     has_next_page?: boolean;
     next_cursor?: string;
     status: "success" | string;
-    message?: string;
+    message?: string; // API seems inconsistent (msg vs message)
 }
 
 // Interface for the tweet/quotes endpoint response
@@ -307,7 +257,7 @@ export interface TweetQuotesResponse {
     has_next_page?: boolean;
     next_cursor?: string;
     status: "success" | string;
-    message?: string;
+    message?: string; // API seems inconsistent (msg vs message)
 }
 
 // Interface for the tweet/retweeters endpoint response
@@ -317,58 +267,29 @@ export interface TweetRetweetersResponse {
     next_cursor?: string;
 }
 
-// --- Interfaces for Tweet Entities ---
-interface TweetEntityHashtag {
-    indices?: number[];
-    text: string;
-}
-
-interface TweetEntityUrl {
-    display_url: string;
-    expanded_url: string;
-    indices: number[];
-    url: string;
-}
-
-interface TweetEntityUserMention {
-    id_str: string;
-    indices?: number[];
-    name: string;
-    screen_name: string;
-}
-
-interface TweetEntities {
-    hashtags?: TweetEntityHashtag[];
-    urls?: TweetEntityUrl[];
-    user_mentions?: TweetEntityUserMention[];
-    symbols?: unknown[]; 
-    polls?: unknown[]; 
-    media?: unknown[]; // Actual media details are in extendedEntities
-}
-
-// --- Interfaces for Extended Entities (Media) ---
+// --- Interfaces for Extended Entities (Media) --- RE-DEFINED ---
 // Basic structure, expand as needed
-interface MediaEntity {
+interface MediaEntity { // Keep non-exported if only used here
     id_str: string;
-    indices: number[];
-    media_url_https: string;
-    type: 'photo' | 'video' | 'animated_gif';
-    url: string; 
-    display_url: string;
-    expanded_url: string;
+    indices?: number[];
+    media_url_https?: string;
+    type?: 'photo' | 'video' | 'animated_gif';
+    url?: string; 
+    display_url?: string;
+    expanded_url?: string;
     // Add video_info, sizes, etc. if needed
 }
 
-interface ExtendedEntities {
-    media: MediaEntity[];
+export interface ExtendedEntities { // Export if needed elsewhere, or keep internal
+    media?: MediaEntity[];
 }
 
-// --- Main Detailed Tweet Interface ---
-export interface TweetDetailed {
+// --- Main Detailed Tweet Interface --- Uses ExtendedEntities ---
+export interface TweetDetailed { // Used by TweetsByIds, UserLastTweets responses
     type: "tweet";
     id: string;
     url: string;
-    twitterUrl?: string; // Add twitterUrl based on example
+    twitterUrl?: string; 
     text: string;
     source?: string;
     retweetCount: number;
@@ -376,7 +297,7 @@ export interface TweetDetailed {
     likeCount: number;
     quoteCount: number;
     viewCount: number;
-    createdAt: string; // Twitter date format
+    createdAt: string; // Twitter date string format (e.g., "Sun Apr 13 03:28:39 +0000 2025")
     lang?: string;
     bookmarkCount?: number;
     isReply?: boolean;
@@ -386,26 +307,39 @@ export interface TweetDetailed {
     inReplyToUsername?: string | null;
     isPinned?: boolean;
     author: TwitterUserInfoDetailed; 
-    entities?: TweetEntities | object; 
-    extendedEntities?: ExtendedEntities | object; 
-    card?: object | null; // Allow null for card
+    entities?: TweetEntities; 
+    extendedEntities?: ExtendedEntities | object; // Now references defined ExtendedEntities
+    card?: object | null; 
     place?: object; 
     isRetweet?: boolean;
     isQuote?: boolean;
     isConversationControlled?: boolean;
-    quoted_tweet?: TweetDetailed | null; // Recursive, optional
-    retweeted_tweet?: TweetDetailed | null; // Recursive, optional
+    quoted_tweet?: TweetDetailed | null; 
+    retweeted_tweet?: TweetDetailed | null; 
     possiblySensitive?: boolean;
 }
 
-// --- API Response Interfaces ---
+// --- API Response Interfaces --- Updated ---
 
-// Update TweetsByIds response
-export interface TweetsByIdsResponse {
+// Interface for the tweets endpoint response (Updated based on example)
+export interface TweetsByIdsResponse { 
     tweets: TweetDetailed[];
     status: "success" | string; 
     msg: string;
-    code?: number; // Seen in example
+    code?: number; 
+}
+
+// NEW Interface for the user/last_tweets endpoint response
+export interface UserLastTweetsResponse {
+    status: "success" | string;
+    code?: number;
+    msg?: string;
+    data?: { // Tweets are nested under 'data'
+        pin_tweet?: TweetDetailed; // Pinned tweet is separate
+        tweets: TweetDetailed[]; // Array of regular tweets
+    };
+    has_next_page?: boolean;
+    next_cursor?: string;
 }
 
 // --- Core API Call Function (Copied from tools.ts) ---
@@ -442,6 +376,7 @@ async function callTwitterApi(endpoint: string, params: Record<string, string> =
             // Throw an error with details
             throw new Error(`Twitter API Error (${endpoint}): ${errorMessage}`);
         }
+        //console.log(JSON.stringify(data, null, 2));
         return data; 
     } catch (error) {
         // Catch fetch errors or errors thrown from the response check
@@ -453,7 +388,7 @@ async function callTwitterApi(endpoint: string, params: Record<string, string> =
     }
 }
 
-// --- Exported Service Functions ---
+// --- Exported Service Functions --- Update signatures ---
 
 /**
  * Get information about multiple Twitter users by their user IDs.
@@ -477,21 +412,9 @@ export async function getUserByUsername(userName: string): Promise<UserInfoRespo
  * Retrieve latest tweets by user name (excluding replies).
  * Returns optimized tweet data and pagination info.
  */
-export async function getUserLastTweets(userName: string, cursor: string = ""): Promise<{ tweets: TweetDetailed[], next_cursor?: string, has_next_page?: boolean }> {
-    const response = await callTwitterApi('user/last_tweets', { userName, cursor });
-    const data = response.data;
-    // Return the raw tweets array from the response, assuming it matches TweetDetailed[]
-    // TODO: Add runtime validation or safer casting if needed
-    const tweets: TweetDetailed[] = data?.tweets || [];
-    // Include pinned tweet if present and matches structure
-    if (data?.pin_tweet) {
-        tweets.unshift(data.pin_tweet as TweetDetailed); // Assuming pin_tweet matches TweetDetailed
-    }
-    return {
-        tweets: tweets,
-        next_cursor: response.next_cursor,
-        has_next_page: response.has_next_page
-    };
+export async function getUserLastTweets(userName: string, cursor: string = ""): Promise<UserLastTweetsResponse> { // Use new Response type
+    // Cast the result, assuming callTwitterApi returns data compatible with the interface
+    return callTwitterApi('user/last_tweets', { userName, cursor }) as Promise<UserLastTweetsResponse>;
 }
 
 /**
@@ -528,7 +451,6 @@ export async function getUserMentions(userName: string, sinceTime?: number, unti
  * Returns the first optimized tweet data.
  */
 export async function getTweetsByIds(tweet_ids: string): Promise<TweetsByIdsResponse> {
-    // Remove optimizeTweetsData call, cast directly
     return callTwitterApi('tweets', { tweet_ids }) as Promise<TweetsByIdsResponse>;
 }
 
@@ -564,3 +486,16 @@ export async function getTweetRetweeters(tweetId: string, cursor: string = ""): 
     if (cursor) params.cursor = cursor;
     return callTwitterApi('tweet/retweeters', params) as Promise<TweetRetweetersResponse>;
 }
+
+// --- Remove Deprecated/Unused Optimization Structures --- 
+
+// OptimizedTweet interface (Kept for reference) - Exported
+// export interface OptimizedTweet { ... } // REMOVED
+
+// optimizeTweetsData function (Kept for reference) - Not Exported
+/**
+ * @deprecated This function might not be needed if using TweetDetailed directly.
+ * Optimizes raw tweet data into a cleaner format.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// function optimizeTweetsData(tweets: RawTweet[], pinTweet?: RawTweet): OptimizedTweet[] { ... } // REMOVED

@@ -32,15 +32,24 @@ describeIfApiKey('Twitter Service E2E Tests (Requires TWITTER_API_KEY)', () => {
     test('getUserLastTweets should fetch recent tweets', async () => {
         const response = await twitterService.getUserLastTweets(TEST_USERNAME);
         expect(response).toBeDefined();
-        // The root response structure for last_tweets doesn't have a top-level status
-        // expect(response.status).toBe('success'); // Adjust based on actual API
-        expect(response.tweets).toBeDefined();
-        // expect(response.tweets).toBeInstanceOf(Array);
-        expect(Array.isArray(response.tweets)).toBe(true); // Use Array.isArray
-        // Assuming TwitterDev has tweets
-        expect(response.tweets.length).toBeGreaterThan(0); 
-        expect(response.tweets[0].id).toBeDefined();
-        expect(response.tweets[0].author).toBeDefined();
+        // Check the overall status from the root response
+        expect(response.status).toBe('success'); 
+        // Check that the data object exists
+        expect(response.data).toBeDefined();
+        // Check that tweets array exists within data (can be empty)
+        expect(response.data?.tweets).toBeDefined();
+        expect(Array.isArray(response.data?.tweets)).toBe(true);
+        
+        // Combine pinned and regular tweets for checking if any tweet exists
+        const allTweets = [];
+        if(response.data?.pin_tweet) allTweets.push(response.data.pin_tweet);
+        if(response.data?.tweets) allTweets.push(...response.data.tweets);
+
+        // Assuming the user has at least one tweet (pinned or regular)
+        expect(allTweets.length).toBeGreaterThan(0); 
+        // Check the first available tweet for basic structure
+        expect(allTweets[0].id).toBeDefined();
+        expect(allTweets[0].author).toBeDefined();
     });
 
     test('getUserFollowers should fetch followers', async () => {

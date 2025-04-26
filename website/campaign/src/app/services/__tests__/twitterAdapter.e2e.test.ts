@@ -56,7 +56,6 @@ describeIfApiKey('Twitter Adapter E2E Tests (Requires TWITTER_API_KEY)', () => {
         // Validate the new author object structure
         expect(tweet.author).toBeDefined();
         expect(typeof tweet.author?.id).toBe('string');
-        expect(typeof tweet.author?.name).toBe('string');
         expect(typeof tweet.author?.username).toBe('string');
 
         expect(tweet.text).toBeDefined();
@@ -84,6 +83,35 @@ describeIfApiKey('Twitter Adapter E2E Tests (Requires TWITTER_API_KEY)', () => {
         expect(tweet?.id).toBe(TEST_TWEET_ID);
         // Check if author object has the correct ID (or other properties if needed)
         // expect(tweet?.author?.id).toBe(...); // Add if author ID is known and stable
+    });
+
+    test('getStandardTweetById to handle quote tweets', async () => {
+        const tweet = await twitterAdapter.getStandardTweetById("1911260216320249953");
+        validateStandardTweet(tweet);
+        //console.log(JSON.stringify(tweet, null, 2));
+        expect(tweet?.id).toBe("1911260216320249953");
+        expect(tweet?.referenced_tweets).toBeDefined();
+        expect(tweet?.referenced_tweets?.length).toBeGreaterThan(0);
+        expect(tweet?.referenced_tweets?.[0]?.type).toBe("quoted");
+        expect(tweet?.referenced_tweets?.[0]?.id).toBe("1911049162285826169");
+        expect(tweet?.referenced_tweets?.[0]?.author?.username).toBe("NuwaDev");
+    });
+
+    test('getStandardTweetById to handle entities', async () => {
+        const tweet = await twitterAdapter.getStandardTweetById("1911049162285826169");
+        validateStandardTweet(tweet);
+        //console.log(JSON.stringify(tweet, null, 2));
+        expect(tweet?.id).toBe("1911049162285826169");
+        expect(tweet?.entities).toBeDefined();
+        expect(tweet?.entities?.urls).toBeDefined();
+        expect(tweet?.entities?.urls?.length).toBeGreaterThan(0);
+        expect(tweet?.entities?.urls?.[0]?.url).toBe("https://t.co/ReqSAzeedV");
+        expect(tweet?.entities?.urls?.[0]?.expanded_url).toBe("https://test.nuwa.dev/");
+        expect(tweet?.entities?.urls?.[0]?.display_url).toBe("test.nuwa.dev");
+        expect(tweet?.entities?.mentions).toBeDefined();
+        expect(tweet?.entities?.mentions?.length).toBeGreaterThan(0);
+        expect(tweet?.entities?.mentions?.[0]?.id).toBe("1600777721075838977");
+        expect(tweet?.entities?.mentions?.[0]?.username).toBe("RoochNetwork");
     });
 
     test('getStandardUserFollowers should return followers in standard format', async () => {

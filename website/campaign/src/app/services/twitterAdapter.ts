@@ -42,7 +42,7 @@ export interface StandardTweetPublicMetrics {
 
 export interface StandardTweetMentionEntity {
     id: string; // User ID
-    username: string; // Screen name
+    username: string;
 }
 
 export interface StandardTweetUrlEntity {
@@ -64,12 +64,12 @@ export interface StandardTweetEntities {
 export interface StandardReferencedTweet {
     type: 'retweeted' | 'quoted' | 'replied_to';
     id: string;
+    author?: StandardTweetAuthor;
 }
 
 // New structure for embedding author info directly in the tweet
 export interface StandardTweetAuthor {
     id: string;
-    name: string;
     username: string;
 }
 
@@ -214,35 +214,21 @@ function convertToStandardRetweeterUser(user: twitterService.TwitterRetweeterUse
 }
 
 /**
- * Converts the detailed or mention tweet info from twitterService into StandardTweet format.
+ * Converts the detailed tweet info from twitterService into StandardTweet format.
  */
-function convertToStandardTweet(tweet: twitterService.TweetDetailed | twitterService.TweetMention | null | undefined): StandardTweet | null {
+function convertToStandardDetailedTweet(tweet: twitterService.TweetDetailed | null | undefined): StandardTweet | null {
     if (!tweet) return null;
 
-    let standardAuthor: StandardUser | null = null;
-    if (tweet.author) {
-        if ('userName' in tweet.author && 'profile_bio' in tweet.author) { 
-            standardAuthor = convertToStandardUserDetailed(tweet.author as twitterService.TwitterUserInfoDetailed);
-        } else if ('userName' in tweet.author) { 
-             standardAuthor = convertToStandardUserDetailed(tweet.author as twitterService.TwitterUserInfoDetailed); 
-        } else if ('screen_name' in tweet.author) { 
-            standardAuthor = convertToStandardUserListItem(tweet.author as twitterService.TwitterUserListItem);
-        } else if ('id' in tweet.author) {
-             console.warn("Tweet author has minimal info, cannot fully convert to StandardUser:", tweet.author);
-             return null; 
-        }
-    }
+    const standardAuthor = convertToStandardUserDetailed(tweet.author);
 
     if (!standardAuthor) {
-        console.warn("Could not convert author within tweet, skipping tweet conversion:", tweet.id);
+        console.warn("[Detailed] Could not convert author within tweet, skipping conversion:", tweet.id);
         return null;
     }
 
-    // Create the StandardTweetAuthor object
     const tweetAuthor: StandardTweetAuthor = {
         id: standardAuthor.id,
-        name: standardAuthor.name, // Already validated in StandardUser conversion
-        username: standardAuthor.username, // Already validated in StandardUser conversion
+        username: standardAuthor.username,
     };
 
     const metrics: StandardTweetPublicMetrics = {
@@ -255,44 +241,135 @@ function convertToStandardTweet(tweet: twitterService.TweetDetailed | twitterSer
     };
 
     const entities: StandardTweetEntities = {};
+    // Detailed tweets use the unified TweetEntities structure now
     if (tweet.entities && typeof tweet.entities === 'object') {
-        const tweetEntities = tweet.entities as twitterService.TweetMentionEntities; 
-        if (tweetEntities.user_mentions?.length) {
-            entities.mentions = tweetEntities.user_mentions.map((m) => ({ id: m.id_str, username: m.screen_name }));
+        const detailedEntities = tweet.entities as twitterService.TweetEntities; 
+        if (detailedEntities.user_mentions?.length) {
+            entities.mentions = detailedEntities.user_mentions.map((m) => ({ id: m.id_str, username: m.screen_name }));
         }
-        if (tweetEntities.urls?.length) {
-            entities.urls = tweetEntities.urls.map((u) => ({ url: u.url, expanded_url: u.expanded_url, display_url: u.display_url }));
+        if (detailedEntities.urls?.length) {
+            entities.urls = detailedEntities.urls.map((u) => ({ url: u.url, expanded_url: u.expanded_url, display_url: u.display_url }));
         }
-        if (tweetEntities.hashtags?.length) {
-            entities.hashtags = tweetEntities.hashtags.map((h) => ({ tag: h.text }));
+        if (detailedEntities.hashtags?.length) {
+            entities.hashtags = detailedEntities.hashtags.map((h) => ({ tag: h.text }));
         }
+        // Could add symbols here too if needed: entities.symbols = detailedEntities.symbols.map(...);
     }
 
     const referenced_tweets: StandardReferencedTweet[] = [];
     if (tweet.isReply && tweet.inReplyToId) {
         referenced_tweets.push({ type: 'replied_to', id: tweet.inReplyToId });
     }
-    if ('isQuote' in tweet && tweet.isQuote && tweet.quoted_tweet?.id) {
-        referenced_tweets.push({ type: 'quoted', id: tweet.quoted_tweet.id });
+    if (tweet.isQuote && tweet.quoted_tweet?.id) {
+        let referencedAuthor: StandardTweetAuthor | undefined = undefined;
+        if (tweet.quoted_tweet.author) { 
+            const convertedAuthor = convertToStandardUserDetailed(tweet.quoted_tweet.author);
+            if(convertedAuthor) {
+                referencedAuthor = { id: convertedAuthor.id, username: convertedAuthor.username };
+            }
+        }
+        referenced_tweets.push({ type: 'quoted', id: tweet.quoted_tweet.id, author: referencedAuthor });
     }
-    if ('isRetweet' in tweet && tweet.isRetweet && tweet.retweeted_tweet?.id) {
-        referenced_tweets.push({ type: 'retweeted', id: tweet.retweeted_tweet.id });
+    if (tweet.isRetweet && tweet.retweeted_tweet?.id) {
+         let referencedAuthor: StandardTweetAuthor | undefined = undefined;
+        if (tweet.retweeted_tweet.author) { 
+            const convertedAuthor = convertToStandardUserDetailed(tweet.retweeted_tweet.author);
+            if(convertedAuthor) {
+                referencedAuthor = { id: convertedAuthor.id, username: convertedAuthor.username };
+            }
+        }
+        referenced_tweets.push({ type: 'retweeted', id: tweet.retweeted_tweet.id, author: referencedAuthor });
     }
 
     let standardCreatedAt: string | undefined;
-    if (tweet.createdAt) {
-        try {
-             standardCreatedAt = new Date(tweet.createdAt).toISOString();
-        } catch (e) {
-            console.warn(`Failed to parse date string: ${tweet.createdAt}`, e);
-            standardCreatedAt = tweet.createdAt; 
+    if (tweet.createdAt) { // Handle Twitter date format
+        try { standardCreatedAt = new Date(tweet.createdAt).toISOString(); } catch (e) {
+            console.warn(`[Detailed] Failed to parse date string: ${tweet.createdAt}`, e); standardCreatedAt = tweet.createdAt;
         }
     }
 
     return {
         id: tweet.id,
         text: tweet.text,
-        author: tweetAuthor, // Use the created author object
+        author: tweetAuthor, 
+        conversation_id: tweet.conversationId,
+        created_at: standardCreatedAt,
+        entities: Object.keys(entities).length > 0 ? entities : undefined,
+        in_reply_to_user_id: tweet.inReplyToUserId ?? undefined,
+        lang: tweet.lang,
+        public_metrics: metrics,
+        possibly_sensitive: tweet.possiblySensitive ?? false, 
+        referenced_tweets: referenced_tweets.length > 0 ? referenced_tweets : undefined,
+        source: tweet.source,
+    };
+}
+
+/**
+ * Converts the mention/reply/quote tweet info (TweetMention) from twitterService into StandardTweet format.
+ */
+function convertToStandardMentionTweet(tweet: twitterService.TweetMention | null | undefined): StandardTweet | null {
+    if (!tweet) return null;
+
+    // Mention tweet author is now expected to be Detailed based on example
+    const standardAuthor = convertToStandardUserDetailed(tweet.author);
+    
+    if (!standardAuthor) {
+        console.warn("[Mention] Could not convert author within tweet, skipping conversion:", tweet.id);
+        return null;
+    }
+    const tweetAuthor: StandardTweetAuthor = {
+        id: standardAuthor.id,
+        username: standardAuthor.username, 
+    };
+
+    const metrics: StandardTweetPublicMetrics = {
+        retweet_count: tweet.retweetCount ?? 0,
+        reply_count: tweet.replyCount ?? 0,
+        like_count: tweet.likeCount ?? 0,
+        quote_count: tweet.quoteCount ?? 0,
+        bookmark_count: tweet.bookmarkCount ?? 0, 
+        impression_count: tweet.viewCount ?? 0,
+    };
+
+    const entities: StandardTweetEntities = {};
+    // Mention tweets use the unified TweetEntities structure now
+    if (tweet.entities && typeof tweet.entities === 'object') {
+        const mentionEntities = tweet.entities as twitterService.TweetEntities;
+        if (mentionEntities.user_mentions?.length) {
+            entities.mentions = mentionEntities.user_mentions.map((m) => ({ id: m.id_str, username: m.screen_name }));
+        }
+        if (mentionEntities.urls?.length) {
+            entities.urls = mentionEntities.urls.map((u) => ({ url: u.url, expanded_url: u.expanded_url, display_url: u.display_url }));
+        }
+        if (mentionEntities.hashtags?.length) {
+            entities.hashtags = mentionEntities.hashtags.map((h) => ({ tag: h.text }));
+        }
+         // Could add symbols here too if needed: entities.symbols = mentionEntities.symbols.map(...);
+    }
+
+    const referenced_tweets: StandardReferencedTweet[] = [];
+    if (tweet.isReply && tweet.inReplyToId) {
+        referenced_tweets.push({ type: 'replied_to', id: tweet.inReplyToId }); // No author info
+    }
+    // Mention tweet's referenced tweets are stubs (only ID)
+    if (tweet.isQuote && tweet.quoted_tweet?.id) {
+        referenced_tweets.push({ type: 'quoted', id: tweet.quoted_tweet.id }); // No author info
+    }
+    if (tweet.isRetweet && tweet.retweeted_tweet?.id) {
+        referenced_tweets.push({ type: 'retweeted', id: tweet.retweeted_tweet.id }); // No author info
+    }
+
+    let standardCreatedAt: string | undefined;
+    if (tweet.createdAt) { // Handle Twitter date format
+        try { standardCreatedAt = new Date(tweet.createdAt).toISOString(); } catch (e) {
+            console.warn(`[Mention] Failed to parse date string: ${tweet.createdAt}`, e); standardCreatedAt = tweet.createdAt;
+        }
+    }
+
+    return {
+        id: tweet.id,
+        text: tweet.text,
+        author: tweetAuthor, 
         conversation_id: tweet.conversationId,
         created_at: standardCreatedAt,
         entities: Object.keys(entities).length > 0 ? entities : undefined,
@@ -326,7 +403,6 @@ export async function getStandardUsersByIds(userIds: string): Promise<{ users: S
 
 /**
  * Gets a single tweet by ID, adapted to StandardTweet format.
- * (No pagination needed for this one)
  */
 export async function getStandardTweetById(tweetId: string): Promise<StandardTweet | null> {
     try {
@@ -335,7 +411,9 @@ export async function getStandardTweetById(tweetId: string): Promise<StandardTwe
             console.log(`Tweet not found via twitterService for ID: ${tweetId}`);
             return null;
         }
-        return convertToStandardTweet(response.tweets[0]); 
+        // Service returns TweetDetailed[]
+        // return convertToStandardTweet(response.tweets[0]); // Old call
+        return convertToStandardDetailedTweet(response.tweets[0]); // Use detailed converter
     } catch (error) {
         console.error(`Adapter error fetching tweet ${tweetId}:`, error);
         throw error; 
@@ -403,16 +481,29 @@ export async function getStandardUserFollowings(username: string, cursor?: strin
 /**
  * Gets latest tweets for a user, adapted to StandardTweet format.
  */
-export async function getStandardUserLastTweets(username: string, cursor?: string): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> {
+export async function getStandardUserLastTweets(username: string, cursor?: string): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> { 
     try {
+        // Use the new response type from service
         const response = await twitterService.getUserLastTweets(username, cursor || "");
-        const standardTweets = (response.tweets || [])
-            .map(convertToStandardTweet) 
+        
+        // Combine pinned and regular tweets before mapping
+        const allRawTweets: twitterService.TweetDetailed[] = [];
+        if (response.data?.pin_tweet) {
+            allRawTweets.push(response.data.pin_tweet);
+        }
+        if (response.data?.tweets) {
+            allRawTweets.push(...response.data.tweets);
+        }
+
+        // Map using the detailed converter
+        const standardTweets = allRawTweets
+            .map(convertToStandardDetailedTweet) // Use detailed converter
             .filter((t): t is StandardTweet => t !== null);
+            
         return { 
             tweets: standardTweets, 
             next_cursor: response.next_cursor, 
-            has_next_page: response.has_next_page
+            has_next_page: response.has_next_page 
         };
     } catch (error) {
         console.error(`Adapter error fetching last tweets for ${username}:`, error);
@@ -423,16 +514,18 @@ export async function getStandardUserLastTweets(username: string, cursor?: strin
 /**
  * Gets tweet mentions for a user, adapted to StandardTweet format.
  */
-export async function getStandardUserMentions(username: string, sinceTime?: number, untilTime?: number, cursor?: string): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> {
+export async function getStandardUserMentions(username: string, sinceTime?: number, untilTime?: number, cursor?: string): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> { 
     try {
         const response = await twitterService.getUserMentions(username, sinceTime, untilTime, cursor || "");
+        // Service returns { tweets: TweetMention[] }
         const standardTweets = (response.tweets || [])
-            .map(convertToStandardTweet) 
+            // .map(convertToStandardTweet) // Old call
+            .map(convertToStandardMentionTweet) // Use mention converter
             .filter((t): t is StandardTweet => t !== null);
         return {
             tweets: standardTweets,
             next_cursor: response.next_cursor,
-            has_next_page: response.has_next_page
+            has_next_page: response.has_next_page 
         };
     } catch (error) {
         console.error(`Adapter error fetching mentions for ${username}:`, error);
@@ -443,16 +536,18 @@ export async function getStandardUserMentions(username: string, sinceTime?: numb
 /**
  * Gets tweet replies by tweet ID, adapted to StandardTweet format.
  */
-export async function getStandardTweetReplies(tweetId: string, sinceTime?: number, untilTime?: number, cursor?: string): Promise<{ replies: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> {
+export async function getStandardTweetReplies(tweetId: string, sinceTime?: number, untilTime?: number, cursor?: string): Promise<{ replies: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> { 
      try {
         const response = await twitterService.getTweetReplies(tweetId, sinceTime, untilTime, cursor || "");
+        // Service returns { replies: TweetMention[] }
         const standardReplies = (response.replies || [])
-            .map(convertToStandardTweet) 
+            // .map(convertToStandardTweet) // Old call
+            .map(convertToStandardMentionTweet) // Use mention converter
             .filter((t): t is StandardTweet => t !== null);
         return {
             replies: standardReplies,
             next_cursor: response.next_cursor,
-            has_next_page: response.has_next_page
+            has_next_page: response.has_next_page 
         };
     } catch (error) {
         console.error(`Adapter error fetching replies for tweet ${tweetId}:`, error);
@@ -463,16 +558,18 @@ export async function getStandardTweetReplies(tweetId: string, sinceTime?: numbe
 /**
  * Gets tweet quotes by tweet ID, adapted to StandardTweet format.
  */
-export async function getStandardTweetQuotes(tweetId: string, sinceTime?: number, untilTime?: number, includeReplies: boolean = true, cursor?: string): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> {
+export async function getStandardTweetQuotes(tweetId: string, sinceTime?: number, untilTime?: number, includeReplies: boolean = true, cursor?: string): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> { 
     try {
         const response = await twitterService.getTweetQuotes(tweetId, sinceTime, untilTime, includeReplies, cursor || "");
+        // Service returns { tweets: TweetMention[] }
          const standardTweets = (response.tweets || [])
-            .map(convertToStandardTweet) 
+            // .map(convertToStandardTweet) // Old call
+            .map(convertToStandardMentionTweet) // Use mention converter
             .filter((t): t is StandardTweet => t !== null);
         return { 
             tweets: standardTweets, 
             next_cursor: response.next_cursor, 
-            has_next_page: response.has_next_page
+            has_next_page: response.has_next_page 
         };
     } catch (error) {
         console.error(`Adapter error fetching quotes for tweet ${tweetId}:`, error);
@@ -513,7 +610,6 @@ async function _checkUserFollowsTarget(userName: string, targetUsername: string)
     const targetUsernameLower = targetUsername.toLowerCase();
 
     while (hasMorePages) {
-        console.log(`Checking followings page for ${userName}, cursor: ${cursor}`);
         const response = await getStandardUserFollowings(userName, cursor);
         const standardUsers = response.users || [];
         
@@ -527,7 +623,7 @@ async function _checkUserFollowsTarget(userName: string, targetUsername: string)
         cursor = response.next_cursor;
         hasMorePages = !!response.has_next_page && !!cursor;
         
-        console.log(`Loop check: hasMorePages=${hasMorePages}, next_cursor=${cursor}`);
+        //console.log(`Loop check: hasMorePages=${hasMorePages}, next_cursor=${cursor}`);
         
         if(hasMorePages) await new Promise(resolve => setTimeout(resolve, 200)); 
     }
