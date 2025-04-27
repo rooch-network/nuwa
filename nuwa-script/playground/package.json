@@ -25,7 +25,6 @@
     "json-schema": "^0.4.0",
     "konva": "^9.3.13",
     "monaco-editor": "^0.52.2",
-    "nuwa-script": "file:../implementations/typescript",
     "openai": "^4.53.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -33,7 +32,8 @@
     "react-resizable-panels": "^2.0.20",
     "react-syntax-highlighter": "^15.5.0",
     "zod": "^3.24.3",
-    "zustand": "^4.5.4"
+    "zustand": "^4.5.4",
+    "nuwa-script": "file:../implementations/typescript"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
@@ -51,6 +51,5 @@
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
     "vite": "^6.2.0"
-  },
-  "packageManager": "yarn@1.22.21+sha1.1959a18351b811cdeedbd484a8f86c3cc3bbaf72"
+  }
 }
