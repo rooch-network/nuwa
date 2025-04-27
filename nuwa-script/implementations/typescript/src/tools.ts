@@ -169,14 +169,14 @@ export class ToolRegistry {
       throw new Error(`Tool '${toolName}' is already registered.`); 
     }
 
-    // Validate that parameters is a Zod schema
-    if (!(definition.parameters instanceof z.ZodType)) {
-        throw new Error(`Tool '${toolName}' parameters must be a Zod schema.`);
+    // Duck-type check for Zod schema (parameters)
+    if (!definition.parameters || typeof definition.parameters._def !== 'object' || typeof definition.parameters.parse !== 'function') {
+        throw new Error(`Tool '${toolName}' parameters must provide a valid Zod schema object (detected via duck-typing).`);
     }
     
-    // Validate returns schema
-    if (!(definition.returns.schema instanceof z.ZodType)) {
-        throw new Error(`Tool '${toolName}' returns schema must be a Zod schema.`);
+    // Duck-type check for Zod schema (returns)
+    if (!definition.returns?.schema || typeof definition.returns.schema._def !== 'object' || typeof definition.returns.schema.parse !== 'function') {
+        throw new Error(`Tool '${toolName}' returns schema must provide a valid Zod schema object (detected via duck-typing).`);
     }
 
     let normalizedSchema: NormalizedToolSchema;
