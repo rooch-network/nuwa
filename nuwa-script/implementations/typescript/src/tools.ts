@@ -496,12 +496,13 @@ export function normalizeSchemaToJsonSchema(
     toolName: string,
     expectObject: boolean
 ): JSONSchema7Definition {
-    let jsonSchema: JSONSchema7Definition;
+    let resultSchema: JSONSchema7Definition;
 
-    if (schemaInput instanceof z.ZodType) {
+    // Use duck-typing to check if it looks like a Zod schema
+    if (schemaInput && typeof (schemaInput as any)._def === 'object' && typeof (schemaInput as any).parse === 'function') {
         try {
             // Ensure zod-to-json-schema options are suitable
-            const converted = zodToJsonSchema(schemaInput, {
+            const converted = zodToJsonSchema(schemaInput as z.ZodTypeAny, { // Cast needed for zodToJsonSchema
                  target: 'jsonSchema7', 
                  $refStrategy: 'none', // Avoid internal refs for LLM compatibility
                  definitionPath: 'definitions', // Standard path
@@ -510,32 +511,36 @@ export function normalizeSchemaToJsonSchema(
             
             // Handle cases where the main schema is under definitions (common for complex types)
             const { $schema, definitions, ...rest } = converted;
+            let extractedSchema = rest;
+
             if (Object.keys(rest).length === 0 && definitions && typeof definitions === 'object' && Object.keys(definitions).length === 1) {
                 const defKey = Object.keys(definitions)[0];
                 if (defKey !== undefined) {
-                   jsonSchema = definitions[defKey];
+                   extractedSchema = definitions[defKey];
                 } else {
                     // Should not happen if definitions has one key
-                    jsonSchema = rest; 
+                    extractedSchema = rest;
                 }
             } else {
-                jsonSchema = rest;
+                extractedSchema = rest;
             }
 
             // Add description from Zod schema if missing in JSON schema
-            if (typeof jsonSchema === 'object' && jsonSchema !== null) {
-                if (schemaInput.description && !jsonSchema.description) {
-                   jsonSchema.description = schemaInput.description;
-               }
-               // Ensure top-level object has type: 'object' if properties exist
-               if (!jsonSchema.type && jsonSchema.properties) {
-                   jsonSchema.type = 'object';
-               }
-           } else if (typeof jsonSchema !== 'boolean') {
-               // zod-to-json-schema should ideally throw or return valid schema.
-               // If conversion result is unexpected, log a warning.
-               console.warn(`Unexpected output from zod-to-json-schema for tool '${toolName}' schema '${schemaName}'. Result was not an object or boolean.`);
-           }
+            if (typeof extractedSchema === 'object' && extractedSchema !== null) {
+                if (typeof schemaInput === 'object' && schemaInput !== null && schemaInput.description && !extractedSchema.description) {
+                    extractedSchema.description = schemaInput.description;
+                }
+                // Ensure top-level object has type: 'object' if properties exist
+                if (!extractedSchema.type && extractedSchema.properties) {
+                    extractedSchema.type = 'object';
+                }
+            } else if (typeof extractedSchema !== 'boolean') {
+                // zod-to-json-schema should ideally throw or return valid schema.
+                // If conversion result is unexpected, log a warning.
+                console.warn(`Unexpected output from zod-to-json-schema for tool '${toolName}' schema '${schemaName}'. Result was not an object or boolean.`);
+            }
+
+            resultSchema = extractedSchema as JSONSchema7Definition;
 
         } catch (error: any) {
             throw new Error(`Failed to convert Zod schema '${schemaName}' for tool '${toolName}': ${error.message}`);
@@ -543,11 +548,12 @@ export function normalizeSchemaToJsonSchema(
     } else if (typeof schemaInput === 'object' || typeof schemaInput === 'boolean') {
         // Handle direct JSON Schema input (remove $schema keyword)
         if (typeof schemaInput === 'object' && schemaInput !== null) {
-           jsonSchema = { ...schemaInput };
-           delete (jsonSchema as any).$schema;
-       } else {
-           jsonSchema = schemaInput; // Boolean schema
-       }
+           const directSchema = { ...schemaInput };
+           delete (directSchema as any).$schema;
+           resultSchema = directSchema as JSONSchema7Definition;
+        } else {
+           resultSchema = schemaInput;
+        }
     } else {
         throw new Error(`Invalid schema format for '${schemaName}' of tool '${toolName}'. Expected Zod schema, JSON Schema object, or boolean.`);
     }
@@ -556,26 +562,26 @@ export function normalizeSchemaToJsonSchema(
     if (expectObject) {
         let finalObjectSchema: JSONSchema7 & { type: 'object'; properties?: { [key: string]: JSONSchema7Definition }; required?: string[] };
 
-        if (typeof jsonSchema === 'object' && jsonSchema !== null && jsonSchema.type === 'object') {
-            finalObjectSchema = jsonSchema as typeof finalObjectSchema;
-        } else if (typeof jsonSchema === 'object' && jsonSchema !== null && !jsonSchema.type && jsonSchema.properties) {
+        if (typeof resultSchema === 'object' && resultSchema !== null && resultSchema.type === 'object') {
+            finalObjectSchema = resultSchema as typeof finalObjectSchema;
+        } else if (typeof resultSchema === 'object' && resultSchema !== null && !resultSchema.type && resultSchema.properties) {
             // If type is missing but properties exist, assume object
-            finalObjectSchema = { ...jsonSchema, type: 'object' } as typeof finalObjectSchema;
-        } else if (jsonSchema === true || (typeof jsonSchema === 'object' && jsonSchema !== null && Object.keys(jsonSchema).length === 0)) {
+            finalObjectSchema = { ...resultSchema, type: 'object' } as typeof finalObjectSchema;
+        } else if (resultSchema === true || (typeof resultSchema === 'object' && resultSchema !== null && Object.keys(resultSchema).length === 0)) {
             // Allow `true` or empty object `{}` to mean any object (no specific props)
             finalObjectSchema = { type: 'object', properties: {} };
         } else {
             // If it's not clearly an object schema, reject it for parameters
-            throw new Error(`Tool parameters schema for '${toolName}' must resolve to type 'object' or boolean 'true'. Received: ${JSON.stringify(jsonSchema)}`);
+            throw new Error(`Tool parameters schema for '${toolName}' must resolve to type 'object' or boolean 'true'. Received: ${JSON.stringify(resultSchema)}`);
         }
 
         // Ensure properties object exists, even if empty
         if (!finalObjectSchema.properties) {
             finalObjectSchema.properties = {};
         }
-        return finalObjectSchema;
+        return finalObjectSchema as JSONSchema7Definition;
     }
 
     // Return the normalized schema if object type wasn't enforced
-    return jsonSchema;
+    return resultSchema;
 }
