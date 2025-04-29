@@ -77,6 +77,10 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             `
         });
 
+        if (scoreResult.score > 100) {
+            console.warn("Score result is greater than 100. Clamping to 100.");
+            scoreResult.score = 100;
+        }
         return scoreResult;
 
     } catch (error) {
