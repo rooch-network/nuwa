@@ -6,11 +6,11 @@ import { z } from 'zod';
  * Schema for the Twitter Profile scoring result with category scores.
  */
 export const profileScoreSchema = z.object({
-    profileCompleteness: z.number().min(0).max(15).describe("Score for Profile Completeness & Clarity (0-15)."),
-    relevance: z.number().min(0).max(20).describe("Score for Relevance to Web3 or AI (0-20)."),
-    accountActivity: z.number().min(0).max(20).describe("Score for Account Activity (0-20)."),
-    influence: z.number().min(0).max(10).describe("Score for Influence & Reach (0-10)."),
-    contentQuality: z.number().min(0).max(35).describe("Score for Content Quality & Engagement (0-35)."),
+    profileCompleteness: z.number().min(0).describe("Score for Profile Completeness & Clarity (0-15)."),
+    relevance: z.number().min(0).describe("Score for Relevance to Web3 or AI (0-15)."),
+    accountActivity: z.number().min(0).describe("Score for Account Activity (0-20)."),
+    influence: z.number().min(0).describe("Score for Influence & Reach (0-15)."),
+    contentQuality: z.number().min(0).describe("Score for Content Quality & Engagement (0-35)."),
     reasoning: z.string().describe("A brief explanation of why these scores were given, based on the profile criteria.")
 });
 
@@ -44,20 +44,20 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
         - Bio/Description: Informative and clear? (0-7 points)
         - Profile Picture & Header: Appropriate, professional/on-topic? (0-5 points)
         - Location/Link: Provided and relevant? (0-3 points)
-    2.  **Relevance to Web3 or AI (0-20 points):**
-        - Bio/Description Keywords: Explicitly mentions relevant topics (Web3, AI, Blockchain, DeFi, ML, specific technologies)? (0-10 points)
-        - Recent Tweet Content (if provided): Consistent discussion or engagement with relevant topics? (0-7 points)
-        - Overall Focus: Profile clearly centers around relevant themes? (0-3 points)
+    2.  **Relevance to Web3 or AI (0-15 points):**
+        - Bio/Description Keywords: Explicitly mentions relevant topics (Web3, AI, Blockchain, DeFi, ML, specific technologies)? (0-8 points)
+        - Recent Tweet Content (if provided): Consistent discussion or engagement with relevant topics? (0-5 points)
+        - Overall Focus: Profile clearly centers around relevant themes? (0-2 points)
     3.  **Account Activity (0-20 points):**
         - Tweet Frequency: Active posting schedule (relative to account age)? (0-10 points)
         - Follower/Following Ratio: Healthy ratio (e.g., not excessively following)? (0-5 points)
         - Account Age & Consistency: Established account with consistent activity? (0-5 points)
-    4.  **Influence & Reach (0-10 points):**
+    4.  **Influence & Reach (0-15 points):**
         - Follower Count: Scale (e.g., <1k, 1k-10k, 10k+)? (Consider quality over quantity). (0-7 points)
         - Listed Count (if available): Indicator of perceived value by others. (0-3 points)
+        - Verified Status: Twitter verified account? (0-5 points)
     5.  **Content Quality & Engagement (0-35 points):**
-        - Content Quality: Professional, relevant, and valuable to the community? (0-10 points)
-        - Recent Tweet Quality (if provided): Well-written, informative, non-spammy? (0-10 points)
+        - Recent Tweet Quality (if provided): Well-written, informative, non-spammy? Professional, relevant, and valuable to the community (0-20 points)
         - Engagement Metrics: Likes, retweets, replies, and overall interaction rate on tweets (0-10 points)
         - Originality & Uniqueness: Shares original thoughts, analysis, or insights rather than just retweeting others? (0-5 points)
 
@@ -82,12 +82,16 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             ${JSON.stringify(profileData, null, 2)}
             \`\`\`
 
+            **IMPORTANT**: If certain information is not provided in the profile data (such as recent tweets, engagement metrics, etc.), 
+            you MUST assign a score of 0 for those specific criteria and explicitly mention in your reasoning that this information was not available.
+            Do NOT make assumptions about data that is not provided.
+
             For your output, you MUST provide scores for each of the following main categories:
 
             1. profileCompleteness: total points for Profile Completeness & Clarity (0-15)
-            2. relevance: total points for Relevance to Web3 or AI (0-20)
+            2. relevance: total points for Relevance to Web3 or AI (0-15)
             3. accountActivity: total points for Account Activity (0-20)
-            4. influence: total points for Influence & Reach (0-10)
+            4. influence: total points for Influence & Reach (0-15)
             5. contentQuality: total points for Content Quality & Engagement (0-35)
             6. reasoning: A brief explanation of why these scores were given
             
@@ -96,6 +100,7 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             - Assign points as indicated in the subcriteria ranges
             - Sum the subcriteria points to get each category score
             - Ensure no category exceeds its maximum possible score
+            - For any criteria referencing data that is not provided, assign 0 points and note this in your reasoning
             `
         });
             
