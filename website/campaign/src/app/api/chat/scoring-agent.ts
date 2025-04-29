@@ -133,7 +133,12 @@ export async function assessTweetScore(
             3. engagement_score: The portion of score based on engagement metrics (criteria 5+6, 0-50 points)
             4. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
             
-            Please ensure that all four fields are included in your response, with the correct value ranges.
+            Scoring Guidelines:
+            - Be generous in your evaluation - most tweets should receive at least some points in multiple categories
+            - Avoid assigning 0 points for any major category unless the tweet is completely irrelevant or has no engagement
+            - Consider the context and intent of the tweet, not just keywords
+            
+            Please ensure that all four fields are included in your response, with appropriate positive scores.
             `
         });
         //finalize the score to ensure it falls within the expected range

@@ -65,8 +65,7 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
             // Score the tweet
             const scoreResult = await assessTweetScore(tweet);
             // Log the result for manual inspection
-            console.log(`Tweet scoring result: ${scoreResult.score}/100`);
-            console.log(`Reasoning: ${scoreResult.reasoning}`);
+            console.log(`Tweet scoring result: ` + JSON.stringify(scoreResult));
 
             expect(scoreResult).toBeDefined();
             expect(scoreResult.score).toBeDefined();
@@ -158,16 +157,17 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
             },
             scored_at: new Date(Date.now() - 86400000).toISOString() // Assume scored one day ago
         });
-        
-        // Verify that the score increases with increased engagement
-        expect(updatedScore.engagement_score).toBeGreaterThan(initialScore.engagement_score);
-        expect(updatedScore.score).toBeGreaterThan(initialScore.score);
-        
+
         // Log the results
         console.log(`Initial Score: ${initialScore.score}/100, Engagement: ${initialScore.engagement_score}/50`);
         console.log(`Updated Score: ${updatedScore.score}/100, Engagement: ${updatedScore.engagement_score}/50`);
         console.log(`Engagement Increase: ${updatedScore.engagement_score - initialScore.engagement_score}`);
         console.log(`Total Score Increase: ${updatedScore.score - initialScore.score}`);
+        
+        // Verify that the score increases with increased engagement
+        expect(updatedScore.engagement_score).toBeGreaterThan(initialScore.engagement_score);
+        expect(updatedScore.score).toBeGreaterThan(initialScore.score);
+        
     });
     
     test('assessTweetScore should consider followers count for engagement calculation', async () => {
@@ -190,14 +190,15 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
         // Score both tweets
         const lowFollowersScore = await assessTweetScore(lowFollowersTweet);
         const highFollowersScore = await assessTweetScore(highFollowersTweet);
+
+         // Log the results
+        console.log(`Low Followers Tweet (200): Engagement Score: ${lowFollowersScore.engagement_score}/50, Engagement Rate: ${(20+10+5)/200*100}%`);
+        console.log(`High Followers Tweet (5000): Engagement Score: ${highFollowersScore.engagement_score}/50, Engagement Rate: ${(30+15+7)/5000*100}%`);
         
         // Verify that the tweet with fewer followers but higher engagement rate gets a higher engagement score
         // Note: Content scores should be similar since the text content is the same
         expect(lowFollowersScore.engagement_score).toBeGreaterThan(highFollowersScore.engagement_score);
         expect(Math.abs(lowFollowersScore.content_score - highFollowersScore.content_score)).toBeLessThan(5); // Content scores should be close
-        
-        // Log the results
-        console.log(`Low Followers Tweet (200): Engagement Score: ${lowFollowersScore.engagement_score}/50, Engagement Rate: ${(20+10+5)/200*100}%`);
-        console.log(`High Followers Tweet (5000): Engagement Score: ${highFollowersScore.engagement_score}/50, Engagement Rate: ${(30+15+7)/5000*100}%`);
+       
     });
 });
