@@ -51,23 +51,26 @@ export async function assessTweetScore(
         - Reads as authentic, individual thought and expression: (2-3 points)
         - Feels somewhat generic or uses common phrasings/templates: (1 point)
         - Seems highly templated, uninspired, or potentially copied: (0 points)
-    5.  **Engagement Growth (0-25 points):**
-        - Significant increase in engagement (likes, retweets, replies) compared to previous metrics: (18-25 points)
-        - Moderate increase in engagement metrics: (8-17 points)
-        - Minimal or no change in engagement: (1-7 points)
-        - Decrease in engagement: (0 points)
-        - For first-time scoring with no previous data, assign points based on initial engagement relative to followers (12-15 points is typical)
-        - NOTE: You MUST assign a score in this category even if there is no change in engagement metrics.
-    6.  **Current Engagement Level (0-25 points):**
-        - High engagement relative to author's followers (e.g., >5% engagement rate): (18-25 points)
-        - Moderate engagement relative to author's followers: (8-17 points)
-        - Low engagement relative to author's followers: (0-7 points)
-        - NOTE: Calculate engagement rate as (likes + retweets + replies + quotes) / followers_count * 100%.
-          If followers_count is not available or is 0, estimate an appropriate score based on raw engagement numbers.
+    5.  **Engagement Score (0-50 points):**
+        - For tweets with previous scoring data:
+          • Significant engagement growth (>50% increase): (35-50 points)
+          • Moderate engagement growth (10-50% increase): (20-34 points)
+          • Minimal engagement growth (<10% increase): (10-19 points)
+          • No change or decrease in engagement: Use the engagement rate scoring below, but maximum 15 points
+        
+        - For new tweets or tweets without previous data (based on engagement rate):
+          • Exceptional engagement rate (>10%): (40-50 points)
+          • High engagement rate (5-10%): (30-39 points)
+          • Good engagement rate (2-5%): (20-29 points)
+          • Average engagement rate (0.5-2%): (10-19 points)
+          • Low engagement rate (<0.5%): (5-9 points)
+          • New tweet with minimal engagement: (15-20 points as potential score)
+        
+        - NOTE: The engagement rate has been pre-calculated for you. For newer tweets (less than 24 hours old), focus on the quality of early engagement rather than raw numbers.
     
     The total score is the sum of points from these criteria (max 100).
-    Calculate the engagement_score (criteria 5+6, max 50) and content_score (criteria 1-4, max 50) separately.
-    ALWAYS provide a numerical score for EACH criterion, even when there is no change in metrics.
+    Calculate the engagement_score (criterion 5, max 50) and content_score (criteria 1-4, max 50) separately.
+    ALWAYS provide a numerical score for EACH criterion.
     `;
     // --- End of Scoring Criteria Definition ---
 
@@ -81,6 +84,15 @@ export async function assessTweetScore(
             impressions: tweetData.public_metrics?.impression_count,
             followers: tweetData.author?.public_metrics?.followers_count
         };
+        
+        // Calculate engagement rate
+        let engagementRate = 0;
+        const totalInteractions = currentMetrics.likes + currentMetrics.retweets + 
+                                 currentMetrics.replies + (currentMetrics.quotes || 0);
+        
+        if (currentMetrics.followers && currentMetrics.followers > 0) {
+            engagementRate = (totalInteractions / currentMetrics.followers) * 100;
+        }
          
         
         // Prepare previous score context if available
@@ -118,7 +130,9 @@ export async function assessTweetScore(
             - Replies: ${currentMetrics.replies}
             - Quotes: ${currentMetrics.quotes || 'N/A'}
             ${currentMetrics.impressions ? `- Impressions: ${currentMetrics.impressions}` : ''}
-            ${currentMetrics.followers ? `- Author Followers: ${currentMetrics.followers}` : '- Author Followers: Unknown (use raw engagement numbers for scoring)'}
+            - Author Followers: ${currentMetrics.followers || 'Unknown'}
+            - Total Interactions: ${totalInteractions}
+            - Engagement Rate: ${engagementRate.toFixed(2)}% ${!currentMetrics.followers ? '(estimated without follower count)' : ''}
             
             ${previousScoreContext}
 
@@ -130,7 +144,7 @@ export async function assessTweetScore(
             Your response MUST include the following fields in the specified format:
             1. score: The total numerical score = engagement_score + content_score (0-100)
             2. reasoning: A brief explanation of your scoring rationale
-            3. engagement_score: The portion of score based on engagement metrics (criteria 5+6, 0-50 points)
+            3. engagement_score: The portion of score based on engagement metrics (criteria 5, 0-50 points)
             4. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
             
             Scoring Guidelines:
