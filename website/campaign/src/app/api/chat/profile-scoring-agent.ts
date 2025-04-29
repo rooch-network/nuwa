@@ -28,24 +28,25 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
 
     // --- Profile Scoring Criteria (0-100 points) ---
     const scoringCriteria = `
-    1.  **Profile Completeness & Clarity (0-20 points):**
-        - Bio/Description: Informative, clear, relevant keywords? (0-10 points)
+    1.  **Profile Completeness & Clarity (0-15 points):**
+        - Bio/Description: Informative and clear? (0-7 points)
         - Profile Picture & Header: Appropriate, professional/on-topic? (0-5 points)
-        - Location/Link: Provided and relevant? (0-5 points)
-    2.  **Relevance to Web3 or AI (0-25 points):**
+        - Location/Link: Provided and relevant? (0-3 points)
+    2.  **Relevance to Web3 or AI (0-20 points):**
         - Bio/Description Keywords: Explicitly mentions relevant topics (Web3, AI, Blockchain, DeFi, ML, specific technologies)? (0-10 points)
-        - Recent Tweet Content (if provided): Consistent discussion or engagement with relevant topics? (0-10 points)
-        - Overall Focus: Profile clearly centers around relevant themes? (0-5 points)
-    3.  **Activity & Engagement (0-25 points):**
+        - Recent Tweet Content (if provided): Consistent discussion or engagement with relevant topics? (0-7 points)
+        - Overall Focus: Profile clearly centers around relevant themes? (0-3 points)
+    3.  **Account Activity (0-20 points):**
         - Tweet Frequency: Active posting schedule (relative to account age)? (0-10 points)
         - Follower/Following Ratio: Healthy ratio (e.g., not excessively following)? (0-5 points)
-        - Engagement signals (if available/inferrable from recent tweets): Likes/retweets on relevant content? (0-10 points)
+        - Account Age & Consistency: Established account with consistent activity? (0-5 points)
     4.  **Influence & Reach (0-10 points):**
         - Follower Count: Scale (e.g., <1k, 1k-10k, 10k+)? (Consider quality over quantity). (0-7 points)
         - Listed Count (if available): Indicator of perceived value by others. (0-3 points)
-    5.  **Content Quality Impression (0-20 points):**
-        - Bio Language & Tone: Professional, engaging, clear? (0-5 points)
+    5.  **Content Quality & Engagement (0-35 points):**
+        - Content Quality: Professional, relevant, and valuable to the community? (0-10 points)
         - Recent Tweet Quality (if provided): Well-written, informative, non-spammy? (0-10 points)
+        - Engagement Metrics: Likes, retweets, replies, and overall interaction rate on tweets (0-10 points)
         - Originality & Uniqueness: Shares original thoughts, analysis, or insights rather than just retweeting others? (0-5 points)
 
     The total score is the sum of points from these criteria (max 100). Focus on evaluating both relevance to Web3/AI ecosystems and overall content quality.
