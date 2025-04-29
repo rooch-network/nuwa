@@ -132,29 +132,28 @@ export async function assessTweetScore(
             currentMetrics.replies * 2.0 + 
             (currentMetrics.quotes || 0) * 2.5;
         
-        // Calculate multiple engagement metrics
-        let followerBasedRate = 0;
-        let impressionBasedRate = 0;
-        
+        // Base engagement rate calculation - always use followers as denominator
         if (currentMetrics.followers && currentMetrics.followers > 0) {
-            followerBasedRate = (weightedInteractions / currentMetrics.followers) * 100;
-        }
-        
-        if (currentMetrics.impressions && currentMetrics.impressions > 0) {
-            impressionBasedRate = (weightedInteractions / currentMetrics.impressions) * 100;
-        }
-        
-        // Use impression-based rate if available, otherwise use follower-based rate
-        // For high-follower accounts, blend the rates to avoid unfair penalties
-        if (currentMetrics.impressions && currentMetrics.impressions > 0) {
-            if (currentMetrics.followers && currentMetrics.followers > 10000) {
-                // For accounts with many followers, use a blended approach
-                engagementRate = (impressionBasedRate * 0.7) + (followerBasedRate * 0.3);
-            } else {
-                engagementRate = impressionBasedRate;
-            }
+            engagementRate = (weightedInteractions / currentMetrics.followers) * 100;
         } else {
-            engagementRate = followerBasedRate;
+            // If no followers data, use a reasonable default divisor
+            const defaultFollowers = 500;
+            engagementRate = (weightedInteractions / defaultFollowers) * 100;
+        }
+        
+        // Apply impression boost if available
+        // Higher impression-to-follower ratio means better reach, which should be rewarded
+        if (currentMetrics.impressions && currentMetrics.followers && currentMetrics.impressions > currentMetrics.followers) {
+            // Calculate impression-to-follower ratio (viral coefficient)
+            const viralCoefficient = currentMetrics.impressions / currentMetrics.followers;
+            
+            // Apply a logarithmic boost to avoid extreme values
+            // log10(2) ≈ 0.3 means 2x followers in impressions gives ~30% boost
+            // log10(10) = 1 means 10x followers in impressions gives 100% boost
+            const impressionBoost = Math.min(2, Math.log10(viralCoefficient) + 1);
+            
+            // Apply the boost - maximum 2x original rate for extremely viral content
+            engagementRate = engagementRate * impressionBoost;
         }
         
         // Get raw interaction total for reference
@@ -201,7 +200,7 @@ export async function assessTweetScore(
             - Author Followers: ${currentMetrics.followers || 'Unknown'}
             - Total Raw Interactions: ${totalInteractions}
             - Weighted Interactions: ${weightedInteractions.toFixed(1)}
-            - Weighted Engagement Rate: ${engagementRate.toFixed(2)}% (uses higher weight for retweets, replies, and quotes)
+            - Weighted Engagement Rate: ${engagementRate.toFixed(2)}% (weighted interactions relative to followers, with a boost for high impression content)
             
             ${previousScoreContext}
 
