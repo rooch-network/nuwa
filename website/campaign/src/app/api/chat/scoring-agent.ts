@@ -141,19 +141,41 @@ export async function assessTweetScore(
             engagementRate = (weightedInteractions / defaultFollowers) * 100;
         }
         
-        // Apply impression boost if available
+        // Apply impression boost when calculating engagement rate
         // Higher impression-to-follower ratio means better reach, which should be rewarded
         if (currentMetrics.impressions && currentMetrics.followers && currentMetrics.impressions > currentMetrics.followers) {
             // Calculate impression-to-follower ratio (viral coefficient)
             const viralCoefficient = currentMetrics.impressions / currentMetrics.followers;
             
-            // Apply a logarithmic boost to avoid extreme values
-            // log10(2) ≈ 0.3 means 2x followers in impressions gives ~30% boost
-            // log10(10) = 1 means 10x followers in impressions gives 100% boost
-            const impressionBoost = Math.min(2, Math.log10(viralCoefficient) + 1);
+            // Apply stronger logarithmic boost to increase impact of impressions
+            // Research shows quality content typically has 2-5x impressions compared to followers
+            // Viral content can reach 10-50x impressions
+            // log10(5) ≈ 0.7, meaning 5x impressions provides a 70% boost
+            // log10(10) = 1, meaning 10x impressions provides a 100% boost
+            // log10(50) ≈ 1.7, meaning 50x impressions provides a 170% boost
+            const impressionBoost = Math.min(3, 1 + Math.log10(viralCoefficient) * 1.5);
             
-            // Apply the boost - maximum 2x original rate for extremely viral content
-            engagementRate = engagementRate * impressionBoost;
+            // Consider absolute impression count as well
+            // Research shows tweets with higher absolute impressions have broader impact
+            // Add bonus for high absolute impression counts
+            let absoluteImpressionBonus = 0;
+            if (currentMetrics.impressions >= 100000) {
+                // 100k+ impressions: significant additional boost (up to 0.5)
+                absoluteImpressionBonus = Math.min(0.5, Math.log10(currentMetrics.impressions / 100000) * 0.3);
+            } else if (currentMetrics.impressions >= 10000) {
+                // 10k-100k impressions: modest additional boost (up to 0.3)
+                absoluteImpressionBonus = Math.min(0.3, Math.log10(currentMetrics.impressions / 10000) * 0.2);
+            } else if (currentMetrics.impressions >= 1000) {
+                // 1k-10k impressions: small additional boost (up to 0.1)
+                absoluteImpressionBonus = Math.min(0.1, Math.log10(currentMetrics.impressions / 1000) * 0.1);
+            }
+            
+            // Apply combined boost - up to 3x from viral coefficient plus absolute bonus
+            const totalImpressionBoost = impressionBoost + absoluteImpressionBonus;
+            engagementRate = engagementRate * totalImpressionBoost;
+            
+            console.log("Viral Coefficient:", viralCoefficient, "Ratio Boost:", impressionBoost, 
+                       "Absolute Bonus:", absoluteImpressionBonus, "Total Boost:", totalImpressionBoost);
         }
         
         // Get raw interaction total for reference
