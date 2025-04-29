@@ -7,10 +7,17 @@ import { TweetScoreData } from '@/app/types/scoring';
  * Schema for the tweet scoring result.
  */
 export const tweetScoreSchema = z.object({
-    score: z.number().min(0).describe("The numerical score assigned to the tweet (0-100)."),
     reasoning: z.string().describe("A brief explanation of why this score was given, based on the criteria."),
     engagement_score: z.number().min(0).describe("Portion of score based on engagement metrics (0-50)."),
     content_score: z.number().min(0).describe("Portion of score based on content quality (0-50).")
+}).transform(data => {
+    // Calculate the total score from the component scores
+    const score = data.content_score + data.engagement_score;
+    // Return the data with the calculated score
+    return {
+        ...data,
+        score: Math.min(score, 100) // Ensure score doesn't exceed 100
+    };
 });
 
 /**
@@ -173,26 +180,26 @@ export async function assessTweetScore(
             \`\`\`
 
             Your response MUST include the following fields in the specified format:
-            1. score: The total numerical score = engagement_score + content_score (0-100)
-            2. reasoning: A brief explanation of your scoring rationale
-            3. engagement_score: The portion of score based on engagement metrics (criteria 5, 0-50 points)
-            4. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
+            1. reasoning: A brief explanation of your scoring rationale
+            2. engagement_score: The portion of score based on engagement metrics (criterion 5, 0-50 points)
+            3. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
             
-            Scoring Guidelines:
-            - Be generous in your evaluation - most tweets should receive at least some points in multiple categories
-            - Avoid assigning 0 points for any major category unless the tweet is completely irrelevant or has no engagement
-            - Consider the context and intent of the tweet, not just keywords
+            Focus on accurately calculating content_score and engagement_score. Do NOT calculate the total score - that will be done automatically.
             
-            Please ensure that all four fields are included in your response, with appropriate positive scores.
+            Important Scoring Instructions:
+            - When you see "assign X to Y points", you should choose a specific score within that range. For example, "assign 20 to 25 points" means you should pick a specific value like 21, 22, 23, etc.
+            - Each criterion has its own maximum. 
+            - Always use your judgment to determine where in each range a specific tweet falls.
+            
+            CONTENT LENGTH GUIDELINES:
+            - Short, relevant tweets (1-2 sentences mentioning Nuwa AI) should receive a content_score of 15 to 25 points out of 50.
+            - Medium-length tweets (3-5 sentences with some details) should receive a content_score of 25 to 35 points out of 50 if relevant and well-written.
+            - Long, detailed tweets (6+ sentences with specific insights or technical details) should receive a content_score of 35 to 50 points out of 50 if highly relevant and well-structured.
             `
         });
         //finalize the score to ensure it falls within the expected range
         if (!scoreResult) {
             throw new Error("Failed to generate score object from AI model.");
-        }
-        if (scoreResult.score < 0){
-            console.warn("Score is less than 0, which is unexpected.");
-            scoreResult.score = 0;
         }
         if (scoreResult.content_score < 0){   
             console.warn("Content score is less than 0, which is unexpected.");
@@ -210,14 +217,8 @@ export async function assessTweetScore(
             console.warn("Engagement score exceeds 50, which is unexpected.");
             scoreResult.engagement_score = 50;
         }
-        if (scoreResult.content_score + scoreResult.engagement_score != scoreResult.score){   
-            console.warn("Score does not match the sum of content_score and engagement_score.");
-            scoreResult.score = scoreResult.engagement_score + scoreResult.content_score;
-        }
-        if (scoreResult.score > 100){
-            console.warn("Score is greater than 100, which is unexpected.");
-            scoreResult.score = 100;
-        }
+        
+        // The score is already calculated in the schema transform
 
         return scoreResult;
 
