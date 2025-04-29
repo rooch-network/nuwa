@@ -127,7 +127,13 @@ export async function assessTweetScore(
             ${JSON.stringify(tweetData, null, 2)}
             \`\`\`
 
-            Provide the final numerical score (0-100), engagement_score (0-25), content_score (0-75), and a brief reasoning summarizing how the score was derived based *only* on the criteria.
+            Your response MUST include the following fields in the specified format:
+            1. score: The total numerical score (0-100)
+            2. reasoning: A brief explanation of your scoring rationale
+            3. engagement_score: The portion of score based on engagement metrics (criteria 5+6, 0-50 points)
+            4. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
+            
+            Please ensure that all four fields are included in your response, with the correct value ranges.
             `
         });
 

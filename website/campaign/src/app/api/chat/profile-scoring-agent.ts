@@ -68,7 +68,11 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             ${JSON.stringify(profileData, null, 2)}
             \`\`\`
 
-            Provide the final numerical score (0-100) and a brief reasoning summarizing how the score was derived based *only* on the criteria and the provided data.
+            Your response MUST include the following fields in the specified format:
+            1. score: The total numerical score (0-100)
+            2. reasoning: A brief explanation of your scoring rationale that summarizes how the score was derived based *only* on the criteria
+            
+            Please ensure that both fields are included in your response, with the score being a number between 0 and 100.
             `
         });
 
