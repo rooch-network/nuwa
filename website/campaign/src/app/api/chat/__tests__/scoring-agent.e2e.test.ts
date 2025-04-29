@@ -64,6 +64,10 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
         if (tweet) {
             // Score the tweet
             const scoreResult = await assessTweetScore(tweet);
+            // Log the result for manual inspection
+            console.log(`Tweet scoring result: ${scoreResult.score}/100`);
+            console.log(`Reasoning: ${scoreResult.reasoning}`);
+
             expect(scoreResult).toBeDefined();
             expect(scoreResult.score).toBeDefined();
             expect(typeof scoreResult.score).toBe('number');
@@ -73,9 +77,6 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
             expect(typeof scoreResult.reasoning).toBe('string');
             expect(scoreResult.reasoning.length).toBeGreaterThan(0);
             
-            // Log the result for manual inspection
-            console.log(`Tweet scoring result: ${scoreResult.score}/100`);
-            console.log(`Reasoning: ${scoreResult.reasoning}`);
         }
     });
     
@@ -111,13 +112,15 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
         const highQualityScore = await assessTweetScore(highQualityTweet);
         const irrelevantScore = await assessTweetScore(irrelevantTweet);
 
+        // Log the results
+        console.log(`Nuwa AI Tweet Score: ` + JSON.stringify(highQualityScore));
+        console.log(`Irrelevant Tweet Score: ` + JSON.stringify(irrelevantScore));
+
         // Verify that the tweet about Nuwa and AI scores higher
         expect(highQualityScore.score).toBeGreaterThan(irrelevantScore.score);
         expect(highQualityScore.content_score).toBeGreaterThan(irrelevantScore.content_score);
         
-        // Log the results
-        console.log(`Nuwa AI Tweet Score: ${highQualityScore.score}/100, Content: ${highQualityScore.content_score}/75`);
-        console.log(`Irrelevant Tweet Score: ${irrelevantScore.score}/100, Content: ${irrelevantScore.content_score}/75`);
+        
     });
 
     test('assessTweetScore should reflect engagement changes in the score', async () => {

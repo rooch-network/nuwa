@@ -7,10 +7,10 @@ import { TweetScoreData } from '@/app/types/scoring';
  * Schema for the tweet scoring result.
  */
 export const tweetScoreSchema = z.object({
-    score: z.number().min(0).max(100).describe("The numerical score assigned to the tweet (0-100)."),
+    score: z.number().min(0).describe("The numerical score assigned to the tweet (0-100)."),
     reasoning: z.string().describe("A brief explanation of why this score was given, based on the criteria."),
-    engagement_score: z.number().min(0).max(50).describe("Portion of score based on engagement metrics (0-50)."),
-    content_score: z.number().min(0).max(50).describe("Portion of score based on content quality (0-50).")
+    engagement_score: z.number().min(0).describe("Portion of score based on engagement metrics (0-50)."),
+    content_score: z.number().min(0).describe("Portion of score based on content quality (0-50).")
 });
 
 /**
@@ -128,20 +128,46 @@ export async function assessTweetScore(
             \`\`\`
 
             Your response MUST include the following fields in the specified format:
-            1. score: The total numerical score (0-100)
+            1. score: The total numerical score = engagement_score + content_score (0-100)
             2. reasoning: A brief explanation of your scoring rationale
             3. engagement_score: The portion of score based on engagement metrics (criteria 5+6, 0-50 points)
             4. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
             
-            IMPORTANT SCORING CONSTRAINTS:
-            - content_score MUST be between 0-50 (sum of criteria 1-4 only)
-            - engagement_score MUST be between 0-50 (sum of criteria 5-6 only)
-            - The final score MUST be the sum of content_score + engagement_score
-            - Double-check your calculations to ensure content_score does not exceed 50
-            
             Please ensure that all four fields are included in your response, with the correct value ranges.
             `
         });
+        //finalize the score to ensure it falls within the expected range
+        if (!scoreResult) {
+            throw new Error("Failed to generate score object from AI model.");
+        }
+        if (scoreResult.score < 0){
+            console.warn("Score is less than 0, which is unexpected.");
+            scoreResult.score = 0;
+        }
+        if (scoreResult.content_score < 0){   
+            console.warn("Content score is less than 0, which is unexpected.");
+            scoreResult.content_score = 0;
+        }
+        if (scoreResult.engagement_score < 0){   
+            console.warn("Engagement score is less than 0, which is unexpected.");
+            scoreResult.engagement_score = 0;
+        }
+        if (scoreResult.content_score > 50){   
+            console.warn("Content score exceeds 50, which is unexpected.");
+            scoreResult.content_score = 50;
+        }
+        if (scoreResult.engagement_score > 50){   
+            console.warn("Engagement score exceeds 50, which is unexpected.");
+            scoreResult.engagement_score = 50;
+        }
+        if (scoreResult.content_score + scoreResult.engagement_score != scoreResult.score){   
+            console.warn("Score does not match the sum of content_score and engagement_score.");
+            scoreResult.score = scoreResult.engagement_score + scoreResult.content_score;
+        }
+        if (scoreResult.score > 100){
+            console.warn("Score is greater than 100, which is unexpected.");
+            scoreResult.score = 100;
+        }
 
         return scoreResult;
 
