@@ -82,9 +82,16 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             ${JSON.stringify(profileData, null, 2)}
             \`\`\`
 
-            **IMPORTANT**: If certain information is not provided in the profile data (such as recent tweets, engagement metrics, etc.), 
-            you MUST assign a score of 0 for those specific criteria and explicitly mention in your reasoning that this information was not available.
-            Do NOT make assumptions about data that is not provided.
+            **IMPORTANT SCORING RULES**:
+            1. If certain information is not provided at all (such as recent tweets, engagement metrics, etc.), you MUST assign a score of 0 for those specific criteria.
+            2. If information is partially provided or incomplete, you must deduct points proportionally to how much is missing.
+            3. Be consistent in your scoring - the same profile should receive similar scores across multiple evaluations.
+            4. In your reasoning, explicitly mention what information was missing or incomplete and how that affected your scoring.
+            5. Follow these specific guidelines for common scenarios:
+               - If profile header is missing: deduct at least 2 points from Profile Completeness
+               - If engagement metrics are incomplete: deduct at least 5 points from Content Quality
+               - If listed count is 0 or missing: assign 0 points for that specific criterion
+               - If verification status is not explicitly stated as true: assign 0 points for that criterion
 
             For your output, you MUST provide scores for each of the following main categories:
 
@@ -93,14 +100,13 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             3. accountActivity: total points for Account Activity (0-20)
             4. influence: total points for Influence & Reach (0-15)
             5. contentQuality: total points for Content Quality & Engagement (0-35)
-            6. reasoning: A brief explanation of why these scores were given
+            6. reasoning: A detailed explanation of why these scores were given
             
-            Follow these scoring guidelines:
-            - For each category, carefully evaluate all subcriteria listed in the scoring criteria
-            - Assign points as indicated in the subcriteria ranges
-            - Sum the subcriteria points to get each category score
-            - Ensure no category exceeds its maximum possible score
-            - For any criteria referencing data that is not provided, assign 0 points and note this in your reasoning
+            In your reasoning, you MUST include for each category:
+            - The specific score assigned (e.g., "Profile Completeness & Clarity (12/15)")
+            - What information was present and what was missing
+            - How you calculated the score based on subcriteria
+            - Any deductions made due to missing or incomplete information
             `
         });
             
