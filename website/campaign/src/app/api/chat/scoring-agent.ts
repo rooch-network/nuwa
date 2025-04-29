@@ -116,28 +116,20 @@ export async function assessTweetScore(
     
     // --- Refined Scoring Criteria (0-50 points for content quality) ---
     const scoringCriteria = `
-    1.  **Core Theme Relevance (Nuwa & AI) (0-25 points):** 
-        - Extended discussion of Nuwa AI with specific applications, technical details, or use cases: assign 20 to 25 points
-          Example: "Nuwa's AI platform offers developers powerful tools for building natural language applications with minimal coding required. The platform's strength lies in its pre-trained models that understand context across multiple languages..."
+    1.  **Core Theme Relevance (Nuwa or AI) (0-25 points):** 
+        - Extended discussion of Nuwa or AI with specific applications, technical details, or use cases: assign 20 to 25 points
         - Clear discussion of both Nuwa and AI with some details: assign 15 to 19 points
-          Example: "Nuwa's AI technology helps developers build better applications by automating repetitive tasks and generating code suggestions."
         - Simple mention of Nuwa AI in relevant context: assign 8 to 14 points
-          Example: "Nuwa AI is incredibly helpful for developers!"
         - Brief or passing mention of either Nuwa or AI: assign 1 to 7 points
-          Example: "Looking forward to trying this new tech!"
         - No mention of Nuwa or AI: assign 0 points
         
     2.  **Depth and Novelty (0-15 points):** 
-        - Detailed explanation with examples, data, or technical insights (requires longer text): assign 12 to 15 points
-          Example: "Nuwa's AI models achieve 95% accuracy on translation tasks while using 40% less computing resources. This is achieved through a novel approach to transformer architecture that optimizes token processing..."
-        - Explains concepts with some supporting details: assign 8 to 11 points
-          Example: "Nuwa AI helps developers by automating the documentation process and suggesting code improvements based on context-aware pattern recognition."
-        - Mentions specific benefits or features without elaboration: assign 4 to 7 points
-          Example: "Nuwa AI helps developers by automating documentation."
+        - Detailed explanation with examples, data, or technical insights (typically longer content): assign 12 to 15 points
+        - Explains concepts with supporting details OR provides unique insights/perspectives: assign 8 to 11 points          
+        - Mentions specific benefits/features without elaboration OR uses creative expression (metaphor, humor, etc.): assign 4 to 7 points
         - General statements without specifics: assign 0 to 3 points
-          Example: "Nuwa AI is great."
         
-        Note: This category strongly favors longer, more detailed content. Short tweets cannot score above 7 points here.
+        Note: While detailed content often scores higher, short content with exceptional creativity, unique insights, or emotional impact can also score in the 8-12 point range. Evaluate based on the value provided, not just length.
         
     3.  **Clarity and Quality (0-7 points):** 
         - Exceptionally well-structured with excellent flow (typically longer content): assign 6 to 7 points
@@ -158,12 +150,13 @@ export async function assessTweetScore(
     - When you see "assign X to Y points", you should choose a specific score within that range. For example, "assign 20 to 25 points" means you should pick a specific value like 21, 22, 23, etc.
     - Each criterion has its own maximum. 
     - Always use your judgment to determine where in each range a specific tweet falls.
+    - Consider both length AND quality - shorter content with high creativity, unique perspectives, or emotional impact can score as well as longer detailed content.
     
     The total content score is the sum of points from criteria 1-4 (max 50).
     ALWAYS provide a numerical score for EACH criterion (1-4).
     
     CONTENT LENGTH GUIDELINES:
-    - Short, relevant tweets (1-2 sentences mentioning Nuwa AI) should receive a content_score of 15 to 25 points out of 50.
+    - Short, relevant tweets (1-2 sentences) with high creativity or unique perspective should receive a content_score of 15 to 30 points out of 50 if well-executed.
     - Medium-length tweets (3-5 sentences with some details) should receive a content_score of 25 to 35 points out of 50 if relevant and well-written.
     - Long, detailed tweets (6+ sentences with specific insights or technical details) should receive a content_score of 35 to 50 points out of 50 if highly relevant and well-structured.
     `;
