@@ -32,9 +32,9 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
         - Bio/Description: Informative, clear, relevant keywords? (0-10 points)
         - Profile Picture & Header: Appropriate, professional/on-topic? (0-5 points)
         - Location/Link: Provided and relevant? (0-5 points)
-    2.  **Relevance to Nuwa & AI (0-35 points):**
-        - Bio/Description Keywords: Explicitly mentions relevant topics (Nuwa, AI, Web3, Blockchain, specific tech)? (0-15 points)
-        - Recent Tweet Content (if provided): Consistent discussion or engagement with relevant topics? (0-15 points)
+    2.  **Relevance to Web3 or AI (0-25 points):**
+        - Bio/Description Keywords: Explicitly mentions relevant topics (Web3, AI, Blockchain, DeFi, ML, specific technologies)? (0-10 points)
+        - Recent Tweet Content (if provided): Consistent discussion or engagement with relevant topics? (0-10 points)
         - Overall Focus: Profile clearly centers around relevant themes? (0-5 points)
     3.  **Activity & Engagement (0-25 points):**
         - Tweet Frequency: Active posting schedule (relative to account age)? (0-10 points)
@@ -43,11 +43,12 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
     4.  **Influence & Reach (0-10 points):**
         - Follower Count: Scale (e.g., <1k, 1k-10k, 10k+)? (Consider quality over quantity). (0-7 points)
         - Listed Count (if available): Indicator of perceived value by others. (0-3 points)
-    5.  **Content Quality Impression (0-10 points):**
+    5.  **Content Quality Impression (0-20 points):**
         - Bio Language & Tone: Professional, engaging, clear? (0-5 points)
-        - Recent Tweet Quality (if provided): Well-written, informative, non-spammy? (0-5 points)
+        - Recent Tweet Quality (if provided): Well-written, informative, non-spammy? (0-10 points)
+        - Originality & Uniqueness: Shares original thoughts, analysis, or insights rather than just retweeting others? (0-5 points)
 
-    The total score is the sum of points from these criteria (max 100). Focus on the profile's relevance and quality within the Nuwa/AI ecosystem.
+    The total score is the sum of points from these criteria (max 100). Focus on evaluating both relevance to Web3/AI ecosystems and overall content quality.
     `;
     // --- End of Profile Scoring Criteria Definition ---
 
