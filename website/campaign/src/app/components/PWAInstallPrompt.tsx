@@ -6,8 +6,10 @@ import { IoClose } from 'react-icons/io5';
 export const PWAInstallPrompt = () => {
     const [showPrompt, setShowPrompt] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         // Check if device is iOS
         const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
         setIsIOS(isIOSDevice);
@@ -21,7 +23,7 @@ export const PWAInstallPrompt = () => {
         }
     }, []);
 
-    if (!showPrompt) return null;
+    if (!mounted || !showPrompt) return null;
 
     return (
         <div className="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-lg z-50 border-t border-gray-200">

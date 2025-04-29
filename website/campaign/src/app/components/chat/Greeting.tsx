@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '../providers/SupabaseAuthProvider';
 
 export const Greeting = () => {
-    const { data: session } = useSession();
-    const twitterName = session?.user?.name || 'there';
+    const { session } = useSupabaseAuth();
+    const twitterName = session?.user?.user_metadata?.name || 'there';
 
     return (
         <div className="flex flex-col items-center justify-center p-6 text-center">

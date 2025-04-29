@@ -1,17 +1,18 @@
 'use client'
 
-import React, { useState, useContext } from "react";
+import React, { useContext } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SOCIAL_CTAS } from "./NavigationWrapper";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+// import { useSession } from "next-auth/react";
 import { navItems } from "./NavigationWrapper";
 import Image from "next/image";
 import { MobileNavContext } from "@/app/components/navigation/MobileNavContext";
+import { useSupabaseAuth } from "../providers/SupabaseAuthProvider";
 
 export const MobileNav = () => {
-    const { data: session, status } = useSession();
+    const { session } = useSupabaseAuth();
     const pathname = usePathname();
     const { active, setActive } = useContext(MobileNavContext);
 
@@ -19,7 +20,7 @@ export const MobileNav = () => {
     const isPathValid = navItems.some(item => pathname === item.path);
 
     // 如果用户未登录或路径无效，返回 null
-    if (status === "unauthenticated" || !session || !isPathValid) {
+    if (!session || session.user === null || !isPathValid) {
         return null;
     }
 

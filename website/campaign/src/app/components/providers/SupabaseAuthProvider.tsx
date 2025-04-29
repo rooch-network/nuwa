@@ -3,7 +3,7 @@
 
 import { createClientComponentClient } from '@/app/services/supabase'
 import { useRouter } from 'next/navigation'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo } from 'react'
 
 // Define types for our session and user
 type User = {
@@ -16,6 +16,7 @@ type User = {
     user_name?: string
     full_name?: string
     picture?: string
+    twitter_handle?: string
   }
 }
 
@@ -47,7 +48,9 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     error: null,
   })
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  
+  // Use useMemo to create a single instance of the Supabase client
+  const supabase = useMemo(() => createClientComponentClient(), [])
 
   // Fetch session when the component mounts
   useEffect(() => {

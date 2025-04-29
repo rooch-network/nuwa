@@ -3,13 +3,13 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSupabaseAuth } from "@/app/components/providers/SupabaseAuthProvider";
 import { navItems } from "./NavigationWrapper";
 import Image from "next/image";
 
 export const FloatingNav = () => {
     const pathname = usePathname();
-    const { data: session, status } = useSession();
+    const { session } = useSupabaseAuth();
 
     // 检查当前路径是否匹配任何导航项
     const isPathValid = navItems.some(item => pathname === item.path);
@@ -18,7 +18,7 @@ export const FloatingNav = () => {
     }
 
     // 如果用户未登录，返回 null
-    if (status === "unauthenticated" || !session) {
+    if (!session || session.user === null) {
         return null;
     }
 

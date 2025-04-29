@@ -4,12 +4,12 @@ import { useChat } from '@ai-sdk/react';
 import { useScrollToBottom } from './useScrollToBottom';
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSession } from 'next-auth/react';
 import { Missions } from './Missions';
 import { MessageContainer } from './MessageContainer';
 import { InputContainer } from './InputContainer';
 import NeubrutalismButton from '@/app/components/shared/NeubrutalismButton';
 import { useMissions } from '@/app/context/MissionsContext';
+import { useSupabaseAuth } from '../providers/SupabaseAuthProvider';
 
 // Define classification state interface
 interface ClassificationState {
@@ -19,11 +19,11 @@ interface ClassificationState {
 }
 
 export function Chat() {
-    const { data: session } = useSession();
+    const { session } = useSupabaseAuth();
     const { missions } = useMissions();
     const userInfo = {
-        name: session?.user?.name || "visitor",
-        twitterHandle: session?.user?.twitterHandle || "visitor"
+        name: session?.user?.user_metadata?.name || "visitor",
+        twitterHandle: session?.user?.user_metadata?.twitter_handle || "visitor"
     };
 
     // Save the last user message for retry

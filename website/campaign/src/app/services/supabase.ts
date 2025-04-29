@@ -1,8 +1,6 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
 import { type CookieOptions } from '@supabase/ssr'
-import { NextRequest, NextResponse } from 'next/server'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -26,9 +24,26 @@ export const createClient = () => {
     return createSupabaseClient(supabaseUrl, supabaseAnonKey)
 }
 
-// 创建服务端组件的 Supabase 客户端
-export function createServerComponentClient() {
-    const cookieStore = cookies()
+// Singleton instance for client component client
+let clientComponentClient: ReturnType<typeof createSupabaseClient> | null = null;
+
+// 为客户端组件创建 Supabase 客户端
+export function createClientComponentClient() {
+    if (!clientComponentClient) {
+        clientComponentClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+            auth: {
+                flowType: 'pkce',
+            }
+        });
+    }
+    return clientComponentClient;
+}
+
+// 服务端专用的 Supabase 客户端创建函数
+export async function createServerComponentClient() {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    
     return createServerClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
             get(name: string) {
@@ -52,9 +67,11 @@ export function createServerComponentClient() {
     })
 }
 
-// 创建路由处理程序的 Supabase 客户端
-export function createRouteHandlerClient(request: NextRequest, response: NextResponse) {
-    const cookieStore = cookies()
+// 路由处理程序专用的 Supabase 客户端创建函数
+export async function createRouteHandlerClient(request: Request, response: Response) {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    
     return createServerClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
             get(name: string) {
@@ -62,21 +79,12 @@ export function createRouteHandlerClient(request: NextRequest, response: NextRes
             },
             set(name: string, value: string, options: CookieOptions) {
                 cookieStore.set({ name, value, ...options })
-                response.cookies.set({ name, value, ...options })
+                response.headers.set('Set-Cookie', `${name}=${value}; ${Object.entries(options).map(([key, value]) => `${key}=${value}`).join('; ')}`)
             },
             remove(name: string, options: CookieOptions) {
                 cookieStore.set({ name, value: '', ...options })
-                response.cookies.set({ name, value: '', ...options })
+                response.headers.set('Set-Cookie', `${name}=; ${Object.entries(options).map(([key, value]) => `${key}=${value}`).join('; ')}`)
             }
-        }
-    })
-}
-
-// 为客户端组件创建 Supabase 客户端
-export function createClientComponentClient() {
-    return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-            flowType: 'pkce',
         }
     })
 }

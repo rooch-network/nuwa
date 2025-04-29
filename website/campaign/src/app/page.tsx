@@ -1,12 +1,12 @@
 'use client'
 
-import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { GridHoverHero } from "@/app/components/hero/GridHoverHero";
 import { Chat } from "@/app/components/chat/Chat";
 import { motion } from "framer-motion";
 import { BarLoader } from "@/app/components/shared/BarLoader";
+import { useSupabaseAuth } from "./components/providers/SupabaseAuthProvider";
+import { GridHoverHero } from "./components/hero/GridHoverHero";
 
 // 定义淡入动画变体
 const fadeInUp = {
@@ -22,16 +22,16 @@ const fadeInUp = {
 };
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { session } = useSupabaseAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!session || session.user === null) {
       router.push("/");
     }
-  }, [status, router]);
+  }, [session, router]);
 
-  if (status === "loading") {
+  if (session.isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
         <BarLoader />
@@ -40,9 +40,9 @@ export default function Home() {
     );
   }
 
-  // if (!session) {
-  //   return <GridHoverHero />;
-  // }
+  if (!session || session.user === null) {
+    return <GridHoverHero />;
+  }
 
   return (
     <main className="container mx-auto px-2 sm:px-4 sm:py-4">
