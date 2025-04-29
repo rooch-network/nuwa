@@ -321,6 +321,8 @@ export interface TweetScoreRecord {
     
     // Previous scoring data
     previous_score?: number;
+    previous_content_score?: number;
+    previous_engagement_score?: number;
     previous_reasoning?: string;
     previous_engagement_metrics?: {
         likes: number;
@@ -368,7 +370,7 @@ export async function saveTweetScoreRecord(
     // Check if record exists
     const { data: existingRecord, error: fetchError } = await supabase
         .from('tweet')
-        .select('score, reasoning, engagement_metrics')
+        .select('score, content_score, engagement_score, reasoning, engagement_metrics')
         .eq('id', tweetId)
         .maybeSingle();
     
@@ -393,6 +395,8 @@ export async function saveTweetScoreRecord(
                 reasoning: reasoning,
                 engagement_metrics: engagementMetrics,
                 previous_score: existingRecord.score,
+                previous_content_score: existingRecord.content_score,
+                previous_engagement_score: existingRecord.engagement_score,
                 previous_reasoning: existingRecord.reasoning,
                 previous_engagement_metrics: existingRecord.engagement_metrics,
                 score_change: scoreChange,
@@ -467,6 +471,7 @@ export async function getPreviousTweetScoreData(tweetId: string): Promise<TweetS
     }
     
     return {
+        tweet_id: tweetId,
         score: tweet.previous_score,
         content_score: tweet.previous_content_score || 0,  
         engagement_score: tweet.previous_engagement_score || 0, 

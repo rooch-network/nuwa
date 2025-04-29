@@ -10,15 +10,22 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 // Skip tests if OpenAI API key is not provided
 const describeIfApiKey = OPENAI_API_KEY ? describe : describe.skip;
 
-// 创建模拟推文数据的工厂函数
+// Factory function to create mock tweet data
 function createMockTweet(
   id: string,
   text: string,
-  metrics: Partial<StandardTweetPublicMetrics> = {}
+  metrics: Partial<StandardTweetPublicMetrics> = {},
+  followers_count: number = 1000 // Default follower count
 ): StandardTweet {
   const author: StandardTweetAuthor = {
     id: '123456789',
     username: 'test_user',
+    public_metrics: {
+      followers_count: followers_count,
+      following_count: 500,
+      tweet_count: 1200,
+      listed_count: 10
+    }
   };
 
   const defaultMetrics: StandardTweetPublicMetrics = {
@@ -86,52 +93,54 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
     });
 
     test('assessTweetScore should give higher score to tweets about Nuwa and AI', async () => {
-        // 创建一个关于Nuwa和AI的高质量推文
+        // Create a high-quality tweet about Nuwa and AI
         const highQualityTweet = createMockTweet(
             'mock123',
             'Nuwa is revolutionizing AI technology by providing personalized AI assistants. The deep learning models they use offer unprecedented accuracy and understanding, making AI more accessible and useful for everyday tasks!',
             { like_count: 10, retweet_count: 5, reply_count: 3 }
         );
 
-        // 创建一个没有提及Nuwa或AI的推文
+        // Create a tweet that doesn't mention Nuwa or AI
         const irrelevantTweet = createMockTweet(
             'mock456',
             'Just had a great cup of coffee this morning! The weather is beautiful today.',
             { like_count: 10, retweet_count: 5, reply_count: 3 }
         );
 
-        // 对两个推文进行评分
+        // Score both tweets
         const highQualityScore = await assessTweetScore(highQualityTweet);
         const irrelevantScore = await assessTweetScore(irrelevantTweet);
 
-        // 验证包含Nuwa和AI的推文得分更高
+        // Verify that the tweet about Nuwa and AI scores higher
         expect(highQualityScore.score).toBeGreaterThan(irrelevantScore.score);
         expect(highQualityScore.content_score).toBeGreaterThan(irrelevantScore.content_score);
         
-        // 记录结果
+        // Log the results
         console.log(`Nuwa AI Tweet Score: ${highQualityScore.score}/100, Content: ${highQualityScore.content_score}/75`);
         console.log(`Irrelevant Tweet Score: ${irrelevantScore.score}/100, Content: ${irrelevantScore.content_score}/75`);
     });
 
     test('assessTweetScore should reflect engagement changes in the score', async () => {
-        // 创建一个基础推文
+        // Create a base tweet
         const baseTweet = createMockTweet(
             'mock789',
             'Nuwa AI is helping developers build smarter applications with its innovative solutions and powerful APIs.',
-            { like_count: 5, retweet_count: 2, reply_count: 1 }
+            { like_count: 5, retweet_count: 2, reply_count: 1 },
+            1000 // 1000 followers
         );
         
-        // 获取初始评分
+        // Get initial score
         const initialScore = await assessTweetScore(baseTweet);
         
-        // 创建同一推文但互动数据增加的版本
+        // Create a version of the same tweet with increased engagement metrics
         const increasedEngagementTweet = createMockTweet(
             'mock789',
             'Nuwa AI is helping developers build smarter applications with its innovative solutions and powerful APIs.',
-            { like_count: 50, retweet_count: 20, reply_count: 10, impression_count: 1000 }
+            { like_count: 50, retweet_count: 20, reply_count: 10, impression_count: 1000 },
+            1000 // Keep the same follower count to test pure engagement growth
         );
         
-        // 使用之前的评分作为比较基准进行评分
+        // Score using previous score as comparison baseline
         const updatedScore = await assessTweetScore(increasedEngagementTweet, {
             tweet_id: baseTweet.id,
             score: initialScore.score,
@@ -144,17 +153,48 @@ describeIfApiKey('Tweet Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', () =
                 quotes: baseTweet.public_metrics?.quote_count || 0,
                 impressions: baseTweet.public_metrics?.impression_count || 0
             },
-            scored_at: new Date(Date.now() - 86400000).toISOString() // 假设一天前评分
+            scored_at: new Date(Date.now() - 86400000).toISOString() // Assume scored one day ago
         });
         
-        // 验证互动增加后的得分也增加
+        // Verify that the score increases with increased engagement
         expect(updatedScore.engagement_score).toBeGreaterThan(initialScore.engagement_score);
         expect(updatedScore.score).toBeGreaterThan(initialScore.score);
         
-        // 记录结果
-        console.log(`Initial Score: ${initialScore.score}/100, Engagement: ${initialScore.engagement_score}/25`);
-        console.log(`Updated Score: ${updatedScore.score}/100, Engagement: ${updatedScore.engagement_score}/25`);
+        // Log the results
+        console.log(`Initial Score: ${initialScore.score}/100, Engagement: ${initialScore.engagement_score}/50`);
+        console.log(`Updated Score: ${updatedScore.score}/100, Engagement: ${updatedScore.engagement_score}/50`);
         console.log(`Engagement Increase: ${updatedScore.engagement_score - initialScore.engagement_score}`);
         console.log(`Total Score Increase: ${updatedScore.score - initialScore.score}`);
+    });
+    
+    test('assessTweetScore should consider followers count for engagement calculation', async () => {
+        // Create a tweet with low follower count (high engagement rate)
+        const lowFollowersTweet = createMockTweet(
+            'mock555',
+            'Nuwa AI technology is incredibly advanced and helpful for developers!',
+            { like_count: 20, retweet_count: 10, reply_count: 5 },
+            200 // Only 200 followers, but relatively high engagement
+        );
+        
+        // Create a tweet with high follower count (low engagement rate)
+        const highFollowersTweet = createMockTweet(
+            'mock666',
+            'Nuwa AI technology is incredibly advanced and helpful for developers!',
+            { like_count: 30, retweet_count: 15, reply_count: 7 },
+            5000 // 5000 followers, but relatively low engagement rate
+        );
+        
+        // Score both tweets
+        const lowFollowersScore = await assessTweetScore(lowFollowersTweet);
+        const highFollowersScore = await assessTweetScore(highFollowersTweet);
+        
+        // Verify that the tweet with fewer followers but higher engagement rate gets a higher engagement score
+        // Note: Content scores should be similar since the text content is the same
+        expect(lowFollowersScore.engagement_score).toBeGreaterThan(highFollowersScore.engagement_score);
+        expect(Math.abs(lowFollowersScore.content_score - highFollowersScore.content_score)).toBeLessThan(5); // Content scores should be close
+        
+        // Log the results
+        console.log(`Low Followers Tweet (200): Engagement Score: ${lowFollowersScore.engagement_score}/50, Engagement Rate: ${(20+10+5)/200*100}%`);
+        console.log(`High Followers Tweet (5000): Engagement Score: ${highFollowersScore.engagement_score}/50, Engagement Rate: ${(30+15+7)/5000*100}%`);
     });
 });

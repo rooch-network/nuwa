@@ -5,20 +5,15 @@ import {
     checkUserRewardHistory,
     deductUserPoints,
     getUserPointsByHandle,
-    getTweetScore, getPreviousTweetScoreData, saveTweetScoreRecord,
-    addTweetScore,
-    checkTweetExists,
+    getTweetScore,
+    saveTweetScoreRecord,
     checkRecentTwitterProfileScore,
     addTwitterProfileScore,
-    // Assume a function exists to add profile scores, similar to addTweetScore
-    // We'll call it addProfileScore for now. It needs to be created in supabaseService.
-    // addProfileScore 
 } from '@/app/services/supabaseService';
 import { assessTweetScore } from './scoring-agent';
 // Import the profile scoring function
 import { getProfileScore } from './profile-scoring-agent';
 import * as twitterAdapter from '@/app/services/twitterAdapter';
-import { TweetScoreData } from '@/app/types/scoring';
 
 
 export const tools = {
@@ -297,33 +292,57 @@ export const tools = {
 
     // 18. Score a tweet using the scoring agent and save to database
     scoreTweet: tool({
-        description: 'Analyzes a tweet based on content quality and engagement metrics, assigns a score (0-100), and tracks score changes over time. Can rescore existing tweets to analyze engagement growth.',
+        description: 'Analyzes a tweet based on content quality and engagement metrics, assigns a score (0-100), and tracks score changes over time. Automatically rescores tweets after sufficient time has passed to analyze engagement growth.',
         parameters: z.object({
-            tweetId: z.string().describe('The unique identifier of the tweet to be scored.'),
-            forceRescoring: z.boolean().optional().default(false).describe('Whether to force rescoring even if the tweet has already been scored.')
+            tweetId: z.string().describe('The unique identifier of the tweet to be scored.')
         }),
-        execute: async function ({ tweetId, forceRescoring }) {
+        execute: async function ({ tweetId }) {
             try {
                 // Check if tweet has been scored before
                 let existingScore = null;
                 let previousScoreData = null;
+                const MIN_RESCORE_INTERVAL_HOURS = 1; // Minimum hours between scoring attempts
                 
                 try {
                     existingScore = await getTweetScore(tweetId);
-                    previousScoreData = await getPreviousTweetScoreData(tweetId);
                     
-                    // If already scored and not forcing a rescore, return existing score
-                    if (existingScore && !forceRescoring) {
-                        return {
-                            success: true,
-                            message: `Tweet ${tweetId} already has a score of ${existingScore.score}/100. Use forceRescoring=true to recalculate.`,
+                    // If already scored recently, return existing score
+                    if (existingScore) {
+                        // Construct previousScoreData directly from existingScore
+                        previousScoreData = {
+                            tweet_id: tweetId,
                             score: existingScore.score,
                             content_score: existingScore.content_score,
                             engagement_score: existingScore.engagement_score,
-                            reasoning: existingScore.reasoning,
-                            last_scored_at: existingScore.updated_at || existingScore.created_at,
-                            is_rescored: false
+                            engagement_metrics: {
+                                likes: existingScore.engagement_metrics?.likes || 0,
+                                retweets: existingScore.engagement_metrics?.retweets || 0,
+                                replies: existingScore.engagement_metrics?.replies || 0,
+                                quotes: existingScore.engagement_metrics?.quotes || 0,
+                                impressions: existingScore.engagement_metrics?.impressions || 0
+                            },
+                            scored_at: existingScore.updated_at || existingScore.created_at
                         };
+
+                        const lastScoredAt = new Date(existingScore.updated_at || existingScore.created_at);
+                        const hoursSinceLastScore = (Date.now() - lastScoredAt.getTime()) / (1000 * 60 * 60);
+                        
+                        if (hoursSinceLastScore < MIN_RESCORE_INTERVAL_HOURS) {
+                            return {
+                                success: true,
+                                message: `Tweet ${tweetId} was scored ${hoursSinceLastScore.toFixed(1)} hours ago with a score of ${existingScore.score}/100. Rescoring is available after ${MIN_RESCORE_INTERVAL_HOURS} hours.`,
+                                score: existingScore.score,
+                                content_score: existingScore.content_score,
+                                engagement_score: existingScore.engagement_score,
+                                reasoning: existingScore.reasoning,
+                                last_scored_at: lastScoredAt.toISOString(),
+                                hours_until_rescore: (MIN_RESCORE_INTERVAL_HOURS - hoursSinceLastScore).toFixed(1),
+                                is_rescored: false
+                            };
+                        }
+                        
+                        // If more than MIN_RESCORE_INTERVAL_HOURS have passed, we'll automatically rescore
+                        console.log(`Tweet ${tweetId} was last scored ${hoursSinceLastScore.toFixed(1)} hours ago. Rescoring now.`);
                     }
                 } catch (error) {
                     console.warn(`Could not check existing score for tweet ${tweetId}: ${error}`);

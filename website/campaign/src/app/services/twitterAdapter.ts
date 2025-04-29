@@ -71,6 +71,7 @@ export interface StandardReferencedTweet {
 export interface StandardTweetAuthor {
     id: string;
     username: string;
+    public_metrics?: StandardUserPublicMetrics;
 }
 
 export interface StandardTweet {
@@ -229,6 +230,7 @@ function convertToStandardDetailedTweet(tweet: twitterService.TweetDetailed | nu
     const tweetAuthor: StandardTweetAuthor = {
         id: standardAuthor.id,
         username: standardAuthor.username,
+        public_metrics: standardAuthor.public_metrics,
     };
 
     const metrics: StandardTweetPublicMetrics = {
@@ -265,7 +267,7 @@ function convertToStandardDetailedTweet(tweet: twitterService.TweetDetailed | nu
         if (tweet.quoted_tweet.author) { 
             const convertedAuthor = convertToStandardUserDetailed(tweet.quoted_tweet.author);
             if(convertedAuthor) {
-                referencedAuthor = { id: convertedAuthor.id, username: convertedAuthor.username };
+                referencedAuthor = { id: convertedAuthor.id, username: convertedAuthor.username, public_metrics: convertedAuthor.public_metrics };
             }
         }
         referenced_tweets.push({ type: 'quoted', id: tweet.quoted_tweet.id, author: referencedAuthor });
@@ -275,7 +277,7 @@ function convertToStandardDetailedTweet(tweet: twitterService.TweetDetailed | nu
         if (tweet.retweeted_tweet.author) { 
             const convertedAuthor = convertToStandardUserDetailed(tweet.retweeted_tweet.author);
             if(convertedAuthor) {
-                referencedAuthor = { id: convertedAuthor.id, username: convertedAuthor.username };
+                referencedAuthor = { id: convertedAuthor.id, username: convertedAuthor.username, public_metrics: convertedAuthor.public_metrics };
             }
         }
         referenced_tweets.push({ type: 'retweeted', id: tweet.retweeted_tweet.id, author: referencedAuthor });
@@ -319,7 +321,8 @@ function convertToStandardMentionTweet(tweet: twitterService.TweetMention | null
     }
     const tweetAuthor: StandardTweetAuthor = {
         id: standardAuthor.id,
-        username: standardAuthor.username, 
+        username: standardAuthor.username,
+        public_metrics: standardAuthor.public_metrics,
     };
 
     const metrics: StandardTweetPublicMetrics = {
