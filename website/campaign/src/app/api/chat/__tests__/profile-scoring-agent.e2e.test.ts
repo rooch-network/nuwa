@@ -3,7 +3,7 @@ import * as twitterAdapter from '../../../services/twitterAdapter';
 
 // --- Test Configuration ---
 // Use a well-known, stable account for testing
-const TEST_USERNAME = 'roochbot'; // Use a known account
+const TEST_USERNAME = 'jolestar'; // Use a known account
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Skip tests if OpenAI API key is not provided
@@ -19,14 +19,14 @@ describeIfApiKey('Profile Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', ()
         }
     });
 
-    test('getProfileScore should score a user profile with tweets', async () => {
+    test.only('getProfileScore should score a user profile with tweets', async () => {
         // Fetch a user profile to score
         const userProfile = await twitterAdapter.getStandardUserByUsername(TEST_USERNAME);
         expect(userProfile).toBeDefined();
         
         // Fetch recent tweets (optional)
         const tweetResult = await twitterAdapter.getStandardUserLastTweets(TEST_USERNAME);
-        const recentTweets = tweetResult.tweets?.slice(0, 3);
+        const recentTweets = tweetResult.tweets;
         
         // Create profile data for scoring
         const profileData = {
@@ -36,6 +36,11 @@ describeIfApiKey('Profile Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', ()
         
         // Score the profile
         const scoreResult = await getProfileScore(profileData);
+
+        // Log the result for manual inspection
+        console.log(`Profile scoring result: ${scoreResult.score}/100`);
+        console.log(`Reasoning: ${scoreResult.reasoning}`);
+
         expect(scoreResult).toBeDefined();
         expect(scoreResult.score).toBeDefined();
         expect(typeof scoreResult.score).toBe('number');
@@ -45,25 +50,30 @@ describeIfApiKey('Profile Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', ()
         expect(typeof scoreResult.reasoning).toBe('string');
         expect(scoreResult.reasoning.length).toBeGreaterThan(0);
         
-        // Log the result for manual inspection
-        console.log(`Profile scoring result: ${scoreResult.score}/100`);
-        console.log(`Reasoning: ${scoreResult.reasoning}`);
+        const scoreResult2 = await getProfileScore(profileData);
+        console.log(`Profile scoring result2: ${scoreResult2.score}/100`);
+        console.log(`Reasoning: ${scoreResult2.reasoning}`);
+        expect(Math.abs(scoreResult.score - scoreResult2.score)).toBeLessThan(5);
+        
     });
     
     test('getProfileScore works with minimal profile data (no tweets)', async () => {
         // Test with just basic profile info, no tweets
         const userProfile = await twitterAdapter.getStandardUserByUsername(TEST_USERNAME);
-        
+        console.log(`User profile: ${JSON.stringify(userProfile)}`);
         // Score with minimal data
         const scoreResult = await getProfileScore(userProfile);
+        // Log the result for comparison
+        console.log(`Minimal profile scoring result: ${scoreResult.score}/100`);
+        console.log(`Reasoning: ${scoreResult.reasoning}`);
+
         expect(scoreResult).toBeDefined();
         expect(scoreResult.score).toBeDefined();
         expect(typeof scoreResult.score).toBe('number');
         expect(scoreResult.score).toBeGreaterThanOrEqual(0);
         expect(scoreResult.score).toBeLessThanOrEqual(100);
         
-        // Log the result for comparison
-        console.log(`Minimal profile scoring result: ${scoreResult.score}/100`);
+        
     });
     
     test('getProfileScore handles errors gracefully', async () => {
