@@ -133,6 +133,12 @@ export async function assessTweetScore(
             3. engagement_score: The portion of score based on engagement metrics (criteria 5+6, 0-50 points)
             4. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
             
+            IMPORTANT SCORING CONSTRAINTS:
+            - content_score MUST be between 0-50 (sum of criteria 1-4 only)
+            - engagement_score MUST be between 0-50 (sum of criteria 5-6 only)
+            - The final score MUST be the sum of content_score + engagement_score
+            - Double-check your calculations to ensure content_score does not exceed 50
+            
             Please ensure that all four fields are included in your response, with the correct value ranges.
             `
         });
