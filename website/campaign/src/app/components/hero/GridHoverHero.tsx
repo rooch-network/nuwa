@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useAnimate } from "framer-motion";
-import { signIn } from "next-auth/react";
+// import { signIn } from "next-auth/react";
+import { useSupabaseAuth } from "../providers/SupabaseAuthProvider";
 
 interface GridHoverHeroProps {
     onJoinClick?: () => void;
@@ -10,6 +11,7 @@ interface GridHoverHeroProps {
 
 export const GridHoverHero = ({ onJoinClick }: GridHoverHeroProps) => {
     const [scope, animate] = useAnimate();
+    const { signIn } = useSupabaseAuth();
 
     const [size, setSize] = useState({ columns: 0, rows: 0 });
 
@@ -44,7 +46,7 @@ export const GridHoverHero = ({ onJoinClick }: GridHoverHeroProps) => {
 
     const handleTwitterLogin = () => {
         // 调用Twitter登录
-        signIn("twitter", { callbackUrl: "/" });
+        signIn('twitter');
 
         // 如果提供了onJoinClick回调，也执行它
         if (onJoinClick) {
