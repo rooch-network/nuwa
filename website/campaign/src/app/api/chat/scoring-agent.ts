@@ -114,7 +114,7 @@ export async function assessTweetScore(
     tweetData: StandardTweet
 ): Promise<TweetScoreResult> {
     
-    // --- Refined Scoring Criteria (0-100 points) ---
+    // --- Refined Scoring Criteria (0-50 points for content quality) ---
     const scoringCriteria = `
     1.  **Core Theme Relevance (Nuwa & AI) (0-25 points):** 
         - Extended discussion of Nuwa AI with specific applications, technical details, or use cases: assign 20 to 25 points
@@ -154,22 +154,9 @@ export async function assessTweetScore(
         
         Note: Originality can be demonstrated in both short and long content.
     
-    5.  **Engagement Score (0-50 points):**
-        NOTE: This section is provided for information only. The engagement score is calculated automatically by an algorithm based on interaction metrics and does not require your evaluation.
-        
-        The algorithm calculates engagement score using these benchmarks:
-        - Exceptional engagement (≥ 0.60%): 41-50 points
-        - Very high engagement (0.30-0.59%): 31-40 points  
-        - High engagement (0.12-0.29%): 21-30 points
-        - Medium engagement (0.05-0.11%): 11-20 points
-        - Low engagement (≤ 0.04%): 5-10 points
-        
-        You do NOT need to score this section. Focus only on scoring criteria 1-4 for content quality.
-    
     Important Scoring Instructions:
     - When you see "assign X to Y points", you should choose a specific score within that range. For example, "assign 20 to 25 points" means you should pick a specific value like 21, 22, 23, etc.
     - Each criterion has its own maximum. 
-    - Focus only on scoring criteria 1-4 (content quality), which sum to a maximum of 50 points.
     - Always use your judgment to determine where in each range a specific tweet falls.
     
     The total content score is the sum of points from criteria 1-4 (max 50).
@@ -200,59 +187,33 @@ export async function assessTweetScore(
         const totalInteractions = currentMetrics.likes + currentMetrics.retweets + 
                                   currentMetrics.replies + (currentMetrics.quotes || 0);
         
-        // Weighted interactions for reference in the prompt
-        const weightedInteractions = 
-            currentMetrics.likes * 1.0 + 
-            currentMetrics.retweets * 3.0 + 
-            currentMetrics.replies * 2.0 + 
-            (currentMetrics.quotes || 0) * 2.5;
-        
-        // Engagement rate for reference (same calculation as in calculateEngagementScore)
-        const denominator = currentMetrics.impressions ?? currentMetrics.followers ?? 1;
-        const engagementRate = (weightedInteractions / denominator) * 100;
+        console.log(
+            "Score Calculation Details - ",
+            "Tweet ID:", tweetData.id,
+            "Total Interactions:", totalInteractions,
+            "Engagement Score:", engagementScore.toFixed(2)
+        );
         
         const { object: scoreResult } = await generateObject({
             model: openai('gpt-4o-mini'),
             schema: tweetScoreSchema,
             prompt: `Please analyze and score the content quality of the following tweet based *strictly* on the provided criteria. 
-            
-            NOTE: You will ONLY evaluate the content quality (criteria 1-4). The engagement score (criterion 5) has been calculated automatically.
 
             **Scoring Criteria:**
             ${scoringCriteria}
-
-            **Current Engagement Metrics (For Reference Only - DO NOT SCORE THESE):**
-            - Likes: ${currentMetrics.likes}
-            - Retweets: ${currentMetrics.retweets}
-            - Replies: ${currentMetrics.replies}
-            - Quotes: ${currentMetrics.quotes || 'N/A'}
-            ${currentMetrics.impressions ? `- Impressions: ${currentMetrics.impressions}` : ''}
-            - Author Followers: ${currentMetrics.followers || 'Unknown'}
-            - Total Raw Interactions: ${totalInteractions}
-            - Weighted Interactions: ${weightedInteractions.toFixed(1)}
-            - Weighted Engagement Rate: ${engagementRate.toFixed(4)}% (relative to impressions or followers)
-            - Engagement Score: ${engagementScore.toFixed(2)}/50 (calculated automatically based on industry benchmarks)
 
             **Tweet Data (JSON):**
             \`\`\`json
             ${JSON.stringify(tweetData, null, 2)}
             \`\`\`
 
-            Your response MUST include the following fields in the specified format:
+            Your response MUST include:
             1. reasoning: A brief explanation of your content quality scoring rationale
-            2. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
+            2. content_score: The portion of score based on content quality (max 50 points)
             
-            DO NOT evaluate or comment on the engagement metrics in your reasoning - focus ONLY on content quality.
+            Focus ONLY on content quality, NOT on any engagement metrics (likes, retweets, etc.).
             
-            Important Scoring Instructions:
-            - When you see "assign X to Y points", you should choose a specific score within that range. For example, "assign 20 to 25 points" means you should pick a specific value like 21, 22, 23, etc.
-            - Each criterion has its own maximum. 
-            - Always use your judgment to determine where in each range a specific tweet falls.
-            
-            CONTENT LENGTH GUIDELINES:
-            - Short, relevant tweets (1-2 sentences mentioning Nuwa AI) should receive a content_score of 15 to 25 points out of 50.
-            - Medium-length tweets (3-5 sentences with some details) should receive a content_score of 25 to 35 points out of 50 if relevant and well-written.
-            - Long, detailed tweets (6+ sentences with specific insights or technical details) should receive a content_score of 35 to 50 points out of 50 if highly relevant and well-structured.
+            Remember to consider the content length guidelines when determining your final content_score.
             `
         });
 
