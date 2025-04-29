@@ -3,17 +3,29 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 /**
- * Schema for the Twitter Profile scoring result.
+ * Schema for the Twitter Profile scoring result with category scores.
  */
 export const profileScoreSchema = z.object({
-    score: z.number().min(0).max(100).describe("The numerical score assigned to the Twitter profile (0-100)."),
-    reasoning: z.string().describe("A brief explanation of why this score was given, based on the profile criteria.")
+    profileCompleteness: z.number().min(0).max(15).describe("Score for Profile Completeness & Clarity (0-15)."),
+    relevance: z.number().min(0).max(20).describe("Score for Relevance to Web3 or AI (0-20)."),
+    accountActivity: z.number().min(0).max(20).describe("Score for Account Activity (0-20)."),
+    influence: z.number().min(0).max(10).describe("Score for Influence & Reach (0-10)."),
+    contentQuality: z.number().min(0).max(35).describe("Score for Content Quality & Engagement (0-35)."),
+    reasoning: z.string().describe("A brief explanation of why these scores were given, based on the profile criteria.")
 });
 
 /**
  * Type definition for the Twitter Profile scoring result.
  */
-export type ProfileScoreResult = z.infer<typeof profileScoreSchema>;
+export type CategoryProfileScoreResult = z.infer<typeof profileScoreSchema>;
+
+/**
+ * Returns the legacy ProfileScoreResult format for backward compatibility
+ */
+export type ProfileScoreResult = {
+    score: number;
+    reasoning: string;
+};
 
 /**
  * Scores a Twitter Profile based on provided data and predefined criteria using an AI model.
@@ -21,7 +33,7 @@ export type ProfileScoreResult = z.infer<typeof profileScoreSchema>;
  * @param profileData The JSON data object of the Twitter profile to be scored.
  *                      This should include information like description, follower count,
  *                      following count, tweet count, recent tweets (if available), etc.
- * @returns A promise that resolves to an object containing the score and reasoning.
+ * @returns A promise that resolves to an object containing detailed category scores and reasoning.
  * @throws Throws an error if the AI model fails to generate the score object.
  */
 export async function getProfileScore(profileData: object): Promise<ProfileScoreResult> {
@@ -59,7 +71,8 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
         const { object: scoreResult } = await generateObject({
             model: openai('gpt-4o-mini'), // Consider gpt-4o for more complex profile analysis
             schema: profileScoreSchema,
-            prompt: `Please analyze and score the following Twitter profile based *strictly* on the provided criteria. Assign points for each criterion and sum them for the final score (0-100). Evaluate based *only* on the information provided.
+            prompt: `Please analyze and score the following Twitter profile based *strictly* on the provided criteria. 
+            Evaluate based *only* on the information provided.
 
             **Scoring Criteria:**
             ${scoringCriteria}
@@ -69,19 +82,37 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             ${JSON.stringify(profileData, null, 2)}
             \`\`\`
 
-            Your response MUST include the following fields in the specified format:
-            1. score: The total numerical score (0-100)
-            2. reasoning: A brief explanation of your scoring rationale that summarizes how the score was derived based *only* on the criteria
+            For your output, you MUST provide scores for each of the following main categories:
+
+            1. profileCompleteness: total points for Profile Completeness & Clarity (0-15)
+            2. relevance: total points for Relevance to Web3 or AI (0-20)
+            3. accountActivity: total points for Account Activity (0-20)
+            4. influence: total points for Influence & Reach (0-10)
+            5. contentQuality: total points for Content Quality & Engagement (0-35)
+            6. reasoning: A brief explanation of why these scores were given
             
-            Please ensure that both fields are included in your response, with the score being a number between 0 and 100.
+            Follow these scoring guidelines:
+            - For each category, carefully evaluate all subcriteria listed in the scoring criteria
+            - Assign points as indicated in the subcriteria ranges
+            - Sum the subcriteria points to get each category score
+            - Ensure no category exceeds its maximum possible score
             `
         });
-
-        if (scoreResult.score > 100) {
-            console.warn("Score result is greater than 100. Clamping to 100.");
-            scoreResult.score = 100;
-        }
-        return scoreResult;
+            
+        // Calculate the total score
+        const totalScore = Math.min(
+            scoreResult.profileCompleteness +
+            scoreResult.relevance +
+            scoreResult.accountActivity +
+            scoreResult.influence +
+            scoreResult.contentQuality,
+            100
+        );
+        
+        return {
+            score: totalScore,
+            reasoning: scoreResult.reasoning
+        };
 
     } catch (error) {
         console.error("Error generating profile score:", error);
