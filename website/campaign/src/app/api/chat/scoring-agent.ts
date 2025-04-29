@@ -123,15 +123,45 @@ export async function assessTweetScore(
             followers: tweetData.author?.public_metrics?.followers_count
         };
         
-        // Calculate engagement rate
+        // Calculate engagement rate with weighted interactions
+        // Weights: retweets(3x), quotes(2.5x), replies(2x), likes(1x)
         let engagementRate = 0;
+        const weightedInteractions = 
+            currentMetrics.likes * 1.0 + 
+            currentMetrics.retweets * 3.0 + 
+            currentMetrics.replies * 2.0 + 
+            (currentMetrics.quotes || 0) * 2.5;
+        
+        // Calculate multiple engagement metrics
+        let followerBasedRate = 0;
+        let impressionBasedRate = 0;
+        
+        if (currentMetrics.followers && currentMetrics.followers > 0) {
+            followerBasedRate = (weightedInteractions / currentMetrics.followers) * 100;
+        }
+        
+        if (currentMetrics.impressions && currentMetrics.impressions > 0) {
+            impressionBasedRate = (weightedInteractions / currentMetrics.impressions) * 100;
+        }
+        
+        // Use impression-based rate if available, otherwise use follower-based rate
+        // For high-follower accounts, blend the rates to avoid unfair penalties
+        if (currentMetrics.impressions && currentMetrics.impressions > 0) {
+            if (currentMetrics.followers && currentMetrics.followers > 10000) {
+                // For accounts with many followers, use a blended approach
+                engagementRate = (impressionBasedRate * 0.7) + (followerBasedRate * 0.3);
+            } else {
+                engagementRate = impressionBasedRate;
+            }
+        } else {
+            engagementRate = followerBasedRate;
+        }
+        
+        // Get raw interaction total for reference
         const totalInteractions = currentMetrics.likes + currentMetrics.retweets + 
                                  currentMetrics.replies + (currentMetrics.quotes || 0);
         
-        if (currentMetrics.followers && currentMetrics.followers > 0) {
-            engagementRate = (totalInteractions / currentMetrics.followers) * 100;
-        }
-         
+        console.log("Total Interactions:", totalInteractions, "Weighted Interactions:", weightedInteractions, "Engagement Rate:", engagementRate);
         
         // Prepare previous score context if available
         let previousScoreContext = '';
@@ -169,8 +199,9 @@ export async function assessTweetScore(
             - Quotes: ${currentMetrics.quotes || 'N/A'}
             ${currentMetrics.impressions ? `- Impressions: ${currentMetrics.impressions}` : ''}
             - Author Followers: ${currentMetrics.followers || 'Unknown'}
-            - Total Interactions: ${totalInteractions}
-            - Engagement Rate: ${engagementRate.toFixed(2)}% ${!currentMetrics.followers ? '(estimated without follower count)' : ''}
+            - Total Raw Interactions: ${totalInteractions}
+            - Weighted Interactions: ${weightedInteractions.toFixed(1)}
+            - Weighted Engagement Rate: ${engagementRate.toFixed(2)}% (uses higher weight for retweets, replies, and quotes)
             
             ${previousScoreContext}
 
