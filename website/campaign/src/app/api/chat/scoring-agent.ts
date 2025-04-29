@@ -2,21 +2,18 @@ import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { StandardTweet } from '@/app/services/twitterAdapter';
-import { TweetScoreData } from '@/app/types/scoring';
 /**
  * Schema for the tweet scoring result.
  */
 export const tweetScoreSchema = z.object({
     reasoning: z.string().describe("A brief explanation of why this score was given, based on the criteria."),
-    engagement_score: z.number().min(0).describe("Portion of score based on engagement metrics (0-50)."),
     content_score: z.number().min(0).describe("Portion of score based on content quality (0-50).")
 }).transform(data => {
-    // Calculate the total score from the component scores
-    const score = data.content_score + data.engagement_score;
-    // Return the data with the calculated score
+    // Return the data with the calculated engagement_score and total score
     return {
         ...data,
-        score: Math.min(score, 100) // Ensure score doesn't exceed 100
+        engagement_score: 0, // Placeholder, will be replaced with algorithmically calculated value
+        score: 0 // Placeholder, will be calculated after AI response
     };
 });
 
@@ -26,17 +23,95 @@ export const tweetScoreSchema = z.object({
 export type TweetScoreResult = z.infer<typeof tweetScoreSchema>;
 
 /**
+ * Calculates the engagement score for a tweet based on industry benchmarks.
+ * Uses weighted interactions relative to impressions or followers.
+ * 
+ * @param metrics The metrics object containing likes, retweets, replies, etc.
+ * @param createdAt Optional creation date to calculate tweet age
+ * @returns A number between 0-50 representing the engagement score
+ */
+export function calculateEngagementScore(
+    metrics: {
+        likes: number;
+        retweets: number;
+        replies: number;
+        quotes?: number;
+        impressions?: number;
+        followers?: number;
+    },
+    createdAt?: string
+): number {
+    // Calculate weighted interactions
+    // Weights: retweets(3x), quotes(2.5x), replies(2x), likes(1x)
+    const weightedInteractions = 
+        metrics.likes * 1.0 + 
+        metrics.retweets * 3.0 + 
+        metrics.replies * 2.0 + 
+        (metrics.quotes || 0) * 2.5;
+    
+    // Use impressions as denominator (fall back to followers if needed)
+    const denominator = metrics.impressions ?? 
+                        metrics.followers ?? 1;
+    
+    // Calculate weighted engagement rate
+    const engagementRate = (weightedInteractions / denominator) * 100;
+    
+    // Calculate tweet age in hours (if creation time available)
+    let tweetAgeHours = 24; // Default to 24 hours
+    if (createdAt) {
+        const tweetDate = new Date(createdAt);
+        const now = new Date();
+        tweetAgeHours = (now.getTime() - tweetDate.getTime()) / (1000 * 60 * 60);
+    }
+    
+    // Helper function to scale values within a range to another range
+    function scale(val: number, min: number, max: number, outMin: number, outMax: number) {
+        return Math.min(outMax, 
+               Math.max(outMin, ((val-min)/(max-min))*(outMax-outMin)+outMin));
+    }
+    
+    // Determine engagement score based on engagement rate thresholds
+    // Industry benchmarks: median ER ≈ 0.015-0.03%, top 5% accounts ER ≈ 0.3-0.8%
+    let engagementScore: number;
+    
+    if (engagementRate >= 0.60) {          // ≥0.60% (Exceptional)
+        engagementScore = 41 + scale(engagementRate, 0.60, 1.5, 0, 9); // Max 50
+    } else if (engagementRate >= 0.30) {   // 0.30-0.59% (Very High)
+        engagementScore = 31 + scale(engagementRate, 0.30, 0.59, 0, 9);
+    } else if (engagementRate >= 0.12) {   // 0.12-0.29% (High)
+        engagementScore = 21 + scale(engagementRate, 0.12, 0.29, 0, 9);
+    } else if (engagementRate >= 0.05) {   // 0.05-0.11% (Medium)
+        engagementScore = 11 + scale(engagementRate, 0.05, 0.11, 0, 9);
+    } else {                               // ≤0.04% (Low) or New Tweet
+        engagementScore = tweetAgeHours < 1 ? 8 : 5 + scale(engagementRate, 0, 0.04, 0, 5);
+    }
+    
+    // Optional: Apply time decay for older tweets
+    // const timeDecayFactor = Math.exp(-tweetAgeHours / 24);
+    // engagementScore = engagementScore * timeDecayFactor;
+    
+    // Log details for debugging
+    console.log(
+        "Engagement Calculation:",
+        "Weighted Interactions:", weightedInteractions.toFixed(1),
+        "Engagement Rate:", engagementRate.toFixed(4) + "%", 
+        "Tweet Age:", tweetAgeHours.toFixed(1) + "h",
+        "Score:", engagementScore.toFixed(2)
+    );
+    
+    return engagementScore;
+}
+
+/**
  * Scores a tweet based on provided data and predefined criteria using an AI model.
- * Can optionally consider previous scoring data to assess engagement growth.
+ * Content score is evaluated only once, while engagement score can be recalculated.
  * 
  * @param tweetData The StandardTweet object to be scored.
- * @param previousScore Optional previous scoring data for comparison.
  * @returns A promise that resolves to an object containing the score and reasoning.
  * @throws Throws an error if the AI model fails to generate the score object.
  */
 export async function assessTweetScore(
-    tweetData: StandardTweet,
-    previousScore?: TweetScoreData
+    tweetData: StandardTweet
 ): Promise<TweetScoreResult> {
     
     // --- Refined Scoring Criteria (0-100 points) ---
@@ -80,30 +155,25 @@ export async function assessTweetScore(
         Note: Originality can be demonstrated in both short and long content.
     
     5.  **Engagement Score (0-50 points):**
-        - For tweets with previous scoring data:
-          • Significant engagement growth (>50% increase): assign 35 to 50 points
-          • Moderate engagement growth (10-50% increase): assign 20 to 34 points
-          • Minimal engagement growth (<10% increase): assign 10 to 19 points
-          • No change or decrease in engagement: Use the engagement rate scoring below, but maximum 15 points
+        NOTE: This section is provided for information only. The engagement score is calculated automatically by an algorithm based on interaction metrics and does not require your evaluation.
         
-        - For new tweets or tweets without previous data (based on engagement rate):
-          • Exceptional engagement rate (>10%): assign 40 to 50 points
-          • High engagement rate (5-10%): assign 30 to 39 points
-          • Good engagement rate (2-5%): assign 20 to 29 points
-          • Average engagement rate (0.5-2%): assign 10 to 19 points
-          • Low engagement rate (<0.5%): assign 5 to 9 points
-          • New tweet with minimal engagement: assign 15 to 20 points
+        The algorithm calculates engagement score using these benchmarks:
+        - Exceptional engagement (≥ 0.60%): 41-50 points
+        - Very high engagement (0.30-0.59%): 31-40 points  
+        - High engagement (0.12-0.29%): 21-30 points
+        - Medium engagement (0.05-0.11%): 11-20 points
+        - Low engagement (≤ 0.04%): 5-10 points
         
-        - NOTE: The engagement rate has been pre-calculated for you. For newer tweets (less than 24 hours old), focus on the quality of early engagement rather than raw numbers.
+        You do NOT need to score this section. Focus only on scoring criteria 1-4 for content quality.
     
     Important Scoring Instructions:
     - When you see "assign X to Y points", you should choose a specific score within that range. For example, "assign 20 to 25 points" means you should pick a specific value like 21, 22, 23, etc.
-    - Each criterion has its own maximum. Add all criteria scores to get the final score (max 100).
+    - Each criterion has its own maximum. 
+    - Focus only on scoring criteria 1-4 (content quality), which sum to a maximum of 50 points.
     - Always use your judgment to determine where in each range a specific tweet falls.
     
-    The total score is the sum of points from these criteria (max 100).
-    Calculate the engagement_score (criterion 5, max 50) and content_score (criteria 1-4, max 50) separately.
-    ALWAYS provide a numerical score for EACH criterion.
+    The total content score is the sum of points from criteria 1-4 (max 50).
+    ALWAYS provide a numerical score for EACH criterion (1-4).
     
     CONTENT LENGTH GUIDELINES:
     - Short, relevant tweets (1-2 sentences mentioning Nuwa AI) should receive a content_score of 15 to 25 points out of 50.
@@ -123,97 +193,35 @@ export async function assessTweetScore(
             followers: tweetData.author?.public_metrics?.followers_count
         };
         
-        // Calculate engagement rate with weighted interactions
-        // Weights: retweets(3x), quotes(2.5x), replies(2x), likes(1x)
-        let engagementRate = 0;
+        // Calculate engagement score using the dedicated function
+        const engagementScore = calculateEngagementScore(currentMetrics, tweetData.created_at);
+        
+        // Get raw interaction total for reference
+        const totalInteractions = currentMetrics.likes + currentMetrics.retweets + 
+                                  currentMetrics.replies + (currentMetrics.quotes || 0);
+        
+        // Weighted interactions for reference in the prompt
         const weightedInteractions = 
             currentMetrics.likes * 1.0 + 
             currentMetrics.retweets * 3.0 + 
             currentMetrics.replies * 2.0 + 
             (currentMetrics.quotes || 0) * 2.5;
         
-        // Base engagement rate calculation - always use followers as denominator
-        if (currentMetrics.followers && currentMetrics.followers > 0) {
-            engagementRate = (weightedInteractions / currentMetrics.followers) * 100;
-        } else {
-            // If no followers data, use a reasonable default divisor
-            const defaultFollowers = 500;
-            engagementRate = (weightedInteractions / defaultFollowers) * 100;
-        }
+        // Engagement rate for reference (same calculation as in calculateEngagementScore)
+        const denominator = currentMetrics.impressions ?? currentMetrics.followers ?? 1;
+        const engagementRate = (weightedInteractions / denominator) * 100;
         
-        // Apply impression boost when calculating engagement rate
-        // Higher impression-to-follower ratio means better reach, which should be rewarded
-        if (currentMetrics.impressions && currentMetrics.followers) {
-            // Calculate impression-to-follower ratio (viral coefficient)
-            const viralCoefficient = currentMetrics.impressions / currentMetrics.followers;
-            
-            // Apply stronger logarithmic boost to increase impact of impressions
-            // Research shows quality content typically has 2-5x impressions compared to followers
-            // Viral content can reach 10-50x impressions
-            // log10(5) ≈ 0.7, meaning 5x impressions provides a 70% boost
-            // log10(10) = 1, meaning 10x impressions provides a 100% boost
-            // log10(50) ≈ 1.7, meaning 50x impressions provides a 170% boost
-            const impressionBoost = Math.min(3, 1 + Math.log10(viralCoefficient) * 1.5);
-            
-            // Consider absolute impression count as well
-            // Research shows tweets with higher absolute impressions have broader impact
-            // Add bonus for high absolute impression counts
-            let absoluteImpressionBonus = 0;
-            if (currentMetrics.impressions >= 100000) {
-                // 100k+ impressions: significant additional boost (up to 0.5)
-                absoluteImpressionBonus = Math.min(0.5, Math.log10(currentMetrics.impressions / 100000) * 0.3);
-            } else if (currentMetrics.impressions >= 10000) {
-                // 10k-100k impressions: modest additional boost (up to 0.3)
-                absoluteImpressionBonus = Math.min(0.3, Math.log10(currentMetrics.impressions / 10000) * 0.2);
-            } else if (currentMetrics.impressions >= 1000) {
-                // 1k-10k impressions: small additional boost (up to 0.1)
-                absoluteImpressionBonus = Math.min(0.1, Math.log10(currentMetrics.impressions / 1000) * 0.1);
-            }
-            
-            // Apply combined boost - up to 3x from viral coefficient plus absolute bonus
-            const totalImpressionBoost = impressionBoost + absoluteImpressionBonus;
-            engagementRate = engagementRate + (engagementRate * totalImpressionBoost);
-            
-            console.log("Viral Coefficient:", viralCoefficient, "Ratio Boost:", impressionBoost, 
-                       "Absolute Bonus:", absoluteImpressionBonus, "Total Boost:", totalImpressionBoost);
-        }
-        
-        // Get raw interaction total for reference
-        const totalInteractions = currentMetrics.likes + currentMetrics.retweets + 
-                                 currentMetrics.replies + (currentMetrics.quotes || 0);
-        
-        console.log("Total Interactions:", totalInteractions, "Weighted Interactions:", weightedInteractions, "Engagement Rate:", engagementRate);
-        
-        // Prepare previous score context if available
-        let previousScoreContext = '';
-        if (previousScore) {
-            const scoredDate = new Date(previousScore.scored_at).toLocaleDateString();
-            previousScoreContext = `
-            **Previous Scoring Data (${scoredDate}):**
-            - Previous Score: ${previousScore.score}/100
-            - Previous Content Score: ${previousScore.content_score}/50
-            - Previous Engagement Score: ${previousScore.engagement_score}/50
-            
-            **Previous Engagement Metrics:**
-            - Likes: ${previousScore.engagement_metrics.likes}
-            - Retweets: ${previousScore.engagement_metrics.retweets}
-            - Replies: ${previousScore.engagement_metrics.replies}
-            ${previousScore.engagement_metrics.quotes ? `- Quotes: ${previousScore.engagement_metrics.quotes}` : ''}
-            ${previousScore.engagement_metrics.impressions ? `- Impressions: ${previousScore.engagement_metrics.impressions}` : ''}
-            
-            When evaluating engagement growth (criterion 5), compare current metrics with these previous metrics.
-            `;
-        }
-
         const { object: scoreResult } = await generateObject({
             model: openai('gpt-4o-mini'),
             schema: tweetScoreSchema,
-            prompt: `Please analyze and score the following tweet based *strictly* on the provided criteria. Assign points for each criterion and sum them for the final score (0-100).
+            prompt: `Please analyze and score the content quality of the following tweet based *strictly* on the provided criteria. 
+            
+            NOTE: You will ONLY evaluate the content quality (criteria 1-4). The engagement score (criterion 5) has been calculated automatically.
 
             **Scoring Criteria:**
             ${scoringCriteria}
 
-            **Current Engagement Metrics:**
+            **Current Engagement Metrics (For Reference Only - DO NOT SCORE THESE):**
             - Likes: ${currentMetrics.likes}
             - Retweets: ${currentMetrics.retweets}
             - Replies: ${currentMetrics.replies}
@@ -222,9 +230,8 @@ export async function assessTweetScore(
             - Author Followers: ${currentMetrics.followers || 'Unknown'}
             - Total Raw Interactions: ${totalInteractions}
             - Weighted Interactions: ${weightedInteractions.toFixed(1)}
-            - Weighted Engagement Rate: ${engagementRate.toFixed(2)}% (weighted interactions relative to followers, with a boost for high impression content)
-            
-            ${previousScoreContext}
+            - Weighted Engagement Rate: ${engagementRate.toFixed(4)}% (relative to impressions or followers)
+            - Engagement Score: ${engagementScore.toFixed(2)}/50 (calculated automatically based on industry benchmarks)
 
             **Tweet Data (JSON):**
             \`\`\`json
@@ -232,11 +239,10 @@ export async function assessTweetScore(
             \`\`\`
 
             Your response MUST include the following fields in the specified format:
-            1. reasoning: A brief explanation of your scoring rationale
-            2. engagement_score: The portion of score based on engagement metrics (criterion 5, 0-50 points)
-            3. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
+            1. reasoning: A brief explanation of your content quality scoring rationale
+            2. content_score: The portion of score based on content quality (criteria 1-4, 0-50 points)
             
-            Focus on accurately calculating content_score and engagement_score. Do NOT calculate the total score - that will be done automatically.
+            DO NOT evaluate or comment on the engagement metrics in your reasoning - focus ONLY on content quality.
             
             Important Scoring Instructions:
             - When you see "assign X to Y points", you should choose a specific score within that range. For example, "assign 20 to 25 points" means you should pick a specific value like 21, 22, 23, etc.
@@ -249,6 +255,7 @@ export async function assessTweetScore(
             - Long, detailed tweets (6+ sentences with specific insights or technical details) should receive a content_score of 35 to 50 points out of 50 if highly relevant and well-structured.
             `
         });
+
         //finalize the score to ensure it falls within the expected range
         if (!scoreResult) {
             throw new Error("Failed to generate score object from AI model.");
@@ -257,21 +264,19 @@ export async function assessTweetScore(
             console.warn("Content score is less than 0, which is unexpected.");
             scoreResult.content_score = 0;
         }
-        if (scoreResult.engagement_score < 0){   
-            console.warn("Engagement score is less than 0, which is unexpected.");
-            scoreResult.engagement_score = 0;
-        }
         if (scoreResult.content_score > 50){   
             console.warn("Content score exceeds 50, which is unexpected.");
             scoreResult.content_score = 50;
         }
-        if (scoreResult.engagement_score > 50){   
-            console.warn("Engagement score exceeds 50, which is unexpected.");
-            scoreResult.engagement_score = 50;
-        }
         
-        // The score is already calculated in the schema transform
+        // Now use our algorithmically calculated engagement score
+        scoreResult.engagement_score = engagementScore;
+        
+        // Calculate the total score (content + engagement)
+        scoreResult.score = Math.min(scoreResult.content_score + scoreResult.engagement_score, 100);
 
+        console.log("Final Scores - Content:", scoreResult.content_score, "Engagement:", scoreResult.engagement_score, "Total:", scoreResult.score);
+        
         return scoreResult;
 
     } catch (error) {

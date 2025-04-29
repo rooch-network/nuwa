@@ -10,7 +10,7 @@ import {
     checkRecentTwitterProfileScore,
     addTwitterProfileScore,
 } from '@/app/services/supabaseService';
-import { assessTweetScore } from './scoring-agent';
+import { assessTweetScore, calculateEngagementScore } from './scoring-agent';
 // Import the profile scoring function
 import { getProfileScore } from './profile-scoring-agent';
 import * as twitterAdapter from '@/app/services/twitterAdapter';
@@ -300,7 +300,6 @@ export const tools = {
             try {
                 // Check if tweet has been scored before
                 let existingScore = null;
-                let previousScoreData = null;
                 const MIN_RESCORE_INTERVAL_HOURS = 1; // Minimum hours between scoring attempts
                 
                 try {
@@ -308,22 +307,6 @@ export const tools = {
                     
                     // If already scored recently, return existing score
                     if (existingScore) {
-                        // Construct previousScoreData directly from existingScore
-                        previousScoreData = {
-                            tweet_id: tweetId,
-                            score: existingScore.score,
-                            content_score: existingScore.content_score,
-                            engagement_score: existingScore.engagement_score,
-                            engagement_metrics: {
-                                likes: existingScore.engagement_metrics?.likes || 0,
-                                retweets: existingScore.engagement_metrics?.retweets || 0,
-                                replies: existingScore.engagement_metrics?.replies || 0,
-                                quotes: existingScore.engagement_metrics?.quotes || 0,
-                                impressions: existingScore.engagement_metrics?.impressions || 0
-                            },
-                            scored_at: existingScore.updated_at || existingScore.created_at
-                        };
-
                         const lastScoredAt = new Date(existingScore.updated_at || existingScore.created_at);
                         const hoursSinceLastScore = (Date.now() - lastScoredAt.getTime()) / (1000 * 60 * 60);
                         
@@ -341,8 +324,8 @@ export const tools = {
                             };
                         }
                         
-                        // If more than MIN_RESCORE_INTERVAL_HOURS have passed, we'll automatically rescore
-                        console.log(`Tweet ${tweetId} was last scored ${hoursSinceLastScore.toFixed(1)} hours ago. Rescoring now.`);
+                        // If more than MIN_RESCORE_INTERVAL_HOURS have passed, we'll rescore engagement only
+                        console.log(`Tweet ${tweetId} was last scored ${hoursSinceLastScore.toFixed(1)} hours ago. Updating engagement score only.`);
                     }
                 } catch (error) {
                     console.warn(`Could not check existing score for tweet ${tweetId}: ${error}`);
@@ -357,12 +340,36 @@ export const tools = {
                     throw new Error(`Tweet data not found for ID ${tweetId}`);
                 }
 
-                // Score the tweet
-                console.log(`Scoring tweet ${tweetId}...`);
-                const { score, reasoning, engagement_score, content_score } = await assessTweetScore(
-                    standardTweet,
-                    previousScoreData || undefined
-                );
+                let score, reasoning, engagement_score, content_score;
+
+                // If we have an existing score, only update the engagement part
+                if (existingScore) {
+                    // Extract current engagement metrics
+                    const currentMetrics = {
+                        likes: standardTweet.public_metrics?.like_count || 0,
+                        retweets: standardTweet.public_metrics?.retweet_count || 0,
+                        replies: standardTweet.public_metrics?.reply_count || 0,
+                        quotes: standardTweet.public_metrics?.quote_count || 0,
+                        impressions: standardTweet.public_metrics?.impression_count,
+                        followers: standardTweet.author?.public_metrics?.followers_count
+                    };
+                    
+                    // Calculate new engagement score but keep existing content score
+                    engagement_score = calculateEngagementScore(currentMetrics, standardTweet.created_at);
+                    content_score = existingScore.content_score;
+                    score = Math.min(content_score + engagement_score, 100);
+                    reasoning = existingScore.reasoning; // Keep existing reasoning for content
+                    
+                    console.log(`Updated engagement score for tweet ${tweetId}. New engagement score: ${engagement_score.toFixed(2)}`);
+                } else {
+                    // For first-time scoring, do a full assessment
+                    console.log(`Scoring tweet ${tweetId} for the first time...`);
+                    const scoreResult = await assessTweetScore(standardTweet);
+                    score = scoreResult.score;
+                    reasoning = scoreResult.reasoning;
+                    engagement_score = scoreResult.engagement_score;
+                    content_score = scoreResult.content_score;
+                }
 
                 // Save the score to database
                 console.log(`Saving score for tweet ${tweetId}...`);
