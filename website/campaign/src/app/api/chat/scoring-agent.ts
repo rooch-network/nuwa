@@ -143,7 +143,7 @@ export async function assessTweetScore(
         
         // Apply impression boost when calculating engagement rate
         // Higher impression-to-follower ratio means better reach, which should be rewarded
-        if (currentMetrics.impressions && currentMetrics.followers && currentMetrics.impressions > currentMetrics.followers) {
+        if (currentMetrics.impressions && currentMetrics.followers) {
             // Calculate impression-to-follower ratio (viral coefficient)
             const viralCoefficient = currentMetrics.impressions / currentMetrics.followers;
             
@@ -172,7 +172,7 @@ export async function assessTweetScore(
             
             // Apply combined boost - up to 3x from viral coefficient plus absolute bonus
             const totalImpressionBoost = impressionBoost + absoluteImpressionBonus;
-            engagementRate = engagementRate * totalImpressionBoost;
+            engagementRate = engagementRate + (engagementRate * totalImpressionBoost);
             
             console.log("Viral Coefficient:", viralCoefficient, "Ratio Boost:", impressionBoost, 
                        "Absolute Bonus:", absoluteImpressionBonus, "Total Boost:", totalImpressionBoost);
