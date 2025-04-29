@@ -1,27 +1,44 @@
-import { signIn, signOut, useSession } from "next-auth/react";
+'use client'
+
 import { FaTwitter } from "react-icons/fa";
+import { useSupabaseAuth } from "../providers/SupabaseAuthProvider";
 
 export const TwitterLoginButton = () => {
-    const { data: session, status } = useSession();
+    const { session, signIn, signOut } = useSupabaseAuth();
 
-    if (status === "loading") {
+    if (session.isLoading) {
         return <div>Loading...</div>;
     }
 
-    if (session) {
+    if (session.user) {
+        const userData = session.user;
+        const userMetadata = userData.user_metadata;
+        
+        const username = userMetadata.preferred_username || 
+                         userMetadata.user_name || 
+                         userMetadata.twitter_handle;
+                         
+        const name = userMetadata.name || 
+                     userMetadata.full_name || 
+                     'User';
+        
+        const avatarUrl = userMetadata.avatar_url || 
+                          userMetadata.picture || 
+                          '';
+
         return (
             <div className="flex flex-col items-center">
                 <div className="flex items-center space-x-2 mb-4">
-                    {session.user?.image && (
+                    {avatarUrl && (
                         <img
-                            src={session.user.image}
-                            alt={session.user.name || "User avatar"}
+                            src={avatarUrl}
+                            alt={name || "User avatar"}
                             className="w-10 h-10 rounded-full"
                         />
                     )}
                     <div>
-                        <p className="font-medium">{session.user?.name}</p>
-                        <p className="text-sm text-gray-500">@{session.user?.twitterHandle}</p>
+                        <p className="font-medium">{name}</p>
+                        {username && <p className="text-sm text-gray-500">@{username}</p>}
                     </div>
                 </div>
                 <button
@@ -36,11 +53,11 @@ export const TwitterLoginButton = () => {
 
     return (
         <button
-            onClick={() => signIn("twitter", { callbackUrl: "/" })}
+            onClick={() => signIn("twitter")}
             className="flex items-center space-x-2 bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white font-bold py-2 px-4 rounded"
         >
             <FaTwitter className="text-xl" />
             <span>Sign in with Twitter</span>
         </button>
     );
-}; 
+};

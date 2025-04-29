@@ -1,14 +1,14 @@
 'use client'
 
-import { SessionProvider } from "next-auth/react";
+import { SupabaseAuthProvider } from "./SupabaseAuthProvider";
 import { MissionsProvider } from "../../context/MissionsContext";
 
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
-        <SessionProvider>
+        <SupabaseAuthProvider>
             <MissionsProvider>
                 {children}
             </MissionsProvider>
-        </SessionProvider>
+        </SupabaseAuthProvider>
     );
-} 
+}
