@@ -1,11 +1,11 @@
 'use client'
 
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Leaderboard } from "@/app/components/leaderboard/Leaderboard";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
 import { BarLoader } from "@/app/components/shared/BarLoader";
+import { useSupabaseAuth } from "../components/providers/SupabaseAuthProvider";
 
 // 定义淡入动画变体
 const fadeInUp = {
@@ -21,16 +21,16 @@ const fadeInUp = {
 };
 
 export default function LeaderboardPage() {
-    const { data: session, status } = useSession();
+    const { session } = useSupabaseAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (status === "unauthenticated") {
+        if (!session || !session.user) {
             router.push("/");
         }
-    }, [status, router]);
+    }, [session, router]);
 
-    if (status === "loading") {
+    if (session.isLoading) {
         return (
             <div className="flex justify-center items-center h-screen">
                 <BarLoader />

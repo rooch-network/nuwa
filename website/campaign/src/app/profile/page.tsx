@@ -1,11 +1,11 @@
 'use client'
 
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { UserProfilePanel } from "@/app/components/profile/UserProfilePanel";
 import { UserPointsHistory } from "@/app/components/profile/UserPointsHistory";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
+import { useSupabaseAuth } from "../components/providers/SupabaseAuthProvider";
 
 // 定义淡入动画变体
 const fadeInUp = {
@@ -21,16 +21,16 @@ const fadeInUp = {
 };
 
 export default function ProfilePage() {
-    const { data: session, status } = useSession();
+    const { session } = useSupabaseAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (status === "unauthenticated") {
+        if (!session || !session.user) {
             router.push("/");
         }
-    }, [status, router]);
+    }, [session, router]);
 
-    if (status === "loading") {
+    if (session.isLoading) {
         return <div className="flex justify-center items-center h-screen">Loading...</div>;
     }
 
@@ -39,7 +39,7 @@ export default function ProfilePage() {
     }
 
     // 从session中获取Twitter用户名
-    const twitterHandle = session.user?.twitterHandle || '';
+    const twitterHandle = session.user?.user_metadata?.twitter_handle || '';
 
     return (
         <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">

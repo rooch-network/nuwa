@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { TwitterLoginButton } from "@/app/components/auth/TwitterLoginButton";
-import { useSession, signOut } from "next-auth/react";
+// import { useSession, signOut } from "next-auth/react";
 import { motion } from "framer-motion";
 import { FiAward } from "react-icons/fi";
 import { getUserPointsByHandle } from "@/app/services/supabaseService";
 import { PanelHeader } from "@/app/components/shared/PanelHeader";
+import { useSupabaseAuth } from "../providers/SupabaseAuthProvider";
 
 export const UserProfilePanel = () => {
-    const { data: session, status } = useSession();
+    const { session, signOut } = useSupabaseAuth();
     const [points, setPoints] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
         const fetchPoints = async () => {
-            if (session?.user?.twitterHandle) {
+            if (session?.user?.user_metadata.twitter_handle) {
                 try {
-                    const points = await getUserPointsByHandle(session.user.twitterHandle);
+                    const points = await getUserPointsByHandle(session.user.user_metadata.twitter_handle);
                     setPoints(points);
                 } catch (error) {
                     console.error("Error fetching user points:", error);
@@ -73,16 +74,16 @@ export const UserProfilePanel = () => {
                             <div className="flex justify-between items-start">
                                 {/* 左侧：头像和用户信息 */}
                                 <div className="flex items-center space-x-3">
-                                    {session.user?.image && (
+                                    {session.user?.user_metadata.avatar_url && (
                                         <img
-                                            src={session.user.image}
-                                            alt={session.user.name || "User avatar"}
+                                            src={session.user.user_metadata.avatar_url}
+                                            alt={session.user.user_metadata.name || "User avatar"}
                                             className="w-12 h-12 rounded-full border-2 border-indigo-500"
                                         />
                                     )}
                                     <div className="text-left">
-                                        <p className="font-medium text-lg">{session.user?.name}</p>
-                                        <p className="text-sm text-gray-500">@{session.user?.twitterHandle}</p>
+                                        <p className="font-medium text-lg">{session.user?.user_metadata.name}</p>
+                                        <p className="text-sm text-gray-500">@{session.user?.user_metadata.twitter_handle}</p>
                                     </div>
                                 </div>
 

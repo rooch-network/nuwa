@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     
     if (code) {
         const response = NextResponse.redirect(requestUrl.origin)
-        const supabase = createRouteHandlerClient(request, response)
+        const supabase = await createRouteHandlerClient(request, response)
         
         try {
             // 使用授权码交换会话
