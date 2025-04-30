@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { classifyMessage, generateAIResponseStream } from '../agent';
 import { getServerSession } from 'next-auth';
 
-// 拓展 NextAuth Session 类型
 declare module "next-auth" {
     interface Session {
         user?: {
@@ -13,12 +12,9 @@ declare module "next-auth" {
         }
     }
 }
-
-// 用户信息类型定义
 interface UserInfo {
     name: string;
     twitterHandle: string;
-    // Add other potential fields
 }
 
 // Allow streaming responses up to 30 seconds
@@ -70,8 +66,8 @@ export async function POST(req: Request) {
     } = await req.json();
 
     const userInfo: UserInfo = {
-        name: session.user.name || 'visitor',
-        twitterHandle: session.user.twitterHandle || 'visitor'
+        name: session.user.name,
+        twitterHandle: session.user.twitterHandle
     };
 
     if (!process.env.OPENAI_API_KEY) {
