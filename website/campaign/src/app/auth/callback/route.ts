@@ -104,13 +104,13 @@ export async function GET(request: NextRequest) {
                 }
             }
             
-            return response
+            // return response
         } catch (error) {
             console.error('Unexpected error during auth callback:', error)
-            return NextResponse.redirect(`${requestUrl.origin}/auth/error`)
+            // return NextResponse.redirect(`${requestUrl.origin}/auth/error`)
         }
     }
     
     // 如果没有code参数，重定向到首页
-    return NextResponse.redirect(requestUrl.origin)
+    // return NextResponse.redirect(requestUrl.origin)
 }

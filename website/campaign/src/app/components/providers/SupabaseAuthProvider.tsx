@@ -99,6 +99,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     try {
       console.log('signIn', provider)
       console.log('window.location.origin', window.location.origin)
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
