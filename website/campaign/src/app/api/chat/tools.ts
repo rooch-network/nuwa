@@ -7,7 +7,7 @@ import {
     getUserPointsByHandle,
     getTweetScore,
     saveTweetScoreRecord,
-    checkRecentTwitterProfileScore,
+    checkTwitterProfileScore,
     addTwitterProfileScore,
 } from '@/app/services/supabaseService';
 import { assessTweetScore, calculateEngagementScore } from './scoring-agent';
@@ -420,7 +420,7 @@ export const tools = {
             try {
                 // Check if the profile has been scored recently
                 try {
-                    const recentScore = await checkRecentTwitterProfileScore(userName);
+                    const recentScore = await checkTwitterProfileScore(userName);
                     if (recentScore) {
                         return {
                             success: true,

@@ -600,26 +600,17 @@ export async function getTwitterProfileScore(handle: string): Promise<{ score: n
  * Checks if a Twitter profile has been scored recently (within the specified days)
  * 
  * @param handle The Twitter handle to check
- * @param withinDays Number of days to consider a score as "recent"
  * @returns An object with the score and reasoning if found, null otherwise
  */
-export async function checkRecentTwitterProfileScore(
+export async function checkTwitterProfileScore(
     handle: string, 
-    withinDays: number = 7
 ): Promise<{ score: number; reasoning: string } | null> {
     const supabase = await createClient();
     
-    // Calculate date threshold
-    const thresholdDate = new Date();
-    thresholdDate.setDate(thresholdDate.getDate() - withinDays);
-    const thresholdDateString = thresholdDate.toISOString();
-    
-    // Query for records more recent than the threshold
     const { data, error } = await supabase
         .from('twitter_profile_score')
         .select('score, reasoning')
         .eq('handle', handle)
-        .gt('updated_at', thresholdDateString)
         .maybeSingle();
     
     if (error) {
