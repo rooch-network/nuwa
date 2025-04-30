@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FiAward, FiRefreshCw } from "react-icons/fi";
-import { getUserPointsHistory, PointsHistoryItem } from "@/app/services/supabaseService";
+import { PointsHistoryItem } from "@/app/services/supabaseService";
 import { BarLoader } from "@/app/components/shared/BarLoader";
 import { useMissions } from "@/app/context/MissionsContext";
 import { PanelHeader } from "@/app/components/shared/PanelHeader";
@@ -22,7 +22,20 @@ export const UserPointsHistory = ({ userName }: UserPointsHistoryProps) => {
     const fetchHistory = async () => {
         try {
             setLoading(true);
-            const historyData = await getUserPointsHistory(userName);
+            const response = await fetch('/api/user/history');
+            
+            if (response.status === 401) {
+                // 用户未登录
+                setHistory([]);
+                setError('You need to be logged in to view history');
+                return;
+            }
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch points history');
+            }
+            
+            const historyData = await response.json();
             setHistory(historyData);
             setError(null);
         } catch (err) {
@@ -147,7 +160,7 @@ const TableRow = ({
             const minutes = date.getMinutes().toString().padStart(2, '0');
 
             return `${month} ${day}, ${year} ${hours}:${minutes}`;
-        } catch (error) {
+        } catch {
             return 'Unknown date';
         }
     };

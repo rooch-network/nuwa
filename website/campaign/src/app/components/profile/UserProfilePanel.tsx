@@ -3,7 +3,6 @@ import { TwitterLoginButton } from "@/app/components/auth/TwitterLoginButton";
 import { useSession, signOut } from "next-auth/react";
 import { motion } from "framer-motion";
 import { FiAward } from "react-icons/fi";
-import { getUserPointsByHandle } from "@/app/services/supabaseService";
 import { PanelHeader } from "@/app/components/shared/PanelHeader";
 
 export const UserProfilePanel = () => {
@@ -15,10 +14,17 @@ export const UserProfilePanel = () => {
         const fetchPoints = async () => {
             if (session?.user?.twitterHandle) {
                 try {
-                    const points = await getUserPointsByHandle(session.user.twitterHandle);
-                    setPoints(points);
+                    const response = await fetch('/api/user/points');
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch user points');
+                    }
+                    
+                    const data = await response.json();
+                    setPoints(data.points);
                 } catch (error) {
                     console.error("Error fetching user points:", error);
+                    setPoints(0);
                 } finally {
                     setLoading(false);
                 }

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { FiAward } from "react-icons/fi";
-import { getLeaderboardData, LeaderboardUser } from "@/app/services/supabaseService";
+import { LeaderboardUser } from "@/app/services/supabaseService";
 import { BarLoader } from "@/app/components/shared/BarLoader";
 import { PanelHeader } from "@/app/components/shared/PanelHeader";
 
@@ -54,7 +54,13 @@ export const Leaderboard = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const data = await getLeaderboardData();
+                const response = await fetch('/api/leaderboard');
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch leaderboard data');
+                }
+                
+                const data = await response.json();
                 setUsers(data);
                 setError(null);
             } catch (err) {
