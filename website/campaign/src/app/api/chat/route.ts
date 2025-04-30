@@ -1,17 +1,8 @@
 import { type CoreMessage } from 'ai';
 import { NextResponse } from 'next/server';
 import { classifyMessage, generateAIResponseStream } from '../agent';
-import { getServerSession } from 'next-auth';
+import { auth } from '@/auth';
 
-declare module "next-auth" {
-    interface Session {
-        user?: {
-            name: string;
-            twitterHandle: string;
-            image?: string | null;
-        }
-    }
-}
 interface UserInfo {
     name: string;
     twitterHandle: string;
@@ -22,7 +13,7 @@ export const maxDuration = 30;
 
 // Add a new interface for message classification
 export async function GET(req: Request) {
-    const session = await getServerSession();
+    const session = await auth();
     
     if (!session || !session.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -31,6 +22,10 @@ export async function GET(req: Request) {
     // Get message content from request URL
     const url = new URL(req.url);
     const message = url.searchParams.get('message');
+    
+    if (!session.user.name || !session.user.twitterHandle) {
+        return NextResponse.json({ error: 'User information incomplete' }, { status: 400 });
+    }
     
     const userInfo: UserInfo = {
         name: session.user.name,
@@ -53,7 +48,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession();
+    const session = await auth();
     
     if (!session || !session.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -64,6 +59,10 @@ export async function POST(req: Request) {
         messages: CoreMessage[];
         classifiedMissionId: string | null;
     } = await req.json();
+
+    if (!session.user.name || !session.user.twitterHandle) {
+        return NextResponse.json({ error: 'User information incomplete' }, { status: 400 });
+    }
 
     const userInfo: UserInfo = {
         name: session.user.name,

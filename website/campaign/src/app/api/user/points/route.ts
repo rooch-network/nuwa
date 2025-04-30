@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getUserPointsByHandle } from '@/app/services/supabaseService';
-import { getServerSession } from 'next-auth';
+import { auth } from '@/auth';
+import { Session } from 'next-auth';
 
 export async function GET() {
-  const session = await getServerSession();
+  const session = await auth() as Session;
   
-  if (!session || !session.user || !session.user.twitterHandle) {
+  if (!session?.user?.twitterHandle) {
     return NextResponse.json(
       { error: 'Unauthorized' }, 
       { status: 401 }
