@@ -1,38 +1,48 @@
 import { Context } from 'telegraf';
-import { openai } from '@ai-sdk/openai';
-import { generateText } from 'ai';
-import { tools } from '../chat/tools';
+import { generateAIResponse } from '../agent';
+import { UserInfo } from '../chat/mission-router';
 
 /**
- * 生成AI响应并发送给用户
- * @param ctx Telegram上下文
- * @param history 对话历史
- * @param systemPrompt 系统提示
- * @returns AI响应文本
+ * Generate and send AI response
+ * @param ctx Telegram context
+ * @param history Conversation history
+ * @param systemPrompt System prompt
+ * @param userInfo User information
+ * @param missionId Mission ID
  */
 export async function generateAndSendAIResponse(
     ctx: Context,
-    history: Array<{ role: 'user' | 'assistant', content: string }>,
-    systemPrompt: string
-): Promise<string> {
-    // 使用generateText生成响应
-    const result = await generateText({
-        model: openai('gpt-4o-mini'),
-        messages: history,
-        tools,
-        system: systemPrompt,
-        maxSteps: 50,
-        toolChoice: 'auto'
-    });
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    systemPrompt: string,
+    userInfo?: UserInfo,
+    missionId?: string | null
+) {
+    try {
+        // Show "typing..." indicator
+        await ctx.sendChatAction('typing');
 
-    // 获取AI响应
-    const aiResponse = await result.text;
+        // Build message array from history
+        const messages = history.map(entry => ({
+            role: entry.role,
+            content: entry.content
+        }));
 
-    // 添加AI响应到历史记录
-    history.push({ role: 'assistant', content: aiResponse });
+        // If user info not provided, build from context
+        const user = userInfo || {
+            name: ctx.from?.first_name || 'unknown',
+            twitterHandle: ''
+        };
 
-    // 发送响应给用户
-    await ctx.reply(aiResponse, { parse_mode: 'HTML' });
+        // Generate AI response using agent
+        const aiResponseText = await generateAIResponse(messages, user, missionId || null);
 
-    return aiResponse;
+        // Add AI response to history
+        history.push({ role: 'assistant', content: aiResponseText });
+
+        // Send AI response
+        await ctx.reply(aiResponseText, { parse_mode: 'Markdown' });
+    } catch (error) {
+        console.error('Error generating AI response:', error);
+        await ctx.reply('Sorry, an error occurred while generating a response. Please try again later.');
+    }
 } 

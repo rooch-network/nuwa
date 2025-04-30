@@ -8,6 +8,7 @@ import { handleMyPointsCommand } from './points-commands';
 import { handleLeaderboardCommand } from './leaderboard-commands';
 import { sendWelcomeMessage, handleWelcomeButtons } from './send-welcome/send-welcome';
 import { generateAndSendAIResponse } from './ai-utils';
+import { classifyMessage } from '../agent';
 
 // Initialize Telegraf bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN || '');
@@ -46,14 +47,14 @@ bot.command('help', async (ctx) => {
     try {
         const telegramId = ctx.from.id.toString();
 
-        // 检查 Twitter 绑定状态
+        // Check Twitter binding status
         const twitterHandle = await checkTwitterBinding(telegramId);
 
         if (twitterHandle) {
-            // 发送欢迎消息
+            // Send welcome message
             await sendWelcomeMessage(ctx, twitterHandle);
         } else {
-            // 如果未绑定，显示欢迎信息和绑定按钮
+            // If not bound, display welcome message and binding button
             await sendTwitterBindingMessage(ctx, telegramId);
         }
     } catch (error) {
@@ -118,7 +119,7 @@ bot.command('leaderboard', handleLeaderboardCommand);
 
 // Handle mission button clicks
 bot.action(/^mission_(.+)$/, async (ctx) => {
-    // 从回调数据中提取任务ID
+    // Extract mission ID from callback data
     const callbackQuery = ctx.callbackQuery;
     if (callbackQuery && 'data' in callbackQuery) {
         const missionId = callbackQuery.data.replace('mission_', '');
@@ -171,25 +172,15 @@ bot.on(filters.message('text'), async (ctx) => {
         // If no active mission, classify the message
         if (!missionId) {
             try {
-                // Build query parameters
-                const params = new URLSearchParams({
-                    message: userMessage,
-                    userName: userInfo.name || 'unknown',
-                    twitterHandle: userInfo.twitterHandle || 'unknown'
-                });
+                // Use agent module to classify the message
+                const classification = await classifyMessage(userMessage, userInfo);
+                
+                missionId = classification.missionId;
+                confidence = classification.confidence;
 
-                // Call classification API
-                const response = await fetch(`${process.env.NEXTAUTH_URL}/api/chat?${params.toString()}`);
-
-                if (response.ok) {
-                    const result = await response.json();
-                    missionId = result.missionId;
-                    confidence = result.confidence;
-
-                    // If confidence is high, set as active mission
-                    if (confidence > 0.7 && missionId) {
-                        activeMissions.set(telegramId, missionId);
-                    }
+                // If confidence is high, set as active mission
+                if (confidence > 0.7 && missionId) {
+                    activeMissions.set(telegramId, missionId);
                 }
             } catch (error) {
                 console.error('Error classifying message:', error);
@@ -209,8 +200,8 @@ bot.on(filters.message('text'), async (ctx) => {
         await ctx.reply(`Well noted, just a moment...`);
 
 
-        // 使用工具函数生成并发送AI响应
-        await generateAndSendAIResponse(ctx, history, systemPrompt);
+        // Use AI helper tool to generate and send response, passing user info and mission ID
+        await generateAndSendAIResponse(ctx, history, systemPrompt, userInfo, missionId);
 
         await ctx.reply(`You can use /end_mission command to end this mission when you're done.`);
 
