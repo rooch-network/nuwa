@@ -9,9 +9,11 @@ import {
     type StreamTextOnChunkCallback,
     type TextStreamPart,
     type StepResult,
+    generateText
 } from 'ai';
 import { tools } from '../chat/tools';
 import { classifyUserMission, getMissionSystemPrompt, getDefaultSystemPrompt, UserInfo } from '../chat/mission-router';
+import { searchKnowledgeEmbeddings } from '../../services/vectorStore';
 
 /**
  * Classify user message using AI
@@ -21,6 +23,81 @@ export async function classifyMessage(
     userInfo: UserInfo
 ) {
     return await classifyUserMission(message, userInfo);
+}
+
+/**
+ * Enhance user query with RAG technology
+ * Retrieve relevant knowledge from vector database
+ */
+async function enhanceWithRAG(
+    userQuery: string,
+    systemPrompt: string
+): Promise<string> {
+    try {
+        // Use vector search to find knowledge related to the user's question
+        const relevantKnowledge = await searchKnowledgeEmbeddings(
+            userQuery,
+            3,  // Return up to 3 records
+            0.75 // Similarity threshold
+        );
+        
+        if (relevantKnowledge.length === 0) {
+            console.log('No relevant knowledge found for query:', userQuery);
+            return systemPrompt;
+        }
+
+        // Construct enhanced system prompt
+        const knowledgeSection = `
+## Relevant Knowledge Base Content
+The following information from our knowledge base is relevant to the user's question. Please reference this content in your response:
+
+${relevantKnowledge.map((item, i) => `
+### ${i + 1}. ${item.title || 'Knowledge Item'} (Similarity: ${(item.similarity * 100).toFixed(2)}%)
+${item.content || 'No content'}
+`).join('\n')}
+
+Please base your answer on the above knowledge. If the knowledge content is insufficient to completely answer the question, please acknowledge this and provide the information you do know.
+`;
+
+        // Add knowledge content to system prompt
+        const enhancedPrompt = systemPrompt + knowledgeSection;
+        console.log(`Enhanced system prompt with ${relevantKnowledge.length} knowledge records`);
+        
+        return enhancedPrompt;
+    } catch (error) {
+        console.error('Error enhancing with RAG:', error);
+        return systemPrompt; // Return original prompt on error
+    }
+}
+
+/**
+ * Detect if user message is a general question rather than task-related
+ */
+async function isGeneralQuestion(message: string): Promise<boolean> {
+    try {
+        const completion = await generateText({
+            model: openai('gpt-4o-mini'),
+            messages: [
+                {
+                    role: 'system',
+                    content: `Your task is to determine if the user's message is a general question.
+                    Characteristics of general questions: seeking information, asking about concepts, requesting explanation, technical questions, etc.
+                    Characteristics of task-related messages: expressing intent to complete a task, requesting specific operation guidance, submitting task results, etc.
+                    Return only "true" or "false", where true means it's a general question, false means it's a task-related message.`,
+                },
+                {
+                    role: 'user',
+                    content: message,
+                },
+            ],
+        });
+
+        // generateText returns the text content directly, not an object
+        return completion.text.toLowerCase() === 'true';
+    } catch (error) {
+        console.error('Error detecting if message is a general question:', error);
+        return false; // Default to assuming it's not a general question
+    }
 }
 
 /**
@@ -35,12 +112,33 @@ export async function generateAIResponseStream(
         throw new Error('OPENAI_API_KEY is not set');
     }
 
+    // Get the last user message
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+    // Extract text content from user message
+    let userQuery = '';
+    if (lastUserMessage && typeof lastUserMessage.content === 'string') {
+        userQuery = lastUserMessage.content;
+    } else if (lastUserMessage && Array.isArray(lastUserMessage.content)) {
+        // If content is an array, extract all text parts
+        userQuery = lastUserMessage.content
+            .filter(part => typeof part === 'object' && 'type' in part && part.type === 'text')
+            .map(part => (part as { text: string }).text)
+            .join(' ');
+    }
+    
+    // Detect if it's a general question
+    const isGeneralQA = userQuery ? await isGeneralQuestion(userQuery) : false;
+    
     let systemPrompt;
-
     if (classifiedMissionId) {
         systemPrompt = await getMissionSystemPrompt(classifiedMissionId, userInfo);
     } else {
         systemPrompt = await getDefaultSystemPrompt(userInfo);
+    }
+    
+    // For general questions, enhance system prompt with RAG
+    if (isGeneralQA && userQuery) {
+        systemPrompt = await enhanceWithRAG(userQuery, systemPrompt);
     }
 
     // Define streamText options with inline callbacks and exact types
