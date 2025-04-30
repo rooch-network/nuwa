@@ -65,7 +65,7 @@ async function ensureUserRecord(handle: string, name: string, avatar: string): P
 export async function GET(request: NextRequest) {
     const requestUrl = new URL(request.url)
     const code = requestUrl.searchParams.get('code')
-    console.log('重定向', code)
+    console.log('Auth callback received with code:', code)
     
     if (code) {
         const response = NextResponse.redirect(requestUrl.origin)
@@ -86,7 +86,6 @@ export async function GET(request: NextRequest) {
                 const userMetadata = user.user_metadata
                 
                 // 提取Twitter用户名和资料信息
-                // Twitter OAuth可能将用户名存储在不同的元数据字段
                 const handle = userMetadata.preferred_username || 
                                userMetadata.user_name || 
                                userMetadata.twitter_handle
@@ -100,17 +99,20 @@ export async function GET(request: NextRequest) {
                                ''
                 
                 if (handle) {
-                    await ensureUserRecord(handle, name, avatar)
+                    const success = await ensureUserRecord(handle, name, avatar)
+                    if (!success) {
+                        console.error('Failed to ensure user record')
+                    }
                 }
             }
             
-            // return response
+            return response
         } catch (error) {
             console.error('Unexpected error during auth callback:', error)
-            // return NextResponse.redirect(`${requestUrl.origin}/auth/error`)
+            return NextResponse.redirect(`${requestUrl.origin}/auth/error`)
         }
     }
     
     // 如果没有code参数，重定向到首页
-    // return NextResponse.redirect(requestUrl.origin)
+    return NextResponse.redirect(requestUrl.origin)
 }

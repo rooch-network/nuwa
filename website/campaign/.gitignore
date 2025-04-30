@@ -59,6 +59,4 @@ logs
 .cache/
 .temp/
 
-supabase/
-
 certificates

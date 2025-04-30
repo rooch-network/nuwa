@@ -107,6 +107,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         },
       })
 
+      console.log('signIn', error)
+
       if (error) {
         setSession({ ...session, error })
       }
