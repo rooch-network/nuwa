@@ -1,7 +1,7 @@
 import { Context } from 'telegraf';
 import { getMissions } from '../airtable/airtable';
 import { checkTwitterBinding, sendTwitterBindingMessage } from './twitter-binding';
-import { getDefaultSystemPrompt, getMissionSystemPrompt, UserInfo } from '../chat/mission-router';
+import { UserInfo } from '../chat/mission-router';
 import { conversationHistory, activeMissions } from '../bot/route';
 import { generateAndSendAIResponse } from './ai-utils';
 
@@ -22,7 +22,7 @@ export async function handleMissionsCommand(ctx: Context): Promise<void> {
         }
 
         // 构建任务列表消息
-        let message = '📋 <b>Available Missions</b>\n\n';
+        const message = '📋 <b>Available Missions</b>\n\n';
 
         // 构建任务按钮
         const buttons = missions.map(mission => [{
@@ -101,9 +101,6 @@ export async function handleMissionButton(ctx: Context, missionId: string): Prom
             content: `I'll help you complete the "${mission.title}" mission. Let's get started!`
         });
 
-        // 获取任务特定的系统提示
-        const systemPrompt = await getMissionSystemPrompt(missionId, userInfo);
-
         // 构建任务详情消息
         let message = `📌 <b>${mission.title}</b>\n\n`;
         message += `${mission.description}\n\n`;
@@ -115,7 +112,7 @@ export async function handleMissionButton(ctx: Context, missionId: string): Prom
         });
 
         // 使用工具函数生成并发送AI响应
-        await generateAndSendAIResponse(ctx, history, systemPrompt);
+        await generateAndSendAIResponse(ctx, history, userInfo, missionId);
 
         // 添加提示信息
         await ctx.reply(`You can use /end_mission command to end this mission when you're done.`);

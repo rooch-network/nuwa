@@ -187,21 +187,11 @@ bot.on(filters.message('text'), async (ctx) => {
             }
         }
 
-        // Get system prompt
-        let systemPrompt;
-        if (missionId) {
-            // Use mission-specific system prompt
-            systemPrompt = await getMissionSystemPrompt(missionId, userInfo);
-        } else {
-            // Use default system prompt
-            systemPrompt = await getDefaultSystemPrompt(userInfo);
-        }
-
         await ctx.reply(`Well noted, just a moment...`);
 
 
         // Use AI helper tool to generate and send response, passing user info and mission ID
-        await generateAndSendAIResponse(ctx, history, systemPrompt, userInfo, missionId);
+        await generateAndSendAIResponse(ctx, history, userInfo, missionId);
 
         await ctx.reply(`You can use /end_mission command to end this mission when you're done.`);
 

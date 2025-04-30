@@ -13,8 +13,7 @@ import { UserInfo } from '../chat/mission-router';
 export async function generateAndSendAIResponse(
     ctx: Context,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
-    systemPrompt: string,
-    userInfo?: UserInfo,
+    userInfo: UserInfo,
     missionId?: string | null
 ) {
     try {
@@ -27,14 +26,8 @@ export async function generateAndSendAIResponse(
             content: entry.content
         }));
 
-        // If user info not provided, build from context
-        const user = userInfo || {
-            name: ctx.from?.first_name || 'unknown',
-            twitterHandle: ''
-        };
-
         // Generate AI response using agent
-        const aiResponseText = await generateAIResponse(messages, user, missionId || null);
+        const aiResponseText = await generateAIResponse(messages, userInfo, missionId || null);
 
         // Add AI response to history
         history.push({ role: 'assistant', content: aiResponseText });
