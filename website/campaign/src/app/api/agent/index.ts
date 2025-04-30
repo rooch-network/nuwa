@@ -38,9 +38,9 @@ export async function generateAIResponseStream(
     let systemPrompt;
 
     if (classifiedMissionId) {
-        systemPrompt = await getMissionSystemPrompt(classifiedMissionId, userInfo || {});
+        systemPrompt = await getMissionSystemPrompt(classifiedMissionId, userInfo);
     } else {
-        systemPrompt = await getDefaultSystemPrompt(userInfo || {});
+        systemPrompt = await getDefaultSystemPrompt(userInfo);
     }
 
     // Define streamText options with inline callbacks and exact types
