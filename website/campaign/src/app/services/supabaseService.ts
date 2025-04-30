@@ -1,5 +1,5 @@
 
-import { createClient, createServiceClient } from './supabase';
+import { createServiceClient } from './supabase';
 import { StandardTweet } from './twitterAdapter';
 import { TweetScoreData } from '../types/scoring';
 
@@ -27,7 +27,7 @@ export interface PointsHistoryItem {
  * Throws an error if the user is not found or if there's a database error.
  */
 export async function getUserPointsByHandle(twitterHandle: string): Promise<number> {
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
     const { data, error } = await supabase
         .from('campaign_points')
         .select('points')
@@ -57,7 +57,7 @@ export async function getUserPointsByHandle(twitterHandle: string): Promise<numb
 
 export async function getUserPointsHistory(twitterHandle: string): Promise<PointsHistoryItem[]> {
     try {
-        const supabase = await createClient();
+        const supabase = await createServiceClient();
         const { data, error } = await supabase
             .from('points_reward_log')
             .select('*')
@@ -84,7 +84,7 @@ export async function getUserPointsHistory(twitterHandle: string): Promise<Point
 
 export async function getLeaderboardData(): Promise<LeaderboardUser[]> {
     try {
-        const supabase = await createClient();
+        const supabase = await createServiceClient();
 
         // 获取所有用户数据并按积分降序排序
         const { data, error } = await supabase
@@ -183,7 +183,7 @@ export async function rewardUserPoints({ userName, points, missionId, missionDet
 // Function to check user reward history for a specific mission
 export async function checkUserRewardHistory({ userName, missionId }: { userName: string, missionId: string }) {
     try {
-        const supabase = await createClient();
+        const supabase = await createServiceClient();
 
         // Query records
         const { data, error } = await supabase
@@ -441,7 +441,7 @@ export async function saveTweetScoreRecord(
  * @returns {Promise<TweetScoreRecord | null>} The enhanced tweet score or null if not found
  */
 export async function getTweetScore(tweetId: string): Promise<TweetScoreRecord | null> {
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
     
     const { data, error } = await supabase
         .from('tweet')
@@ -558,7 +558,7 @@ export async function addTwitterProfileScore(
  * @throws Throws an error if there is a database error during the check
  */
 export async function checkTwitterProfileExists(handle: string): Promise<boolean> {
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
     const { data, error } = await supabase
         .from('twitter_profile_score')
         .select('handle')
@@ -581,7 +581,7 @@ export async function checkTwitterProfileExists(handle: string): Promise<boolean
  * @returns An object containing score and reasoning, or null if not found
  */
 export async function getTwitterProfileScore(handle: string): Promise<{ score: number; reasoning: string } | null> {
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
     const { data, error } = await supabase
         .from('twitter_profile_score')
         .select('score, reasoning')
@@ -605,7 +605,7 @@ export async function getTwitterProfileScore(handle: string): Promise<{ score: n
 export async function checkTwitterProfileScore(
     handle: string, 
 ): Promise<{ score: number; reasoning: string } | null> {
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
     
     const { data, error } = await supabase
         .from('twitter_profile_score')
