@@ -106,10 +106,14 @@ function getBlogFilePaths(contentDir: string): string[] {
  */
 async function syncBlogRecord(record: BlogRecord): Promise<boolean> {
   try {
+    // 删除之前的所有记录（包括主记录和分块），确保干净同步
+    await deleteKnowledgeEmbedding(record.airtableId);
+    
+    // 使用修改后的 upsertKnowledgeEmbedding 函数，它会自动处理分块
     const success = await upsertKnowledgeEmbedding(record);
     
     if (success) {
-      console.log(`Successfully synced blog: ${record.title}`);
+      console.log(`Successfully synced blog: ${record.title} (may include chunks)`);
       return true;
     } else {
       console.error(`Failed to sync blog: ${record.title}`);
@@ -128,21 +132,21 @@ async function syncBlogRecord(record: BlogRecord): Promise<boolean> {
  * @returns True if the record needs syncing
  */
 function needsSync(record: BlogRecord, existingRecords: Map<string, string>): boolean {
-  // If the record doesn't exist in the database, it needs to be synced
+  // 检查主记录是否存在 - getAllBlogRecords 已经修改为只返回非分块记录
   if (!existingRecords.has(record.airtableId)) {
     console.log(`Blog "${record.title}" is new, needs sync (ID not found in database)`);
     return true;
   }
   
-  // Get the existing content hash
+  // 获取现有的内容哈希
   const existingHash = existingRecords.get(record.airtableId) || '';
   const currentHash = record.content_hash;
   
-  // If the content has changed, the record needs syncing
+  // 如果内容已更改，则需要同步（包括重新分块）
   const needsUpdate = existingHash !== currentHash;
   
   if (needsUpdate) {
-    console.log(`Blog "${record.title}" content has changed, needs sync`);
+    console.log(`Blog "${record.title}" content has changed, needs sync (including rechunking if needed)`);
     console.log(`- DB hash: ${existingHash.substring(0, 8)}...`);
     console.log(`- New hash: ${currentHash.substring(0, 8)}...`);
   } else {
@@ -170,11 +174,11 @@ export async function syncAllBlogPosts(
       return 0;
     }
 
-    // Get existing records from the database for incremental sync
+    // 获取现有记录用于增量同步 - 现在只包含非分块记录
     let existingRecords = new Map<string, string>();
     if (!forceSync) {
       existingRecords = await getAllBlogRecords();
-      console.log(`Retrieved ${existingRecords.size} existing knowledge records from database for comparison`);
+      console.log(`Retrieved ${existingRecords.size} existing non-chunked knowledge records from database for comparison`);
     } else {
       console.log('Force sync enabled, skipping existing records check');
     }
@@ -194,7 +198,7 @@ export async function syncAllBlogPosts(
       
       console.log(`Processing blog #${totalCount}: ${record.title} (ID: ${record.airtableId})`);
       
-      // Check if this file needs to be synced
+      // 检查此文件是否需要同步
       if (forceSync || needsSync(record, existingRecords)) {
         const success = await syncBlogRecord(record);
         if (success) {
@@ -222,10 +226,11 @@ export async function syncAllBlogPosts(
 export async function deleteBlogPost(filePath: string): Promise<boolean> {
   try {
     const uniqueId = generateUniqueId(filePath);
+    // deleteKnowledgeEmbedding 已修改为同时删除所有相关分块
     const success = await deleteKnowledgeEmbedding(uniqueId);
     
     if (success) {
-      console.log(`Successfully deleted blog: ${filePath}`);
+      console.log(`Successfully deleted blog and all its chunks: ${filePath}`);
       return true;
     } else {
       console.error(`Failed to delete blog: ${filePath}`);
@@ -235,4 +240,4 @@ export async function deleteBlogPost(filePath: string): Promise<boolean> {
     console.error(`Error deleting blog ${filePath}:`, error);
     return false;
   }
-} 
+}
