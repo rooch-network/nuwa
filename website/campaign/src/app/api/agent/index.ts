@@ -196,3 +196,21 @@ export async function generateAIResponse(
     
     return fullText;
 } 
+
+function extractUserQuery(messages: CoreMessage[]): string {
+    // Get the last user message
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+    // Extract text content from user message
+    let userQuery = '';
+    if (lastUserMessage && typeof lastUserMessage.content === 'string') {
+        userQuery = lastUserMessage.content;
+    } else if (lastUserMessage && Array.isArray(lastUserMessage.content)) {
+        // If content is an array, extract all text parts
+        userQuery = lastUserMessage.content
+            .filter(part => typeof part === 'object' && 'type' in part && part.type === 'text')
+            .map(part => (part as { text: string }).text)
+            .join(' ');
+    }
+
+    return userQuery;
+}
