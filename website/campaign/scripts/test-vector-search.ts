@@ -1,4 +1,4 @@
-import { searchKnowledgeEmbeddings, enhancedSearchKnowledgeEmbeddings } from '../src/app/services/vectorStore';
+import { searchKnowledgeEmbeddings, enhancedSearchKnowledgeEmbeddings, KnowledgeEmbeddingWithSimilarity, } from '../src/app/services/vectorStore';
 
 // 用于存储测试开始时间
 const testStartTime = Date.now();
@@ -6,12 +6,7 @@ const testStartTime = Date.now();
 interface SearchResult {
   query: string;
   threshold?: number;
-  results: {
-    id: string;
-    content: string;
-    embedding: number[];
-    similarity: number;
-  }[];
+  results: KnowledgeEmbeddingWithSimilarity[];
   duration: number;
 }
 

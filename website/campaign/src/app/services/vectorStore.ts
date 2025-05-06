@@ -41,7 +41,7 @@ interface KnowledgeEmbedding {
 }
 
 // Extended interface including similarity field for search results
-interface KnowledgeEmbeddingWithSimilarity extends Omit<KnowledgeEmbedding, 'embedding'> {
+export interface KnowledgeEmbeddingWithSimilarity extends Omit<KnowledgeEmbedding, 'embedding'> {
   similarity: number;
 }
 
