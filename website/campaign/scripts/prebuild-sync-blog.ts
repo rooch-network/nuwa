@@ -127,8 +127,7 @@ async function main() {
     console.log(`- NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? '✓ Set' : '✗ Not set'}`);
     console.log(`- SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ Set' : '✗ Not set'}`);
     
-    // We force sync in Vercel production builds to ensure all content is up-to-date
-    const shouldForceSync = forceSync || (isVercel && process.env.VERCEL_ENV === 'production');
+    const shouldForceSync = forceSync;
     if (shouldForceSync) {
       console.log('Forcing full sync of all blog posts...');
     }

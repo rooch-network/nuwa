@@ -119,14 +119,14 @@ export async function generateAIResponseStream(
     if (classifiedMissionId) {
         systemPrompt = await getMissionSystemPrompt(classifiedMissionId, userInfo);
     } else {
-         // Detect if it's a general question
-        const isGeneralQA = userQuery ? await isGeneralQuestion(userQuery) : false;
         systemPrompt = await getDefaultSystemPrompt(userInfo);
+    }
 
-        // For general questions, enhance system prompt with RAG
-        if (isGeneralQA) {
-            systemPrompt = await enhanceWithRAG(userQuery, systemPrompt);
-        }
+     // Detect if it's a general question
+    const isGeneralQA = userQuery ? await isGeneralQuestion(userQuery) : false;
+    // For general questions, enhance system prompt with RAG
+    if (isGeneralQA) {
+        systemPrompt = await enhanceWithRAG(userQuery, systemPrompt);
     }
 
     // Define streamText options with inline callbacks and exact types
