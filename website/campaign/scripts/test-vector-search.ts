@@ -3,6 +3,18 @@ import { searchKnowledgeEmbeddings, enhancedSearchKnowledgeEmbeddings } from '..
 // 用于存储测试开始时间
 const testStartTime = Date.now();
 
+interface SearchResult {
+  query: string;
+  threshold?: number;
+  results: {
+    id: string;
+    content: string;
+    embedding: number[];
+    similarity: number;
+  }[];
+  duration: number;
+}
+
 /**
  * Test vector search functionality with various queries
  */
@@ -45,8 +57,8 @@ async function testVectorSearch() {
   
   // 存储结果用于比较
   const allResults = {
-    standard: [],
-    enhanced: []
+    standard: [] as SearchResult[],
+    enhanced: [] as SearchResult[]
   };
   
   // First test standard search
