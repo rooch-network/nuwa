@@ -11,12 +11,12 @@ async function testVectorSearch() {
     // English queries
     { query: 'What is Prompt is law?', threshold: 0.75, limit: 3 },
     { query: 'Prompt is law', threshold: 0.75, limit: 3 },
-    { query: 'Prompt is law', threshold: 0.6, limit: 3 }, // Lower threshold
+    { query: 'Prompt is law', threshold: 0.3, limit: 3 }, // Lower threshold
     
     // Chinese queries
     { query: '什么是 Prompt is law?', threshold: 0.75, limit: 3 },
-    { query: '什么是 Prompt is law?', threshold: 0.6, limit: 3 }, // Lower threshold
-    { query: 'Prompt is law 是什么?', threshold: 0.6, limit: 3 },
+    { query: '什么是 Prompt is law?', threshold: 0.4, limit: 3 }, // Lower threshold
+    { query: 'Prompt is law 是什么?', threshold: 0.4, limit: 3 },
     
     // Additional variations
     { query: 'prompt engineering', threshold: 0.6, limit: 3 },

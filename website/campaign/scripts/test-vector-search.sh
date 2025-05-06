@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# 进入项目根目录
 cd "$(dirname "$0")/.."
 
-# 确保环境变量已设置
 if [ ! -f ".env" ]; then
   if [ -f ".env.local" ]; then
     echo "Using .env.local for environment variables"
@@ -17,11 +15,9 @@ else
   export $(grep -v '^#' .env | xargs)
 fi
 
-# 编译并运行测试脚本
 echo "Compiling and running vector search test..."
 npx tsx scripts/test-vector-search.ts
 
-# 检查测试结果
 if [ $? -eq 0 ]; then
   echo "✅ Vector search test completed successfully"
 else
