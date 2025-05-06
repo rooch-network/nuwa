@@ -154,7 +154,7 @@ async function testVectorSearch() {
       }
     } catch (error) {
       console.error(`Error searching for enhanced query "${query}":`, error);
-      console.error(`Stack trace:`, error.stack);
+      console.error(`Stack trace:`, error instanceof Error ? error.stack : String(error));
     }
   }
   
@@ -302,7 +302,7 @@ async function testSingleQuery(query: string, threshold: number = 0.5, limit: nu
     
   } catch (error) {
     console.error(`Error during detailed test:`, error);
-    console.error(`Stack trace:`, error.stack);
+    console.error(`Stack trace:`, error instanceof Error ? error.stack : String(error));
   }
 }
 

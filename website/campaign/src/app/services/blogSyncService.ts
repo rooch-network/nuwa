@@ -39,14 +39,14 @@ function generateUniqueId(filePath: string): string {
  * @returns MD5 hash of the content
  */
 function calculateContentHash(title: string, content: string, description: string, tags: string[]): string {
-  const textToHash = [
+  // 与 vectorStore.ts 保持一致的哈希计算方式
+  const baseText = [
     title || '',
     description || '',
-    content || '',
     tags.join(' ') || '',
   ].filter(Boolean).join('\n\n');
   
-  return crypto.createHash('md5').update(textToHash).digest('hex');
+  return crypto.createHash('md5').update(baseText + content).digest('hex');
 }
 
 /**
