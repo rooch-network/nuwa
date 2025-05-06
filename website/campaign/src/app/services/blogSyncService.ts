@@ -13,6 +13,7 @@ interface BlogRecord {
   content: string;
   description: string;
   last_modified_time: string;
+  content_hash: string; // Hash of the content for change detection
   tags: string[];
 }
 
@@ -27,6 +28,25 @@ function generateUniqueId(filePath: string): string {
   
   // Use the filename with a blog: prefix to generate a hash
   return crypto.createHash('md5').update(`blog:${filename}`).digest('hex');
+}
+
+/**
+ * Calculate content hash for a blog post
+ * @param title Blog title
+ * @param content Blog content
+ * @param description Blog description
+ * @param tags Blog tags
+ * @returns MD5 hash of the content
+ */
+function calculateContentHash(title: string, content: string, description: string, tags: string[]): string {
+  const textToHash = [
+    title || '',
+    description || '',
+    content || '',
+    tags.join(' ') || '',
+  ].filter(Boolean).join('\n\n');
+  
+  return crypto.createHash('md5').update(textToHash).digest('hex');
 }
 
 /**
@@ -47,14 +67,21 @@ function parseMdxFile(filePath: string): BlogRecord | null {
       ? data.tag 
       : (data.tag ? [data.tag] : []);
     
+    const title = data.title || path.basename(filePath, path.extname(filePath));
+    const description = data.excerpt || '';
+    
+    // Calculate content hash for change detection
+    const contentHash = calculateContentHash(title, content, description, tags);
+    
     return {
       airtableId: generateUniqueId(filePath),
       key: filePath,
-      title: data.title || path.basename(filePath, path.extname(filePath)),
-      content: content,
-      description: data.excerpt || '',
+      title,
+      content,
+      description,
       last_modified_time: stats.mtime.toISOString(),
-      tags: tags,
+      content_hash: contentHash,
+      tags,
     };
   } catch (error) {
     console.error(`Error parsing MDX file ${filePath}:`, error);
@@ -95,9 +122,9 @@ async function syncBlogRecord(record: BlogRecord): Promise<boolean> {
 }
 
 /**
- * Determines if a blog file needs to be synced based on its modification time
+ * Determines if a blog file needs to be synced based on content hash
  * @param record Blog record 
- * @param existingRecords Map of existing record IDs to last_modified_time
+ * @param existingRecords Map of existing record IDs to content hashes
  * @returns True if the record needs syncing
  */
 function needsSync(record: BlogRecord, existingRecords: Map<string, string>): boolean {
@@ -107,19 +134,20 @@ function needsSync(record: BlogRecord, existingRecords: Map<string, string>): bo
     return true;
   }
   
-  // Compare modification times to see if the file has been updated
-  const existingModTimeStr = existingRecords.get(record.airtableId) || '';
-  const existingModTime = new Date(existingModTimeStr);
-  const currentModTime = new Date(record.last_modified_time);
+  // Get the existing content hash
+  const existingHash = existingRecords.get(record.airtableId) || '';
+  const currentHash = record.content_hash;
   
-  // Format dates for logging
-  const existingTimeFormatted = existingModTime.toISOString();
-  const currentTimeFormatted = currentModTime.toISOString();
+  // If the content has changed, the record needs syncing
+  const needsUpdate = existingHash !== currentHash;
   
-  // If the file has been modified after the stored version, it needs syncing
-  const needsUpdate = currentModTime > existingModTime;
-  
-  console.log(`Blog "${record.title}" - DB time: ${existingTimeFormatted}, File time: ${currentTimeFormatted}, Needs update: ${needsUpdate}`);
+  if (needsUpdate) {
+    console.log(`Blog "${record.title}" content has changed, needs sync`);
+    console.log(`- DB hash: ${existingHash.substring(0, 8)}...`);
+    console.log(`- New hash: ${currentHash.substring(0, 8)}...`);
+  } else {
+    console.log(`Blog "${record.title}" content unchanged, no sync needed`);
+  }
   
   return needsUpdate;
 }
@@ -127,7 +155,7 @@ function needsSync(record: BlogRecord, existingRecords: Map<string, string>): bo
 /**
  * Sync all blog posts to vector database
  * @param contentDir Blog content directory
- * @param forceSync Force sync all files regardless of modification time
+ * @param forceSync Force sync all files regardless of content hash
  * @returns Number of successfully synced posts
  */
 export async function syncAllBlogPosts(

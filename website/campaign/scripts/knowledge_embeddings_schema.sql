@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS knowledge_embeddings (
   description TEXT,
   embedding VECTOR(1536) NOT NULL,  -- text-embedding-3-small dimension is 1536
   tags TEXT[] DEFAULT '{}',
+  content_hash TEXT,  -- Store content hash for change detection
   last_modified_time TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -33,6 +34,7 @@ RETURNS TABLE (
   content TEXT,
   description TEXT,
   tags TEXT[],
+  content_hash TEXT,
   last_modified_time TIMESTAMPTZ,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ,
@@ -49,6 +51,7 @@ BEGIN
     ke.content,
     ke.description,
     ke.tags,
+    ke.content_hash,
     ke.last_modified_time,
     ke.created_at,
     ke.updated_at,
@@ -77,4 +80,17 @@ DROP TRIGGER IF EXISTS trigger_knowledge_embeddings_updated_at ON knowledge_embe
 CREATE TRIGGER trigger_knowledge_embeddings_updated_at
 BEFORE UPDATE ON knowledge_embeddings
 FOR EACH ROW
-EXECUTE FUNCTION update_updated_at(); 
+EXECUTE FUNCTION update_updated_at();
+
+-- Add migration for existing tables (if needed)
+DO $$
+BEGIN
+    -- Check if the column doesn't exist
+    IF NOT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'knowledge_embeddings' AND column_name = 'content_hash'
+    ) THEN
+        -- Add the content_hash column
+        ALTER TABLE knowledge_embeddings ADD COLUMN content_hash TEXT;
+    END IF;
+END $$; 

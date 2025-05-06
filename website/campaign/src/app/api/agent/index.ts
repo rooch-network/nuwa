@@ -13,7 +13,7 @@ import {
 } from 'ai';
 import { tools } from '../chat/tools';
 import { classifyUserMission, getMissionSystemPrompt, getDefaultSystemPrompt, UserInfo } from '../chat/mission-router';
-import { searchKnowledgeEmbeddings } from '../../services/vectorStore';
+import { enhancedSearchKnowledgeEmbeddings } from '../../services/vectorStore';
 
 /**
  * Classify user message using AI
@@ -34,11 +34,12 @@ async function enhanceWithRAG(
     systemPrompt: string
 ): Promise<string> {
     try {
-        // Use vector search to find knowledge related to the user's question
-        const relevantKnowledge = await searchKnowledgeEmbeddings(
+        // Use enhanced vector search to find knowledge related to the user's question
+        // This better handles cross-language searches (e.g., Chinese queries for English content)
+        const relevantKnowledge = await enhancedSearchKnowledgeEmbeddings(
             userQuery,
             3,  // Return up to 3 records
-            0.75 // Similarity threshold
+            0.6  // Lower similarity threshold for cross-language searches
         );
         
         if (relevantKnowledge.length === 0) {

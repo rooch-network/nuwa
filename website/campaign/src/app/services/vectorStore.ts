@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
 import { KnowledgeRecord } from './airtable';
 import { createServiceClient } from './supabase';
+import crypto from 'crypto';
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -30,6 +31,7 @@ interface KnowledgeEmbedding {
   embedding: number[];
   tags: string[];
   last_modified_time: string;
+  content_hash?: string;  // New field to store content hash
   created_at?: string;
   updated_at?: string;
 }
@@ -81,6 +83,9 @@ export async function upsertKnowledgeEmbedding(record: KnowledgeRecord): Promise
     // Generate embedding vector
     const embedding = await generateEmbedding(textToEmbed);
 
+    // Calculate content hash for change detection
+    const contentHash = crypto.createHash('md5').update(textToEmbed).digest('hex');
+
     // Prepare record for database insertion
     const embeddingRecord: Omit<KnowledgeEmbedding, 'id' | 'created_at' | 'updated_at'> = {
       airtable_id: record.airtableId,
@@ -90,8 +95,10 @@ export async function upsertKnowledgeEmbedding(record: KnowledgeRecord): Promise
       embedding,
       tags: record.tags || [],
       last_modified_time: record.last_modified_time || new Date().toISOString(),
+      content_hash: contentHash,
     };
 
+    // 获取Supabase客户端
     const supabase = await getSupabase();
 
     // Insert or update record
@@ -113,7 +120,7 @@ export async function upsertKnowledgeEmbedding(record: KnowledgeRecord): Promise
       return false;
     }
 
-    console.log(`Successfully upserted embedding for record: ${record.airtableId}`);
+    console.log(`Successfully upserted embedding for record: ${record.airtableId} (content hash: ${contentHash})`);
     return true;
   } catch (error) {
     console.error('Error in upsertKnowledgeEmbedding:', error);
@@ -224,7 +231,7 @@ export async function getEmbeddingCount(): Promise<number> {
 
 /**
  * Get all blog posts in the vector database
- * @returns Map of airtable_id to last_modified_time
+ * @returns Map of airtable_id to content hash
  */
 export async function getAllBlogRecords(): Promise<Map<string, string>> {
   try {
@@ -235,14 +242,14 @@ export async function getAllBlogRecords(): Promise<Map<string, string>> {
     // we'll fetch all records and use the map in blogSyncService to identify them
     const { data, error } = await supabase
       .from('knowledge_embeddings')
-      .select('airtable_id, last_modified_time');
+      .select('airtable_id, content_hash, last_modified_time');
     
     if (error) {
       console.error('Error fetching knowledge records:', error);
       return new Map();
     }
     
-    // Create a map of ID to last_modified_time for quick lookup
+    // Create a map of ID to content_hash for quick lookup
     const recordsMap = new Map<string, string>();
     
     if (!data || data.length === 0) {
@@ -255,22 +262,24 @@ export async function getAllBlogRecords(): Promise<Map<string, string>> {
     
     // Process the returned records
     data.forEach(record => {
-      if (record.airtable_id && record.last_modified_time) {
-        recordsMap.set(record.airtable_id, record.last_modified_time);
+      if (record.airtable_id) {
+        // Prefer content_hash if available, otherwise fall back to last_modified_time
+        const value = record.content_hash || record.last_modified_time;
+        recordsMap.set(record.airtable_id, value);
       } else {
-        console.warn('Found record with missing airtable_id or last_modified_time:', record);
+        console.warn('Found record with missing airtable_id:', record);
       }
     });
     
     // Debug information about what we found
     console.log(`Created map with ${recordsMap.size} knowledge records for comparison`);
     
-    // Print some example records for verification (limit to 5)
-    const examples = Array.from(recordsMap.entries()).slice(0, 5);
+    // Print some example records for verification (limit to 3)
+    const examples = Array.from(recordsMap.entries()).slice(0, 3);
     if (examples.length > 0) {
       console.log('Sample records:');
-      examples.forEach(([id, time]) => {
-        console.log(`- ID: ${id}, Last Modified: ${time}`);
+      examples.forEach(([id, hash]) => {
+        console.log(`- ID: ${id}, Hash/Modified: ${hash}`);
       });
     }
     
@@ -278,5 +287,75 @@ export async function getAllBlogRecords(): Promise<Map<string, string>> {
   } catch (error) {
     console.error('Error in getAllBlogRecords:', error);
     return new Map();
+  }
+}
+
+/**
+ * Enhanced search for knowledge embeddings with cross-language support
+ * This function provides better support for searching English content with Chinese queries
+ * @param query User query
+ * @param limit Maximum number of results to return
+ * @param similarityThreshold Minimum similarity threshold
+ * @returns Array of relevant knowledge records
+ */
+export async function enhancedSearchKnowledgeEmbeddings(
+  query: string,
+  limit: number = 3,
+  similarityThreshold: number = 0.6 // Lower default threshold for cross-language queries
+): Promise<KnowledgeEmbeddingWithSimilarity[]> {
+  try {
+    // Check if query is in Chinese (simplified or traditional)
+    const containsChinese = /[\u4e00-\u9fff]/.test(query);
+    
+    let results: KnowledgeEmbeddingWithSimilarity[] = [];
+    
+    // If query contains Chinese, try multiple search strategies
+    if (containsChinese) {
+      // Strategy 1: Try with original query but lower threshold
+      const originalResults = await searchKnowledgeEmbeddings(
+        query, 
+        limit, 
+        similarityThreshold
+      );
+      
+      results = [...originalResults];
+      
+      // Extract non-Chinese terms (like "Prompt is law") which might be product names
+      const nonChineseTerms = query.match(/[a-zA-Z][a-zA-Z\s]+[a-zA-Z]/g) || [];
+      
+      // Strategy 2: Search with extracted English terms if available
+      for (const term of nonChineseTerms) {
+        if (term.trim().length > 2) { // Only meaningful terms
+          const termResults = await searchKnowledgeEmbeddings(
+            term.trim(),
+            limit,
+            similarityThreshold
+          );
+          
+          // Merge results, avoiding duplicates
+          for (const result of termResults) {
+            if (!results.some(r => r.airtable_id === result.airtable_id)) {
+              results.push(result);
+            }
+          }
+        }
+      }
+      
+      // Sort results by similarity
+      results.sort((a, b) => b.similarity - a.similarity);
+      
+      // Limit to requested number
+      if (results.length > limit) {
+        results = results.slice(0, limit);
+      }
+    } else {
+      // For non-Chinese queries, use the standard search
+      results = await searchKnowledgeEmbeddings(query, limit, similarityThreshold);
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('Error in enhancedSearchKnowledgeEmbeddings:', error);
+    return [];
   }
 } 
