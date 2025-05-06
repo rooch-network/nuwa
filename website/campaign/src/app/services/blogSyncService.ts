@@ -22,7 +22,11 @@ interface BlogRecord {
  * @returns MD5 hash-based unique ID
  */
 function generateUniqueId(filePath: string): string {
-  return crypto.createHash('md5').update(`blog:${filePath}`).digest('hex');
+  // Only use the filename, not the full path, to ensure the same ID in different environments
+  const filename = path.basename(filePath);
+  
+  // Use the filename with a blog: prefix to generate a hash
+  return crypto.createHash('md5').update(`blog:${filename}`).digest('hex');
 }
 
 /**
@@ -99,15 +103,25 @@ async function syncBlogRecord(record: BlogRecord): Promise<boolean> {
 function needsSync(record: BlogRecord, existingRecords: Map<string, string>): boolean {
   // If the record doesn't exist in the database, it needs to be synced
   if (!existingRecords.has(record.airtableId)) {
+    console.log(`Blog "${record.title}" is new, needs sync (ID not found in database)`);
     return true;
   }
   
   // Compare modification times to see if the file has been updated
-  const existingModTime = new Date(existingRecords.get(record.airtableId) || '');
+  const existingModTimeStr = existingRecords.get(record.airtableId) || '';
+  const existingModTime = new Date(existingModTimeStr);
   const currentModTime = new Date(record.last_modified_time);
   
+  // Format dates for logging
+  const existingTimeFormatted = existingModTime.toISOString();
+  const currentTimeFormatted = currentModTime.toISOString();
+  
   // If the file has been modified after the stored version, it needs syncing
-  return currentModTime > existingModTime;
+  const needsUpdate = currentModTime > existingModTime;
+  
+  console.log(`Blog "${record.title}" - DB time: ${existingTimeFormatted}, File time: ${currentTimeFormatted}, Needs update: ${needsUpdate}`);
+  
+  return needsUpdate;
 }
 
 /**
@@ -129,14 +143,28 @@ export async function syncAllBlogPosts(
     }
 
     // Get existing records from the database for incremental sync
-    const existingRecords = forceSync ? new Map() : await getAllBlogRecords();
+    let existingRecords = new Map<string, string>();
+    if (!forceSync) {
+      existingRecords = await getAllBlogRecords();
+      console.log(`Retrieved ${existingRecords.size} existing knowledge records from database for comparison`);
+    } else {
+      console.log('Force sync enabled, skipping existing records check');
+    }
     
     let successCount = 0;
     let skippedCount = 0;
+    let totalCount = 0;
 
     for (const filePath of blogFilePaths) {
+      totalCount++;
       const record = parseMdxFile(filePath);
-      if (!record) continue;
+      
+      if (!record) {
+        console.error(`Could not parse file: ${filePath}`);
+        continue;
+      }
+      
+      console.log(`Processing blog #${totalCount}: ${record.title} (ID: ${record.airtableId})`);
       
       // Check if this file needs to be synced
       if (forceSync || needsSync(record, existingRecords)) {
@@ -145,11 +173,12 @@ export async function syncAllBlogPosts(
           successCount++;
         }
       } else {
+        console.log(`Skipping unchanged blog: ${record.title}`);
         skippedCount++;
       }
     }
 
-    console.log(`Synced ${successCount} blog posts, skipped ${skippedCount} unchanged posts`);
+    console.log(`Sync summary: ${successCount} synced, ${skippedCount} skipped, ${totalCount} total blog posts`);
     return successCount;
   } catch (error) {
     console.error('Error in syncAllBlogPosts:', error);

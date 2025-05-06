@@ -228,25 +228,52 @@ export async function getEmbeddingCount(): Promise<number> {
  */
 export async function getAllBlogRecords(): Promise<Map<string, string>> {
   try {
+    console.log('Fetching all blog records from vector database...');
     const supabase = await getSupabase();
     
+    // Since we don't have a direct way to identify blog posts in the database,
+    // we'll fetch all records and use the map in blogSyncService to identify them
     const { data, error } = await supabase
       .from('knowledge_embeddings')
-      .select('airtable_id, last_modified_time')
-      .like('airtable_id', 'blog:%');  // Only fetch blog entries (using the prefix we added)
+      .select('airtable_id, last_modified_time');
     
     if (error) {
-      console.error('Error fetching blog records:', error);
+      console.error('Error fetching knowledge records:', error);
       return new Map();
     }
     
     // Create a map of ID to last_modified_time for quick lookup
     const recordsMap = new Map<string, string>();
+    
+    if (!data || data.length === 0) {
+      console.log('No existing records found in database');
+      return recordsMap;
+    }
+    
+    // Debug: Show the total number of knowledge records found
+    console.log(`Found ${data.length} total knowledge records`);
+    
+    // Process the returned records
     data.forEach(record => {
-      recordsMap.set(record.airtable_id, record.last_modified_time);
+      if (record.airtable_id && record.last_modified_time) {
+        recordsMap.set(record.airtable_id, record.last_modified_time);
+      } else {
+        console.warn('Found record with missing airtable_id or last_modified_time:', record);
+      }
     });
     
-    console.log(`Found ${recordsMap.size} existing blog records in vector database`);
+    // Debug information about what we found
+    console.log(`Created map with ${recordsMap.size} knowledge records for comparison`);
+    
+    // Print some example records for verification (limit to 5)
+    const examples = Array.from(recordsMap.entries()).slice(0, 5);
+    if (examples.length > 0) {
+      console.log('Sample records:');
+      examples.forEach(([id, time]) => {
+        console.log(`- ID: ${id}, Last Modified: ${time}`);
+      });
+    }
+    
     return recordsMap;
   } catch (error) {
     console.error('Error in getAllBlogRecords:', error);
