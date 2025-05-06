@@ -42,7 +42,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
 
     return embedding;
   } catch (error) {
-    console.error('Error generating embedding:', error);
+    console.error('Error generating embedding for text snippet:', text.slice(0, 50), 'Error:', error);
     throw error;
   }
 }
