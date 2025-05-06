@@ -1,13 +1,24 @@
-import { createClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
 import { KnowledgeRecord } from './airtable';
+import { createServiceClient } from './supabase';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+let supabaseClient: SupabaseClient | null = null;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+async function getSupabase(): Promise<SupabaseClient> {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+  
+  try {
+    supabaseClient = await createServiceClient();
+    return supabaseClient;
+  } catch (error) {
+    console.error('Error initializing Supabase client:', error);
+    throw new Error('Failed to initialize Supabase client. Please check your environment variables.');
+  }
+}
 
 // Interface for the knowledge_embeddings table
 interface KnowledgeEmbedding {
@@ -81,6 +92,8 @@ export async function upsertKnowledgeEmbedding(record: KnowledgeRecord): Promise
       last_modified_time: record.last_modified_time || new Date().toISOString(),
     };
 
+    const supabase = await getSupabase();
+
     // Insert or update record
     const { error } = await supabase
       .from('knowledge_embeddings')
@@ -124,6 +137,8 @@ export async function searchKnowledgeEmbeddings(
     // Generate embedding for query
     const queryEmbedding = await generateEmbedding(query);
     
+    const supabase = await getSupabase();
+    
     // Perform vector similarity search
     const { data, error } = await supabase
       .rpc('match_knowledge_embeddings', {
@@ -163,6 +178,8 @@ export async function searchKnowledgeEmbeddings(
  */
 export async function deleteKnowledgeEmbedding(airtableId: string): Promise<boolean> {
   try {
+    const supabase = await getSupabase();
+    
     const { error } = await supabase
       .from('knowledge_embeddings')
       .delete()
@@ -187,6 +204,8 @@ export async function deleteKnowledgeEmbedding(airtableId: string): Promise<bool
  */
 export async function getEmbeddingCount(): Promise<number> {
   try {
+    const supabase = await getSupabase();
+    
     const { count, error } = await supabase
       .from('knowledge_embeddings')
       .select('*', { count: 'exact', head: true });
@@ -200,5 +219,37 @@ export async function getEmbeddingCount(): Promise<number> {
   } catch (error) {
     console.error('Error in getEmbeddingCount:', error);
     return 0;
+  }
+}
+
+/**
+ * Get all blog posts in the vector database
+ * @returns Map of airtable_id to last_modified_time
+ */
+export async function getAllBlogRecords(): Promise<Map<string, string>> {
+  try {
+    const supabase = await getSupabase();
+    
+    const { data, error } = await supabase
+      .from('knowledge_embeddings')
+      .select('airtable_id, last_modified_time')
+      .like('airtable_id', 'blog:%');  // Only fetch blog entries (using the prefix we added)
+    
+    if (error) {
+      console.error('Error fetching blog records:', error);
+      return new Map();
+    }
+    
+    // Create a map of ID to last_modified_time for quick lookup
+    const recordsMap = new Map<string, string>();
+    data.forEach(record => {
+      recordsMap.set(record.airtable_id, record.last_modified_time);
+    });
+    
+    console.log(`Found ${recordsMap.size} existing blog records in vector database`);
+    return recordsMap;
+  } catch (error) {
+    console.error('Error in getAllBlogRecords:', error);
+    return new Map();
   }
 } 

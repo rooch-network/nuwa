@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "tsx scripts/prebuild-sync-blog.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "sync-blog": "tsx scripts/sync-blog.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.10",
@@ -16,12 +18,15 @@
     "@anthropic-ai/sdk": "0.39.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
+    "@types/glob": "^8.1.0",
     "@types/uuid": "^10.0.0",
     "@vercel/analytics": "^1.5.0",
     "@web3icons/react": "4.0.13",
     "ai": "4.3.9",
     "airtable": "0.12.2",
     "framer-motion": "12.7.4",
+    "glob": "^11.0.2",
+    "gray-matter": "^4.0.3",
     "katex": "0.16.22",
     "nanoid": "5.1.5",
     "next": "15.3.1",
@@ -52,6 +57,7 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.3.2",
+    "tsx": "^4.19.4",
     "typescript": "5.8.3"
   },
   "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"
