@@ -125,20 +125,19 @@ export async function generateAIResponseStream(
             .map(part => (part as { text: string }).text)
             .join(' ');
     }
-    
-    // Detect if it's a general question
-    const isGeneralQA = userQuery ? await isGeneralQuestion(userQuery) : false;
-    
+     
     let systemPrompt;
     if (classifiedMissionId) {
         systemPrompt = await getMissionSystemPrompt(classifiedMissionId, userInfo);
     } else {
+         // Detect if it's a general question
+        const isGeneralQA = userQuery ? await isGeneralQuestion(userQuery) : false;
         systemPrompt = await getDefaultSystemPrompt(userInfo);
-    }
-    
-    // For general questions, enhance system prompt with RAG
-    if (isGeneralQA && userQuery) {
-        systemPrompt = await enhanceWithRAG(userQuery, systemPrompt);
+
+        // For general questions, enhance system prompt with RAG
+        if (isGeneralQA) {
+            systemPrompt = await enhanceWithRAG(userQuery, systemPrompt);
+        }
     }
 
     // Define streamText options with inline callbacks and exact types
