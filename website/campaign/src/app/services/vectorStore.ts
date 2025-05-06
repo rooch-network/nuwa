@@ -547,19 +547,21 @@ export async function enhancedSearchKnowledgeEmbeddings(
       const nonChineseTerms = query.match(/[a-zA-Z][a-zA-Z\s]+[a-zA-Z]/g) || [];
       
       // Strategy 2: Search with extracted English terms if available
-      for (const term of nonChineseTerms) {
-        if (term.trim().length > 2) { // Only meaningful terms
-          const termResults = await searchKnowledgeEmbeddings(
-            term.trim(),
-            limit,
-            similarityThreshold
-          );
-          
-          // Merge results, avoiding duplicates
-          for (const result of termResults) {
-            if (!results.some(r => r.airtable_id === result.airtable_id)) {
-              results.push(result);
-            }
+      const termPromises = nonChineseTerms
+        .filter(term => term.trim().length > 2) // Only meaningful terms
+        .map(term => searchKnowledgeEmbeddings(
+          term.trim(),
+          limit,
+          similarityThreshold
+        ));
+      
+      const termResultsArray = await Promise.all(termPromises);
+      
+      // Merge results, avoiding duplicates
+      for (const termResults of termResultsArray) {
+        for (const result of termResults) {
+          if (!results.some(r => r.airtable_id === result.airtable_id)) {
+            results.push(result);
           }
         }
       }
