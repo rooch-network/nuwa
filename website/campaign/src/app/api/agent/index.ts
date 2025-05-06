@@ -112,19 +112,8 @@ export async function generateAIResponseStream(
         throw new Error('OPENAI_API_KEY is not set');
     }
 
-    // Get the last user message
-    const lastUserMessage = messages.filter(m => m.role === 'user').pop();
-    // Extract text content from user message
-    let userQuery = '';
-    if (lastUserMessage && typeof lastUserMessage.content === 'string') {
-        userQuery = lastUserMessage.content;
-    } else if (lastUserMessage && Array.isArray(lastUserMessage.content)) {
-        // If content is an array, extract all text parts
-        userQuery = lastUserMessage.content
-            .filter(part => typeof part === 'object' && 'type' in part && part.type === 'text')
-            .map(part => (part as { text: string }).text)
-            .join(' ');
-    }
+    // Extract the user query from the last user message
+    const userQuery = extractUserQuery(messages);
      
     let systemPrompt;
     if (classifiedMissionId) {
