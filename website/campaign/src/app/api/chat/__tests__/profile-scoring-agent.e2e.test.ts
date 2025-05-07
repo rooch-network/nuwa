@@ -40,6 +40,7 @@ describeIfApiKey('Profile Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', ()
         // Log the result for manual inspection
         console.log(`Profile scoring result: ${scoreResult.score}/100`);
         console.log(`Reasoning: ${scoreResult.reasoning}`);
+        console.log(`Summary: ${scoreResult.summary}`);
 
         expect(scoreResult).toBeDefined();
         expect(scoreResult.score).toBeDefined();
@@ -49,7 +50,7 @@ describeIfApiKey('Profile Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', ()
         expect(scoreResult.reasoning).toBeDefined();
         expect(typeof scoreResult.reasoning).toBe('string');
         expect(scoreResult.reasoning.length).toBeGreaterThan(0);
-        
+
         const scoreResult2 = await getProfileScore(profileData);
         console.log(`Profile scoring result2: ${scoreResult2.score}/100`);
         console.log(`Reasoning: ${scoreResult2.reasoning}`);

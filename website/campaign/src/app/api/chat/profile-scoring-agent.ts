@@ -11,7 +11,8 @@ export const profileScoreSchema = z.object({
     accountActivity: z.number().min(0).describe("Score for Account Activity (0-20)."),
     influence: z.number().min(0).describe("Score for Influence & Reach (0-15)."),
     contentQuality: z.number().min(0).describe("Score for Content Quality & Engagement (0-35)."),
-    reasoning: z.string().describe("A brief explanation of why these scores were given, based on the profile criteria.")
+    reasoning: z.string().describe("A brief explanation of why these scores were given, based on the profile criteria."),
+    summary: z.string().describe("A concise summary of the profile and its content, highlighting key aspects and focus areas.")
 });
 
 /**
@@ -25,6 +26,7 @@ export type CategoryProfileScoreResult = z.infer<typeof profileScoreSchema>;
 export type ProfileScoreResult = {
     score: number;
     reasoning: string;
+    summary: string;
 };
 
 /**
@@ -54,7 +56,7 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
         - Account Age & Consistency: Established account with consistent activity? (0-5 points)
     4.  **Influence & Reach (0-15 points):**
         - Follower Count: Scale (e.g., <1k, 1k-10k, 10k+)? (Consider quality over quantity). (0-7 points)
-        - Listed Count (if available): Indicator of perceived value by others. (0-3 points)
+        - Tweet View Count: Average views on recent tweets (0-3 points)
         - Verified Status: Twitter verified account? (0-5 points)
     5.  **Content Quality & Engagement (0-35 points):**
         - Recent Tweet Quality (if provided): Well-written, informative, non-spammy? Professional, relevant, and valuable to the community (0-20 points)
@@ -90,7 +92,6 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             5. Follow these specific guidelines for common scenarios:
                - If profile header is missing: deduct at least 2 points from Profile Completeness
                - If engagement metrics are incomplete: deduct at least 5 points from Content Quality
-               - If listed count is 0 or missing: assign 0 points for that specific criterion
                - If verification status is not explicitly stated as true: assign 0 points for that criterion
 
             For your output, you MUST provide scores for each of the following main categories:
@@ -101,6 +102,11 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             4. influence: total points for Influence & Reach (0-15)
             5. contentQuality: total points for Content Quality & Engagement (0-35)
             6. reasoning: A detailed explanation of why these scores were given
+            7. summary: A concise summary of the profile and its content, including:
+               - Main focus areas and topics
+               - Content style and quality
+               - Key strengths and unique aspects
+               - Overall profile impression
             
             In your reasoning, you MUST include for each category:
             - The specific score assigned (e.g., "Profile Completeness & Clarity (12/15)")
@@ -120,9 +126,30 @@ export async function getProfileScore(profileData: object): Promise<ProfileScore
             100
         );
         
+        console.log(JSON.stringify({
+            type: 'PROFILE_SCORE_DEBUG',
+            event: 'score_calculation',
+            data: {
+                individualScores: {
+                    profileCompleteness: scoreResult.profileCompleteness,
+                    relevance: scoreResult.relevance,
+                    accountActivity: scoreResult.accountActivity,
+                    influence: scoreResult.influence,
+                    contentQuality: scoreResult.contentQuality
+                },
+                totalScore,
+                rawSum: scoreResult.profileCompleteness +
+                    scoreResult.relevance +
+                    scoreResult.accountActivity +
+                    scoreResult.influence +
+                    scoreResult.contentQuality
+            }
+        }));
+
         return {
             score: totalScore,
-            reasoning: scoreResult.reasoning
+            reasoning: scoreResult.reasoning,
+            summary: scoreResult.summary
         };
 
     } catch (error) {
