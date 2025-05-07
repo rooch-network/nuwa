@@ -3,7 +3,7 @@ import * as twitterAdapter from '../../../services/twitterAdapter';
 
 // --- Test Configuration ---
 // Use a well-known, stable account for testing
-const TEST_USERNAME = 'jolestar'; // Use a known account
+const TEST_USERNAME = 'shirleneliu69'; 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Skip tests if OpenAI API key is not provided
@@ -23,10 +23,13 @@ describeIfApiKey('Profile Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', ()
         // Fetch a user profile to score
         const userProfile = await twitterAdapter.getStandardUserByUsername(TEST_USERNAME);
         expect(userProfile).toBeDefined();
-        
+        console.log(`User profile: ${JSON.stringify(userProfile)}`);
         // Fetch recent tweets (optional)
-        const tweetResult = await twitterAdapter.getStandardUserLastTweets(TEST_USERNAME);
+        const tweetResult = await twitterAdapter.getStandardUserLastOriginalTweets(TEST_USERNAME, undefined, 35);
         const recentTweets = tweetResult.tweets;
+
+        console.log(`Recent tweets: ${JSON.stringify(recentTweets)}`);
+        console.log(`Number of recent tweets: ${recentTweets.length}`);
         
         // Create profile data for scoring
         const profileData = {
@@ -62,8 +65,13 @@ describeIfApiKey('Profile Scoring Agent E2E Tests (Requires OPENAI_API_KEY)', ()
         // Test with just basic profile info, no tweets
         const userProfile = await twitterAdapter.getStandardUserByUsername(TEST_USERNAME);
         console.log(`User profile: ${JSON.stringify(userProfile)}`);
+         // Create profile data for scoring
+        const profileData = {
+            ...userProfile,
+            recent_tweets: []   // No tweets
+        };
         // Score with minimal data
-        const scoreResult = await getProfileScore(userProfile);
+        const scoreResult = await getProfileScore(profileData);
         // Log the result for comparison
         console.log(`Minimal profile scoring result: ${scoreResult.score}/100`);
         console.log(`Reasoning: ${scoreResult.reasoning}`);

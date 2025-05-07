@@ -515,6 +515,91 @@ export async function getStandardUserLastTweets(username: string, cursor?: strin
 }
 
 /**
+ * Gets latest original tweets (excluding replies and retweets) for a user, adapted to StandardTweet format.
+ * Can automatically paginate to fetch a minimum number of tweets if specified.
+ * @param username The Twitter username.
+ * @param cursor Optional cursor for pagination to start from for the first page.
+ * @param minTweetsCount Optional minimum number of original tweets to fetch. 
+ *                       If provided, the function will attempt to paginate (up to a fixed limit of pages) 
+ *                       to meet this count. If not provided, it fetches only one page.
+ * @returns A promise that resolves to an object containing the list of original tweets, 
+ *          the next cursor (if more tweets might be available), and a flag indicating if there's a next page.
+ */
+export async function getStandardUserLastOriginalTweets(
+    username: string, 
+    cursor?: string, 
+    minTweetsCount?: number
+): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> {
+    const MAX_PAGES_TO_FETCH_IF_COUNT_SPECIFIED = 10; // Max pages to fetch if minTweetsCount is given
+    let collectedOriginalTweets: StandardTweet[] = [];
+    let currentRequestCursor: string | undefined = cursor;
+    let lastResponseNextCursor: string | undefined = undefined;
+    let lastResponseHasNextPage: boolean = true; // Assume true initially to enter loop at least once
+    let pagesFetched = 0;
+
+    const shouldPaginate = minTweetsCount !== undefined && minTweetsCount > 0;
+    const maxPagesToFetch = shouldPaginate ? MAX_PAGES_TO_FETCH_IF_COUNT_SPECIFIED : 1;
+
+    try {
+        while (pagesFetched < maxPagesToFetch && lastResponseHasNextPage) {
+            pagesFetched++;
+            
+            const response = await twitterService.getUserLastTweets(username, currentRequestCursor || "");
+            
+            const rawTweetsForPage: twitterService.TweetDetailed[] = [];
+
+            // Handle pinned tweet only on the very first actual fetch 
+            // (i.e., no initial cursor was provided to the function, and this is the first page of the loop)
+            if (pagesFetched === 1 && !cursor && response.data?.pin_tweet) {
+                rawTweetsForPage.push(response.data.pin_tweet);
+            }
+            if (response.data?.tweets) {
+                rawTweetsForPage.push(...response.data.tweets);
+            }
+
+            const convertedPageTweets = rawTweetsForPage
+                .map(convertToStandardDetailedTweet)
+                .filter((t): t is StandardTweet => t !== null);
+
+            const pageOriginalTweets = convertedPageTweets.filter(tweet => {
+                if (!tweet.referenced_tweets) return true; // Original or quote tweet
+                const isReply = tweet.referenced_tweets.some(rt => rt.type === 'replied_to');
+                const isRetweet = tweet.referenced_tweets.some(rt => rt.type === 'retweeted');
+                return !isReply && !isRetweet;
+            });
+
+            collectedOriginalTweets.push(...pageOriginalTweets);
+
+            lastResponseNextCursor = response.next_cursor;
+            lastResponseHasNextPage = !!response.has_next_page && !!lastResponseNextCursor;
+            currentRequestCursor = lastResponseNextCursor; // Use this for the next iteration
+
+            console.log(`Fetched ${pageOriginalTweets.length} original tweets from page ${pagesFetched}.`);
+            console.log(`Next cursor: ${lastResponseNextCursor}, has next page: ${lastResponseHasNextPage}`);
+            console.log(`Total collected original tweets: ${collectedOriginalTweets.length}`);
+
+            if (shouldPaginate && collectedOriginalTweets.length >= minTweetsCount) {
+                break; // Desired count reached
+            }
+            
+            if (pagesFetched < maxPagesToFetch && lastResponseHasNextPage) {
+                 await new Promise(resolve => setTimeout(resolve, 200)); // Small delay before next fetch
+            }
+        }
+
+        return {
+            tweets: collectedOriginalTweets,
+            next_cursor: lastResponseNextCursor, // The cursor from the last fetch attempt
+            has_next_page: lastResponseHasNextPage // Whether the last fetch indicated more pages
+        };
+
+    } catch (error) {
+        console.error(`Adapter error fetching last original tweets for ${username} (paginated):`, error);
+        throw error;
+    }
+}
+
+/**
  * Gets tweet mentions for a user, adapted to StandardTweet format.
  */
 export async function getStandardUserMentions(username: string, sinceTime?: number, untilTime?: number, cursor?: string): Promise<{ tweets: StandardTweet[], next_cursor?: string, has_next_page?: boolean }> { 
@@ -659,4 +744,4 @@ export async function checkUserFollowsNuwaDev(userName: string): Promise<{ follo
         console.error(`Adapter error checking follow status for ${userName} -> ${'nuwadev'}:`, error);
          throw new Error(`Failed to check if ${userName} follows ${'nuwadev'}: ${error instanceof Error ? error.message : String(error)}`);
     } 
-} 
+}
