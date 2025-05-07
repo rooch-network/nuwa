@@ -39,7 +39,7 @@ async function enhanceWithRAG(
         const relevantKnowledge = await enhancedSearchKnowledgeEmbeddings(
             userQuery,
             3,  // Return up to 3 records
-            0.6  // Lower similarity threshold for cross-language searches
+            0.3  // Lower similarity threshold for cross-language searches
         );
         
         if (relevantKnowledge.length === 0) {

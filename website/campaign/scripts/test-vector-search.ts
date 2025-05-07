@@ -111,7 +111,7 @@ async function testVectorSearch() {
   console.log('\n\n🔍 ENHANCED SEARCH TEST');
   
   // Test enhanced search with the same queries
-  for (const { query, limit } of queries) {
+  for (const { query, threshold, limit } of queries) {
     console.log(`\n--- Testing enhanced query: "${query}" ---`);
     
     try {
@@ -121,7 +121,7 @@ async function testVectorSearch() {
       // 记录查询参数
       console.log(`Query parameters: { query: "${query}", limit: ${limit} }`);
       
-      const results = await enhancedSearchKnowledgeEmbeddings(query, limit);
+      const results = await enhancedSearchKnowledgeEmbeddings(query, limit, threshold);
       const duration = Date.now() - startTime;
       
       // 保存结果用于后续比较
