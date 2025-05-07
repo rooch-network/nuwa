@@ -428,7 +428,8 @@ export const tools = {
                             success: true,
                             message: `Profile ${userName} was scored recently. Score: ${recentScore.score}/100.`,
                             score: recentScore.score,
-                            reasoning: recentScore.reasoning
+                            reasoning: recentScore.reasoning,
+                            summary: recentScore.summary,
                         };
                     }
                 } catch (error) {
@@ -447,7 +448,7 @@ export const tools = {
                 console.log(`Fetching recent tweets for ${userName}...`);
                 let recentTweets: twitterAdapter.StandardTweet[] = [];
                 try {
-                    const tweetResult = await twitterAdapter.getStandardUserLastTweets(userName);
+                    const tweetResult = await twitterAdapter.getStandardUserLastOriginalTweets(userName, undefined, 35);
                     recentTweets = tweetResult.tweets;
                 } catch (tweetError) {
                     console.warn(`Could not fetch recent tweets for ${userName}:`, tweetError);
@@ -457,18 +458,17 @@ export const tools = {
                 // 3. Create streamlined profile data for scoring
                 const profileDataForScoring = {
                     ...userProfile,
-                    // Only include recent tweets if available
-                    recent_tweets: recentTweets.length > 0 ? recentTweets : undefined
+                    recent_tweets: recentTweets
                 };
 
                 // 4. Get the score from the profile scoring agent
                 console.log(`Scoring profile for ${userName}...`);
-                const { score, reasoning } = await getProfileScore(profileDataForScoring);
+                const { score, reasoning, summary } = await getProfileScore(profileDataForScoring);
 
 
                 // 5. Save the score to the database
                 try {
-                    await addTwitterProfileScore(userName, score, reasoning);
+                    await addTwitterProfileScore(userName, score, reasoning, summary);
                     console.log(`Profile score for ${userName} saved to database.`);
                 } catch (dbError) {
                     console.error(`Failed to save profile score to database: ${dbError}`);
@@ -480,7 +480,8 @@ export const tools = {
                     success: true,
                     message: `Profile ${userName} successfully scored. Score: ${score}/100.`,
                     score: score,
-                    reasoning: reasoning
+                    reasoning: reasoning,
+                    summary: summary,
                 };
 
             } catch (error) {

@@ -507,7 +507,8 @@ export interface TwitterProfileScore {
 export async function addTwitterProfileScore(
     handle: string, 
     score: number, 
-    reasoning: string
+    reasoning: string,
+    summary?: string,
 ): Promise<void> {
     const supabase = await createServiceClient(); // Use service client for write operations
     
@@ -521,6 +522,7 @@ export async function addTwitterProfileScore(
             .update({
                 score: score,
                 reasoning: reasoning,
+                summary: summary,
                 updated_at: new Date().toISOString()
             })
             .eq('handle', handle);
@@ -538,7 +540,8 @@ export async function addTwitterProfileScore(
             .insert({
                 handle: handle,
                 score: score,
-                reasoning: reasoning
+                reasoning: reasoning,
+                summary: summary,
             });
 
         if (error) {
@@ -603,13 +606,13 @@ export async function getTwitterProfileScore(handle: string): Promise<{ score: n
  * @returns An object with the score and reasoning if found, null otherwise
  */
 export async function checkTwitterProfileScore(
-    handle: string, 
-): Promise<{ score: number; reasoning: string } | null> {
+    handle: string,
+): Promise<{ score: number; reasoning: string; summary?: string } | null> {
     const supabase = await createServiceClient();
     
     const { data, error } = await supabase
         .from('twitter_profile_score')
-        .select('score, reasoning')
+        .select('score, reasoning, summary')
         .eq('handle', handle)
         .maybeSingle();
     
