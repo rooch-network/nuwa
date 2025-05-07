@@ -3,7 +3,7 @@ import * as twitterAdapter from '../../../services/twitterAdapter';
 
 // --- Test Configuration ---
 // Use a well-known, stable account for testing
-const TEST_USERNAME = 'shirleneliu69'; 
+const TEST_USERNAME = 'jolestar'; 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Skip tests if OpenAI API key is not provided
