@@ -414,27 +414,50 @@ export const tools = {
 
     // 19. Score a user twitter profile using the profile scoring agent and save to database
     scoreTwitterProfile: tool({
-        description: 'Fetches Twitter user profile data using the username, analyzes it based on predefined criteria, assigns a score (0-100), and saves the result.',
+        description: 'Fetches Twitter user profile data, analyzes it to assign a score (0-100), and saves the result. Can rescore if forced or if the previous score was 0. Returns score changes on rescore.',
         parameters: z.object({
             userName: z.string().describe('The Twitter username (handle) of the profile to be scored.'),
+            forceRescore: z.boolean().optional().default(false).describe('Whether to force a re-evaluation of the profile score, even if recently scored and the score is not 0.'),
         }),
-        execute: async function ({ userName }) {
+        execute: async function ({ userName, forceRescore = false }) {
             try {
-                // Check if the profile has been scored recently
+                let existingScoreData = null;
+                let shouldRescore = forceRescore; // Start with the AI's decision or explicit flag
+
                 try {
-                    const recentScore = await checkTwitterProfileScore(userName);
-                    if (recentScore) {
-                        return {
-                            success: true,
-                            message: `Profile ${userName} was scored recently. Score: ${recentScore.score}/100.`,
-                            score: recentScore.score,
-                            reasoning: recentScore.reasoning,
-                            summary: recentScore.summary,
-                        };
+                    existingScoreData = await checkTwitterProfileScore(userName);
+                    if (existingScoreData) {
+                        if (existingScoreData.score === 0) {
+                            console.log(`Profile ${userName} has a score of 0, triggering automatic rescore.`);
+                            shouldRescore = true; // Automatically rescore if score is 0
+                        }
                     }
                 } catch (error) {
-                    console.warn(`Could not check for recent profile score: ${error}`);
-                    // Continue with scoring even if check fails
+                    console.warn(`Could not check for existing profile score for ${userName}: ${error}. Proceeding with scoring.`);
+                    // existingScoreData remains null. Scoring will proceed.
+                    // shouldRescore depends on the initial forceRescore flag.
+                }
+
+                // If there's existing data, and we are NOT rescoring (neither by force nor due to score 0)
+                if (existingScoreData && !shouldRescore) {
+                    return {
+                        success: true,
+                        message: `Profile ${userName} was scored previously. Score: ${existingScoreData.score}/100. Use 'forceRescore: true' to re-evaluate if needed.`,
+                        score: existingScoreData.score,
+                        reasoning: existingScoreData.reasoning,
+                        summary: existingScoreData.summary,
+                        is_rescored: false,
+                        score_change: null,
+                    };
+                }
+
+                // Determine if this operation is effectively a "rescore" of existing data
+                const isActuallyRescoreOperation = shouldRescore && existingScoreData != null;
+
+                if (isActuallyRescoreOperation) {
+                    console.log(`Rescoring profile for ${userName} (reason: ${forceRescore ? 'forced by AI/user' : 'previous score was 0'})...`);
+                } else {
+                    console.log(`Scoring profile for ${userName} (first time, or check for existing score failed, or forced without prior data)...`);
                 }
 
                 // 1. Fetch user profile data using twitterAdapter
@@ -461,41 +484,55 @@ export const tools = {
                     recent_tweets: recentTweets
                 };
 
-                // 4. Get the score from the profile scoring agent
-                console.log(`Scoring profile for ${userName}...`);
-                const { score, reasoning, summary } = await getProfileScore(profileDataForScoring);
+                // 4. Get the new score from the profile scoring agent
+                console.log(`Scoring profile with AI agent for ${userName}...`);
+                const { score: newScore, reasoning: newReasoning, summary: newSummary } = await getProfileScore(profileDataForScoring);
 
 
                 // 5. Save the score to the database
                 try {
-                    await addTwitterProfileScore(userName, score, reasoning, summary);
-                    console.log(`Profile score for ${userName} saved to database.`);
+                    await addTwitterProfileScore(userName, newScore, newReasoning, newSummary);
+                    console.log(`Profile score for ${userName} (new/updated) saved to database.`);
                 } catch (dbError) {
-                    console.error(`Failed to save profile score to database: ${dbError}`);
-                    // Continue with the response even if saving fails
+                    console.error(`Failed to save profile score to database for ${userName}: ${dbError}`);
+                    // Continue with the response even if saving fails, but log critical error
                 }
 
-                // 7. Return the result
+                let scoreChange = null;
+                if (isActuallyRescoreOperation && existingScoreData) { // existingScoreData check for safety
+                    scoreChange = newScore - existingScoreData.score;
+                }
+
+                let message;
+                if (isActuallyRescoreOperation) {
+                    message = `Profile ${userName} has been rescored. New score: ${newScore}/100 (${scoreChange !== null && scoreChange >= 0 ? '+' : ''}${scoreChange !== null ? scoreChange.toFixed(0) : 'N/A'} change).`;
+                } else { // Covers first time score, or scoring after failed check, or forced without prior data
+                    message = `Profile ${userName} successfully scored. Score: ${newScore}/100.`;
+                }
+                
                 return {
                     success: true,
-                    message: `Profile ${userName} successfully scored. Score: ${score}/100.`,
-                    score: score,
-                    reasoning: reasoning,
-                    summary: summary,
+                    message: message,
+                    score: newScore,
+                    reasoning: newReasoning,
+                    summary: newSummary,
+                    is_rescored: isActuallyRescoreOperation,
+                    score_change: scoreChange,
                 };
 
             } catch (error) {
-                console.error(`Error in scoreUserProfile tool for username ${userName}:`, error);
+                console.error(`Error in scoreTwitterProfile tool for username ${userName}:`, error);
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 return {
                     success: false,
                     message: `Failed to score profile ${userName}: ${errorMessage}`,
                     score: null,
                     reasoning: null,
+                    summary: null, // Added for consistency
                     error: errorMessage
                 };
             }
         },
     }),
 
-}; 
+};
