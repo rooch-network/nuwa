@@ -139,15 +139,43 @@ LLM service providers SHALL extend their DID documents with:
   "publicKey": [ ... ],
   "verificationMethod": [...],
   "llmCapabilities": {
-    "supported_models": ["gpt-4", "claude-3", "mistral-7b"],
+    "supported_models": ["gpt-4", "claude-3-opus", "mistral-7b"],
     "pricing": {
-      "gpt-4": "0.01 USD per 1k tokens",
-      "claude-3": "0.008 USD per 1k tokens"
+      "gpt-4": {
+        "currency": "USD",
+        "unit": "1k_tokens",
+        "prompt_price_per_unit": 0.01,
+        "completion_price_per_unit": 0.03
+      },
+      "claude-3-opus": {
+        "currency": "USD",
+        "unit": "1k_tokens",
+        "prompt_price_per_unit": 0.008,
+        "completion_price_per_unit": 0.015
+      },
+      "mistral-7b": {
+        "currency": "USD",
+        "unit": "1k_tokens",
+        "price_per_unit": 0.001 // Example for models with single rate
+      }
     },
-    "settlement": "x402"
+    "settlement_options": [
+      { "type": "x402" },
+      { "type": "NIP-3_state_channel", "details": { "channel_setup_endpoint": "https://provider.example/nip3/channels" } }
+    ]
   }
 }
 ```
+
+*   **`llmCapabilities.pricing`**: This object provides structured pricing information for each supported model.
+    *   `currency`: ISO 4217 currency code (e.g., "USD").
+    *   `unit`: A string defining the billing unit (e.g., "1k_tokens", "token", "request").
+    *   `prompt_price_per_unit`: (Optional) The price per unit for prompt/input tokens.
+    *   `completion_price_per_unit`: (Optional) The price per unit for completion/output tokens.
+    *   `price_per_unit`: (Optional) Used if prompt and completion prices are the same, or if pricing is per request rather than per token.
+*   **`llmCapabilities.settlement_options`**: An array detailing the NIP-3 compatible settlement mechanisms supported by the gateway. This replaces the singular `settlement` field to allow for multiple options.
+    *   `type`: Indicates the settlement mechanism (e.g., "x402", "NIP-3_state_channel", "NIP-3_prepaid_account").
+    *   `details`: (Optional) An object containing additional information specific to the settlement type, such as an endpoint for setting up a state channel.
 
 ### 4. Payment Integration
 
