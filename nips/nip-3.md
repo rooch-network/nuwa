@@ -14,7 +14,7 @@ version: 0.1
 
 This NIP defines a protocol for on-demand payment for services provided by AI Agents within the Nuwa ecosystem. It builds upon NIP-1 (DID Model) and NIP-2 (A2A Authentication) to enable secure and verifiable payment transactions between a User Agent (Client) and an AI Agent (Service Provider). This protocol outlines mechanisms for pre-payment per service and a state channel model for continuous/streaming payments, where the User Agent authorizes and confirms payment.
 
-##  мотивация (Motivation)
+## Motivation
 
 As AI Agents offer valuable computational services, a standardized payment mechanism is crucial for incentivizing service provision and enabling a sustainable Agent economy. This protocol aims to provide a secure, transparent, and DID-based method for User Agents to pay AI Agents for their services, ensuring that payments are tied to verifiable identities and communication is authenticated.
 
@@ -23,7 +23,7 @@ As AI Agents offer valuable computational services, a standardized payment mecha
 *   **NIP-1: Nuwa Agent Single DID Multi-Device Key Model**: Used for identifying User Agents and AI Agents, and for managing cryptographic keys involved in signing payment-related messages.
 *   **NIP-2: DID-Based A2A Authentication**: Used for securing the communication channel during payment negotiation and service requests, ensuring message integrity and origin authentication.
 
-##  протокол (Protocol Details)
+## Protocol Details
 
 ### Roles
 
