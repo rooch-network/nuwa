@@ -1,5 +1,14 @@
-# NIP-7: Agent Capability Protocol — Capability Package Specification
+---
+nip: 7
+title: Agent Capability Protocol — Capability Package Specification
+status: Draft
+type: Standards Track
+category: Core
+created: 2025-05-13
+version: 0.1
+---
 
+# NIP-7: Agent Capability Protocol — Capability Package Specification
 
 ## 0  Summary
 

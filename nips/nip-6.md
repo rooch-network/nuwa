@@ -1,4 +1,3 @@
-<!-- filepath: /Users/jolestar/opensource/src/github.com/rooch-network/nuwa/nips/nip-6.md -->
 ---
 nip: 6
 title: MCP Identity Authentication and Payment Extension Protocol
