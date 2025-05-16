@@ -1,3 +1,6 @@
 [submodule "agents/deps/a2a"]
 	path = agents/deps/a2a
 	url = git@github.com:google/A2A.git
+[submodule "nips"]
+	path = nips
+	url = git@github.com:nuwa-protocol/NIPs.git
