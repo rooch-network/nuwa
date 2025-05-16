@@ -272,7 +272,7 @@ tool_bindings:
         *   Else, the runtime looks up the tool name in the `tool_bindings` section of the ACP.
             *   If a binding is found, the runtime uses the specified `type` (e.g., `http_get`, `nuwa_a2a`, `mcp_service`) and associated parameters (e.g., `url`, `target_did`) to execute the tool call, passing the arguments provided by the LLM.
             *   If no binding is found and the tool is not built-in, the tool call cannot be fulfilled (this should be treated as an error or a specific response to the LLM).
-    *   For `state.*` tools, runtime persists via CR-SQLite / RocksDB + CRDT log; anchors Merkle root per NIP-4.
+    *   For `state.*` tools, runtime persists via CR-SQLite / RocksDB + CRDT log; anchors Merkle root per NIP-6.
 4.  **Done / pop**
 
    * If tool response contains `{"done":true}` *or* Router times out / re-classifies, stack pops.

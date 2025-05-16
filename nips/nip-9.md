@@ -1,135 +1,204 @@
----
-nip: 9
-title: Custodian Registry & Delegated-Control Protocol
-status: Draft
-type: Standards Track — Meta
-category: Core
-requires: NIP-1, NIP-2
-created: 2025-05-15
-version: 0.1-draft
-license: CC-BY-SA-4.0
----
+# NIP-9: Agent LLM Gateway Protocol
 
-# 0 Summary
+## Summary
 
-*NIP-9* specifies a **Custodian Registry** smart-contract interface and an off-chain **Delegated-Control Protocol** that allow Web2 users to create Nuwa Agent DIDs without holding a wallet. A *Custodian* is an on-chain-registered service that temporarily controls the `controller` field of a freshly minted Agent DID and offers one or more Web2 authentication methods (e.g. Google OAuth, Passkey).  
-Users may later replace the custodian with another service or with their own wallet via a single DID-document update.
+This proposal defines a unified, decentralized protocol for AI Agents to access large language model (LLM) services through verifiable, identity-bound, and programmable gateways. The goal is to enable agents to dynamically invoke different LLMs without hardcoding keys, while ensuring response authenticity, DID-based access control, and programmable per-call payments.
 
 ---
 
-# 1 Motivation
+## Motivation
 
-| Pain point | Effect | Solution offered by NIP-9 |
-|------------|--------|---------------------------|
-| Web2 users have **no crypto wallet** | Cannot sign the on-chain DID-creation tx | Custodian does it on their behalf |
-| Ecosystem needs **multiple custodians** | Avoid vendor lock-in | Registry contract lists and ranks custodians |
-| Users need to **migrate** later | Maintain DID continuity | `controller` field can be switched in one tx |
+* Users should not be required to manage or rotate LLM API keys manually.
+* Agent-to-LLM communication should support verifiability and identity binding.
+* Agents should be able to access multiple LLM services (e.g., OpenAI, Claude, Mistral, Local LLMs) via a unified gateway.
+* The response must be optionally verifiable (signed or provable).
+* Payments for API usage should be programmable and interoperable with NIP-3.
 
 ---
 
-# 2 Custodian Registry (on-chain)
+## Components
 
-## 2.1 Data structure
+### 1. Request Format
 
-```move
-struct CustodianMeta has key {
-    id:              u64,
-    name:            vector<u8>,
-    url:             vector<u8>,      // HTTPS base URL
-    public_key:      vector<u8>,      // Controller pub-key fingerprint
-    auth_methods:    vector<u16>,     // Web2 login codes (see § 2.4)
-    active:          bool,
-    deposit:         u64              // Stake in native token
+The gateway expects an HTTP request where the **body** is compatible with the OpenAI Chat Completions API format. NIP-5 specific parameters are passed in a single HTTP header, `X-Nuwa-Meta`, containing a base64 encoded JSON object.
+
+**HTTP Header:**
+
+*   `X-Nuwa-Meta`: (Required) A base64 encoded JSON string. The JSON object contains the following fields:
+    *   `agent_did`: (Required) The DID of the calling agent (per NIP-1/NIP-2).
+    *   `timestamp`: (Required) A Unix timestamp indicating when the request was made. Used to prevent replay attacks.
+    *   `signature`: (Optional) A signature of the request (details to be defined, likely over a canonical representation of the request body and the `agent_did` and `timestamp` fields from this JSON object).
+    *   `payment_proof`: (Optional) Payment proof, such as an invoice ID or an x402 header, if required by the gateway (per NIP-3).
+
+**Example `X-Nuwa-Meta` JSON (before base64 encoding):**
+```json
+{
+  "agent_did": "did:nuwa:agent123",
+  "timestamp": 1715520000,
+  "signature": "ed25519:...",
+  "payment_proof": "inv_xxxxxxxxxxxx"
 }
 ```
 
-### 2.2 Core entry-points
+**Request Body (Example - OpenAI Compatible):**
 
-| Function                                   | Description                                       |
-| ------------------------------------------ | ------------------------------------------------- |
-| `register(name, url, pubkey, auth_codes)`  | Stake ≥ `MIN_DEPOSIT`, emit `CustodianRegistered` |
-| `update_meta(id, new_url, new_auth_codes)` | Only callable by custodian                        |
-| `deactivate(id)`                           | Voluntary quit (timelock)                         |
-| `info(id)`                                 | Read-only getters                                 |
-
-> **Gas & stake amounts** are implementation-specific and *out of scope* of this draft.
-
-### 2.3 Events
-
-| Event                 | Payload                     |
-| --------------------- | --------------------------- |
-| `CustodianRegistered` | `(id, name, auth_codes)`    |
-| `CustodianUpdated`    | `(id, new_url, auth_codes)` |
-| `CustodianStatus`     | `(id, active)`              |
-
-### 2.4 `auth_methods` enumeration
-
-| Code  | Login method     | Protocol reference |
-| ----- | ---------------- | ------------------ |
-| `1`   | Google OAuth     | OIDC               |
-| `2`   | Twitter OAuth    | OAuth 2            |
-| `3`   | Apple Sign-In    | JWT                |
-| `4`   | GitHub OAuth     | OAuth 2            |
-| `5`   | Email OTP        | RFC 6120           |
-| `6`   | SMS OTP          | —                  |
-| `7`   | WebAuthn Passkey | FIDO2              |
-| `8`   | WeChat QR        | OAuth 2            |
-| `9`   | Discord OAuth    | OAuth 2            |
-| `10+` | *Reserved*       | Added in future versions |
-
----
-
-# 3 Delegated-Control Protocol (off-chain)
-
-## 3.1 Create Agent DID
-
-```mermaid
-sequenceDiagram
-    participant U as User (browser)
-    participant C as Custodian API
-    participant Chain
-
-    U->>C: Start login (e.g. Google OAuth)
-    C-->>U: OAuth redirect or passkey prompt
-    U-->>C: OIDC code or WebAuthn assertion
-    C->>Chain: mintAgentDID(uuid, controller=C)
-    C->>Chain: addVerificationMethod(deviceKey)
-    Chain-->>C: tx_receipt
-    C-->>U: did:rooch:agent:<uuid>
+```json
+{
+  "model": "gpt-4",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Explain Bitcoin like I\\'m five."
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 512
+}
 ```
 
-* `deviceKey` is generated locally by the browser/SDK and **never leaves the device**.
-* Custodian only holds the `controller` key.
+*   The `model` field in the body specifies the logical name of the model (e.g., gpt-4, claude-3, llama2-7b-local).
+*   Other parameters in the body (e.g., `messages`, `temperature`, `max_tokens`) follow the OpenAI Chat Completions API specification.
 
-## 3.2 Switch controller (migrate)
+### 2. Response Format
 
-1. User chooses *“Self-custody”* or another custodian `C₂`.
-2. Device signs migration intent `M` (`did`, new controller pubkey).
-3. New custodian (or user wallet) submits `updateController(did, new_controller_pubkey)` on-chain.
-4. Front-ends refresh DID cache after `ControllerChanged` event.
+The gateway returns an HTTP response where the **body** is compatible with the OpenAI Chat Completions API format. NIP-5 specific parameters are returned in a single HTTP header, `X-Nuwa-Response-Meta`, containing a base64 encoded JSON object.
+
+**HTTP Header:**
+
+*   `X-Nuwa-Response-Meta`: (Required) A base64 encoded JSON string. The JSON object contains the following fields:
+    *   `provider_did`: (Required) The DID of the Nuwa LLM Gateway that processed the request.
+    *   `verification_details`: (Optional) An object detailing how the response's authenticity and origin can be verified. This object MAY contain:
+        *   `method`: (Required if `verification_details` is present) A string indicating the verification method. Examples: `"gateway_signature"`, `"zkTLS_proof_of_origin"`.
+        *   `signature`: (Conditional, if `method` is `"gateway_signature"`) The gateway's signature over a canonical representation of the response body and relevant metadata (e.g., `provider_did`, `timestamp`).
+        *   `origin_proof`: (Conditional, if `method` is `"zkTLS_proof_of_origin"`) The zkTLS proof data or a reference to it. The exact structure of this proof would need further specification (potentially in a dedicated NIP or by referencing an external standard). This proof attests that the response body was faithfully relayed from a specific upstream LLM provider.
+        *   `upstream_source_identifier`: (Conditional, if `method` is `"zkTLS_proof_of_origin"`) An identifier for the claimed upstream source, e.g., the domain name like `"api.openai.com"`.
+    *   `gateway_signature`: (Deprecated, use `verification_details` with method `"gateway_signature"` instead) An optional signature from the provider over the response.
+
+**Example `X-Nuwa-Response-Meta` JSON (before base64 encoding):**
+```json
+{
+  "provider_did": "did:nuwa:llm:gateway123",
+  "verification_details": {
+    "method": "zkTLS_proof_of_origin",
+    "origin_proof": { "proof_type": "tlsnotary_v1", "data": "...base64_encoded_proof..." },
+    "upstream_source_identifier": "api.openai.com"
+  }
+  // Alternatively, for gateway signature:
+  // "verification_details": {
+  //   "method": "gateway_signature",
+  //   "signature": "ed25519:..."
+  // }
+}
+```
+
+**Response Body (Example - OpenAI Compatible):**
+
+```json
+{
+  "id": "chatcmpl-xxxxxxxxxxxxxxxxxxxxxx",
+  "object": "chat.completion",
+  "created": 1715520000,
+  "model": "gpt-4-turbo-2024-04",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Bitcoin is like magic internet money..."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 15,
+    "completion_tokens": 50,
+    "total_tokens": 65
+  }
+  // Potentially other OpenAI standard fields
+}
+```
+
+*   The response body structure (e.g., `choices`, `message`, `usage`) follows the OpenAI Chat Completions API specification.
+*   Optional: The gateway might include additional metadata in the `X-Nuwa-Response-Meta` JSON if needed (e.g., latency, specific model version if different from the logical name).
+
+### 3. Provider Declaration (DID Document Extension)
+
+LLM service providers SHALL extend their DID documents with:
+
+```json
+{
+  "@context": "https://w3id.org/did/v1",
+  "id": "did:nuwa:llm:openrouter123",
+  "service": [
+    {
+      "id": "#llm-gateway",
+      "type": "LLMGateway",
+      "serviceEndpoint": "https://api.openrouter.ai/llm"
+    }
+  ],
+  "publicKey": [ ... ],
+  "verificationMethod": [...],
+  "llmCapabilities": {
+    "supported_models": ["gpt-4", "claude-3-opus", "mistral-7b"],
+    "pricing": {
+      "gpt-4": {
+        "currency": "USD",
+        "unit": "1k_tokens",
+        "prompt_price_per_unit": 0.01,
+        "completion_price_per_unit": 0.03
+      },
+      "claude-3-opus": {
+        "currency": "USD",
+        "unit": "1k_tokens",
+        "prompt_price_per_unit": 0.008,
+        "completion_price_per_unit": 0.015
+      },
+      "mistral-7b": {
+        "currency": "USD",
+        "unit": "1k_tokens",
+        "price_per_unit": 0.001 // Example for models with single rate
+      }
+    },
+    "settlement_options": [
+      { "type": "x402" },
+      { "type": "NIP-3_state_channel", "details": { "channel_setup_endpoint": "https://provider.example/nip3/channels" } }
+    ]
+  }
+}
+```
+
+*   **`llmCapabilities.pricing`**: This object provides structured pricing information for each supported model.
+    *   `currency`: ISO 4217 currency code (e.g., "USD").
+    *   `unit`: A string defining the billing unit (e.g., "1k_tokens", "token", "request").
+    *   `prompt_price_per_unit`: (Optional) The price per unit for prompt/input tokens.
+    *   `completion_price_per_unit`: (Optional) The price per unit for completion/output tokens.
+    *   `price_per_unit`: (Optional) Used if prompt and completion prices are the same, or if pricing is per request rather than per token.
+*   **`llmCapabilities.settlement_options`**: An array detailing the NIP-3 compatible settlement mechanisms supported by the gateway. This replaces the singular `settlement` field to allow for multiple options.
+    *   `type`: Indicates the settlement mechanism (e.g., "x402", "NIP-3_state_channel", "NIP-3_prepaid_account").
+    *   `details`: (Optional) An object containing additional information specific to the settlement type, such as an endpoint for setting up a state channel.
+
+### 4. Payment Integration
+
+*   Compatible with **NIP-3** (Agent Service Payment Protocol). NIP-3 defines the underlying mechanisms for establishing payment relationships (e.g., state channels, pre-paid accounts) and generating payment authorizations.
+*   The `payment_proof` field within the `X-Nuwa-Meta` header (e.g., an invoice ID, a redeemable token, or an L402/x402 header value) is the concrete representation of such authorization presented to the LLM Gateway for verification with each request.
+*   Gateways may reject unauthenticated or unpaid requests.
+*   Request-response pairs can optionally be posted on-chain for audit.
 
 ---
 
-# 4 Security Considerations
+## Security Considerations
 
-* **Minimal trust** Custodian controls *only* `controller` key; every A2A message is still signed by user device keys (NIP-2).
-* **Key rotation & exit** Custodian must allow user-initiated controller switch at any time.
-* **Sybil / spam** Registry demands deposit; malicious or abandoned custodians can be de-activated by governance and forfeit stake.
-* **Privacy** Auth method disclosure on-chain is limited to numeric codes; no PII stored.
-
----
-
-# 5 Backward Compatibility
-
-* NIP-2 (DID-Based A2A Auth) continues to resolve the signer DID and verificationMethod exactly as before.
-* Existing self-custody agents remain valid; their `controller` field is empty or self-referential.
+* Signature scheme should align with NIP-1 key types (Ed25519, Secp256k1, etc.).
+* Gateways should verify Agent identity and timestamp validity to prevent replay attacks.
+* Optionally integrate with zkML/TEE proof networks for enhanced verification of the LLM computation itself.
+* Multi-gateway fallback allowed (agents may rotate across gateways).
+* **Proof of Origin for Relayed Content**: To enhance trust in gateways relaying responses from upstream LLM providers (e.g., OpenAI, Anthropic), mechanisms like zkTLS (or similar TLS-based Notary schemes) can be employed. The gateway can generate a proof that the specific response content was part of a TLS session with the claimed upstream provider. This allows the agent to verify the integrity and origin of the relayed content without requiring the upstream provider to be NIP-aware, and serves as a strong alternative or complement to the gateway's own signature on the response. The `verification_details` field in `X-Nuwa-Response-Meta` is designed to carry such proofs.
 
 ---
 
-# 6 References
+## Future Extensions
 
-1. **DID Core 1.0**, W3C Recommendation
-2. **OpenID Connect Core 1.0**
-3. **WebAuthn Level 2**, W3C Recommendation
-
-> *This draft purposefully omits gas-relay, fee, and SLA mechanics to keep the minimal viable protocol focused on **custodian discovery and Web2 authentication capability declaration**. Such extensions can be proposed in follow-up NIPs.*
+* Support streaming token-level responses
+* Agent-authenticated function calling (`llm.call_tool`)
+* Encrypted response mode using Agent's device key (per NIP-1)
+* Model fingerprinting proof (commit hash + zk proof)
