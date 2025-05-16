@@ -1,73 +1,62 @@
 ---
 nip: 1
 title: Nuwa Agent Single DID Multi-Device Key Model
+author: @jolestar
+discussions-to: <URL to GitHub Issue or Discussion Forum> // TODO: Add discussion link
 status: Draft
 type: Standards Track
 category: Core
 created: 2024-05-12
-version: 0.2
 ---
 
-# NIP-1: Nuwa Agent Single DID Multi-Device Key Model
+## Abstract
 
-## 📌 Preamble & Motivation
+This NIP proposes a decentralized identity model for Nuwa Agents, enabling a single master Decentralized Identifier (DID) to manage multiple device-specific keys. It aims to maintain user identity consistency while achieving key isolation, permission control, and secure revocability for multi-device Agents. The model supports various DID methods, with `did:rooch` (where DID documents are stored on the Rooch Network) presented as a specific example.
 
-To maintain user identity consistency (single DID) while achieving key isolation, permission control, and secure revocability for multi-device Agents, this specification proposes a decentralized identity model supporting multiple DID methods, based on a **"single master identity + multiple device sub-keys"** concept. It aims to provide a robust and flexible identity foundation for Agents in the Nuwa ecosystem. Among these, `did:rooch` serves as a specific DID method implementation where DID documents are stored on the Rooch Network.
+## Motivation
 
-## ✅ Core Design
+To maintain user identity consistency (single DID) while achieving key isolation, permission control, and secure revocability for multi-device Agents, the current ecosystem lacks a standardized approach. This specification proposes a decentralized identity model based on a **"single master identity + multiple device sub-keys"** concept. It aims to provide a robust and flexible identity foundation for Agents in the Nuwa ecosystem, addressing the need for users to securely interact across multiple devices without compromising their core digital identity or creating fragmented identities.
 
-- **Single Master Identity**: Each user possesses a master DID (e.g., any DID compliant with W3C DID specifications, such as `did:example:123`; for implementations on the Rooch network, like `did:rooch:alice`), representing their unique digital persona and associated digital assets/memories. Control over this DID is held by one or more Master Key(s).
-- **Multi-Device Keys**: Each Agent instance running on a different device generates a local Device Key.
-- **DID Document Registration**: The public key information of each Device Key is registered as a `verificationMethod` entry in the DID document.
-- **Fine-grained Verification Relationships**: By adding the `id` of a `verificationMethod` to different verification relationships (e.g., `authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`), the permission scope of each device key can be precisely controlled.
-- **Signatures Indicate Origin**: All signature operations initiated by an Agent must clearly indicate which device key was used (via the `id` of the `verificationMethod`).
+## Specification
 
-## General DID Method Support & `did:rooch` Concept
+### Core Design Principles
+
+-   **Single Master Identity**: Each user possesses a master DID (e.g., any DID compliant with W3C DID specifications, such as `did:example:123`; for implementations on the Rooch network, like `did:rooch:alice`), representing their unique digital persona and associated digital assets/memories. Control over this DID is held by one or more Master Key(s).
+-   **Multi-Device Keys**: Each Agent instance running on a different device generates a local Device Key.
+-   **DID Document Registration**: The public key information of each Device Key is registered as a `verificationMethod` entry in the DID document associated with the master DID.
+-   **Fine-grained Verification Relationships**: By adding the `id` of a `verificationMethod` to different verification relationships (e.g., `authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`), the permission scope of each device key can be precisely controlled.
+-   **Signatures Indicate Origin**: All signature operations initiated by an Agent must clearly indicate which device key was used (via the `id` of the `verificationMethod`).
+
+### General DID Method Support & `did:rooch` Concept
 
 This Nuwa Agent model aims to support existing industry DID methods that comply with W3C DID specifications. An Agent's master DID can adopt any compatible DID method.
 
-As a possible specific implementation, this draft has mentioned `did:rooch:<unique-identifier>`. If `did:rooch` is pursued as a new DID method in the future, its specification will be necessary, covering the following aspects. However, detailing a new DID method is beyond the core scope of this document; key considerations are listed here for reference:
+As a possible specific implementation, this NIP mentions `did:rooch:<unique-identifier>`. If `did:rooch` is pursued as a new DID method, its specification will be necessary, covering:
+-   **Verifiable Data Registry (VDR) for `did:rooch`**: Storage location, data model, access controls.
+-   **DID Operations (CRUD) for `did:rooch`**: Processes for create, read, update, deactivate.
+-   **Resolver for `did:rooch`**: How to resolve `did:rooch` to its DID document.
+-   **Security & Consensus for `did:rooch`**: Security model of the VDR.
+*(Detailing a new DID method is beyond this NIP's scope; these are considerations.)*
 
-- **Verifiable Data Registry (VDR) for `did:rooch`**:
-    - Clarify the storage location and mechanism for `did:rooch` DID documents.
-    - Define the data model, encoding format, and read/write access controls for DID documents within the VDR.
+### Master Key Management & Recovery
 
-- **DID Operations (CRUD) for `did:rooch`**:
-    - Define the specific processes and transaction formats for creating, reading, updating, and deactivating/revoking `did:rooch` DIDs.
-    - Clarify the unique identifier generation mechanism, operational authorization, version control, and transaction fee model.
+Secure management and reliable recovery of master keys are critical.
+-   **Master Key(s)**: Users must generate and securely back up their master DID's Master Key(s) offline. These private keys should not be stored on any routinely used Agent devices.
+-   **Controller**: The `controller` field of the DID document must point to the entity holding the Master Key(s).
+-   **Recovery Mechanisms**: Robust key recovery mechanisms (e.g., Social Recovery, Multi-signature, Hardware Wallet) are essential and depend on the adopted DID method.
 
-- **Resolver for `did:rooch`**:
-    - Specify how to resolve a `did:rooch:...` to its corresponding DID document, including resolver implementation methods (e.g., client library, server endpoint).
-    - Clarify resolution steps, caching strategies, and return formats.
-
-- **Security & Consensus for `did:rooch`**:
-    - Describe the security model and consensus mechanism of the chosen VDR.
-    - Emphasize the importance of `controller` key management, analyze potential attack vectors, and mitigation measures.
-    - Consider the governance mechanism for the `did:rooch` method specification itself.
-
-## 🔑 Master Key Management & Recovery
-
-Secure management and reliable recovery of master keys are cornerstones of this DID model's success. While the choice of specific implementation solutions and detailed specifications are beyond the core scope of this NIP and typically depend on the adopted DID method and its supporting tool ecosystem, the following principles and directions are paramount:
-
-- **Master Key(s)**: Users must generate and securely back up their master DID's Master Key(s) offline through secure, standardized processes. This represents the highest level of control over the entire DID. **Their private keys should absolutely not be stored on any routinely used Agent devices to minimize leakage risk.**
-- **Controller**: The `controller` field of the DID document must clearly point to the entity representing the user holding the Master Key(s) (can be a DID or a specific public key identifier). Only a legitimate Controller has the authority to make fundamental changes to the DID document (e.g., managing authentication keys in `verificationMethod`, changing the Controller itself).
-- **Recovery Mechanisms**: Robust key recovery mechanisms must be designed and integrated to address the risk of Master Key(s) loss or forgotten. Existing industry solution directions include, but are not limited to:
-    - **Social Recovery**: Relies on a group of trusted contacts or entities to assist in recovery.
-    - **Multi-signature / Guardians**: Requires multiple pre-set key holders to jointly authorize recovery.
-    - **Hardware Wallet / Secure Hardware Backup**: Securely stores the master key in a dedicated, tamper-proof hardware device.
-    - **Other mechanisms based on specific DID methods or VDRs.**
-    **The absence or improper design of this mechanism will lead to the permanent loss of the DID and its associated assets/memories; therefore, its detailed design and user guidance are critical.**
-
-## 🧱 DID Document Structure Example
+### DID Document Structure Example
 
 ```json
+// filepath: NIPs/nip-1.md
+// ...existing code...
 {
-  "@context": ["https://www.w3.org/ns/did/v1"], // Add DID context
+  "@context": ["https://www.w3.org/ns/did/v1"],
   "id": "did:rooch:alice",
-  "controller": "did:rooch:alice", // Assume master key is also identified by this DID, needs clarification
+  "controller": "did:rooch:alice",
   "verificationMethod": [
     {
-      "id": "did:rooch:alice#device-key-1", // Use a more generic ID
+      "id": "did:rooch:alice#device-key-1",
       "type": "EcdsaSecp256k1VerificationKey2019", // Or Ed25519VerificationKey2020
       "controller": "did:rooch:alice",
       "publicKeyHex": "0xabc123..."
@@ -79,171 +68,165 @@ Secure management and reliable recovery of master keys are cornerstones of this 
       "publicKeyHex": "0xdef456..."
     },
     {
-      // Example: A temporary, permission-limited Session Key
       "id": "did:rooch:alice#session-temp-xyz",
       "type": "EcdsaSecp256k1VerificationKey2019",
       "controller": "did:rooch:alice",
       "publicKeyHex": "0xghi789...",
-      "expires": 1747252800 // Optional: standardized timestamp (Unix epoch)
+      "expires": 1747252800
     }
   ],
-  // Core authentication, may only include a few high-privilege devices or Master Key
   "authentication": [
     "did:rooch:alice#device-key-1"
-    // May not include all device keys, depending on policy
   ],
-  // Used for asserting claims, e.g., issuing Verifiable Credentials
   "assertionMethod": [
     "did:rooch:alice#device-key-1",
     "did:rooch:alice#device-key-2"
   ],
-  // Used for invoking capabilities (e.g., performing actions)
   "capabilityInvocation": [
      "did:rooch:alice#device-key-1",
      "did:rooch:alice#device-key-2",
-     "did:rooch:alice#session-temp-xyz" // Session Key might only be able to invoke capabilities
+     "did:rooch:alice#session-temp-xyz"
   ],
-  // Used for delegating capabilities to other DIDs to act on behalf of this DID
   "capabilityDelegation": [
      // Typically only Master Key or high-privilege Key
   ]
-  // "service": [ ... ] // Service endpoints can be added, e.g., DIDComm Endpoint
+  // "service": [ ... ]
 }
+// ...existing code...
 ```
 
-## 🔐 Signature Structure Specification
+### Signature Structure Specification
 
-Each signature operation initiated by an Agent device should result in a structure containing sufficient information for verifiers:
+Each signature operation initiated by an Agent device should result in a structure:
 
 ```json
+// filepath: NIPs/nip-1.md
+// ...existing code...
 {
-  "signed_data": { // The data payload covered by the signature needs to be clearly defined
+  "signed_data": {
     "operation": "...",
     "params": { ... },
-    "nonce": "random_nonce_123", // Prevents replay attacks
-    "timestamp": 1715600000 // Prevents timeout replays, requires a verification window
+    "nonce": "random_nonce_123",
+    "timestamp": 1715600000
   },
   "signature": {
-    "signer_did": "did:rooch:alice", // Master DID
-    "key_id": "did:rooch:alice#device-key-1", // Specific device key ID used
-    "value": "0x...." // Signature value
+    "signer_did": "did:rooch:alice",
+    "key_id": "did:rooch:alice#device-key-1",
+    "value": "0x...."
   }
 }
+// ...existing code...
 ```
-
 Verification Process:
-1. Verify if `timestamp` is within an acceptable window.
-2. Check if `nonce` has already been used (requires stateful storage).
-3. Resolve `signer_did` to obtain the DID document.
-4. Find the `verificationMethod` corresponding to `key_id` in the DID document.
-5. Use the public key from this `verificationMethod` to verify if `signature.value` is a valid signature for `signed_data`.
-6. (Optional) Based on the operation type, check if this `key_id` is present in the appropriate verification relationship (e.g., `authentication`, `capabilityInvocation`).
+1.  Verify `timestamp`.
+2.  Check `nonce`.
+3.  Resolve `signer_did`.
+4.  Find `verificationMethod` for `key_id`.
+5.  Verify `signature.value` with the public key.
+6.  (Optional) Check `key_id` against verification relationships.
 
-## 🛠️ Permission Control Model
+### Permission Control Model
 
-Embedding detailed permissions directly into the DID document can lead to bloat and manageability issues. One or a combination of the following strategies is recommended:
+Recommended strategies:
+1.  **Verification Relationship-Based**: Utilize standard DID Core verification relationships.
+2.  **Capability Objects**: Use ZCAP-LD or similar for fine-grained permissions.
+3.  **External Policy Service**: DID document `service` endpoint points to a policy service.
+4.  **Application-Layer Enforcement**: Relying Party enforces based on business logic.
 
-1.  **Verification Relationship-Based**: Utilize standard DID Core verification relationships (`authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`) for coarse-grained permission division. This is the most standards-compliant approach.
-2.  **Capability Objects**: Use ZCAP-LD or similar Capability Objects standards. The Agent presents a Capability Object signed by the Master Key or an authorized device key during an operation, containing fine-grained permission declarations (allowed operations, resources, constraints).
-3.  **External Policy Service**: The DID document can include a `service` endpoint pointing to a permission policy service. Verifiers query this service to obtain detailed permissions for a specific `key_id`.
-4.  **Application-Layer Enforcement**: The Relying Party or the application itself determines whether to authorize an operation based on business logic, combined with DID verification results and internal Access Control Lists (ACLs).
+**Recommendation**: Prioritize Verification Relationship-Based, combinable with Capability Objects.
 
-**Recommendation**: Prioritize the **Verification Relationship-Based** approach for basic authorization. For complex scenarios, it can be combined with **Capability Objects**.
+### Device Key Registration / Update Protocol (Draft)
 
-## 🧯 Security Policies
+This section outlines a high-level protocol for adding a new device key to the DID document.
 
-*   **Device Key Revocation**:
-    *   **Mechanism**: The Controller (holding the Master Key) initiates a transaction to remove the target `key_id` from the `verificationMethod` list and all relevant verification relationships in the DID document.
-    *   **Authorization**: The request initiating the revocation must be strictly verified to originate from a legitimate Controller.
-*   **Key Rotation**:
-    *   **Device Keys**: Regular or on-demand rotation of device keys is recommended. Process: Generate new key -> Controller adds new key -> Controller removes old key.
-    *   **Master Keys**: Master key rotation is a high-risk operation requiring extreme caution and depends on the previously defined `did:rooch` method specification and recovery mechanisms.
-*   **Short-lived/Session Keys**:
-    *   **Registration**: `verificationMethod` entries with an `expires` attribute can be registered as temporary session keys.
-    *   **Permissions**: Typically granted limited `capabilityInvocation` permissions.
-    *   **Verification**: Verifiers must check the `expires` attribute to ensure the key has not expired.
-*   **Anti-Replay**:
-    *   **Nonce**: Verifiers need to maintain a list of used nonces (per DID or `key_id`) to prevent the reuse of identical signatures.
-    *   **Timestamp**: Combined with a timestamp verification window, prevents outdated signatures from being reused. The window size needs to balance security and clock synchronization tolerance.
-
-## 🤝 Device Key Registration / Update Protocol (Draft)
-
-This process is a critical interaction for ensuring DID security and requires a clear and secure protocol. Below is a high-level draft protocol; specific implementation needs to be combined with the capabilities of the `did:rooch` method and VDR.
-
-**Participants:**
-*   **User**: The ultimate owner of the DID.
-*   **New Agent**: An Agent instance running on a new device, wishing to register its device key.
-*   **Authorizing Agent/Device**: A currently trusted and registered Agent instance or device of the user, possessing sufficient permissions (e.g., `authentication` or specific authorization capabilities).
-*   **Controller/Management Service**: An entity responsible for receiving registration requests, verifying user authorization, and interacting with the VDR to update the DID document. This could be:
-    *   A local application/wallet directly controlled by the user's master key.
-    *   A cloud service trusted by the user (requires an additional security and trust model).
-    *   For the `did:rooch` method, potentially a specific smart contract or module on the Rooch Network.
-*   **VDR (Verifiable Data Registry)**: The system storing DID documents. For the `did:rooch` method, this specifically refers to the Rooch Network.
+**Participants:** User, New Agent, Authorizing Agent/Device, Controller/Management Service, VDR.
 
 **Protocol Flow (Example: Authentication via an Authorized Device):**
+1.  **[New Agent] Key Generation**: Generates `newPubKey`, `newPrivKey`.
+2.  **[New Agent → Controller] Initiate Registration Request**: Sends `targetDid`, `newPubKey`, desired relationships, `requestNonce`, `requestTimestamp`.
+3.  **[Controller] Generate Authorization Challenge**: Creates `authChallenge`.
+4.  **[Controller → New Agent] Return Authorization Challenge**.
+5.  **[New Agent → User] Request User Authorization**: Presents request (e.g., QR code with `authChallenge`).
+6.  **[User @ Authorizing Agent] Scan/Open and Authorize**: User confirms on an already authorized device.
+7.  **[Authorizing Agent → Controller] Sign and Send Authorization Proof**: Signs `authChallenge` with its authorized key, sends `authProof`.
+8.  **[Controller] Verify Authorization and Update VDR**: Verifies `authProof`, constructs VDR update transaction, submits to VDR.
+9.  **[VDR] Process Transaction**.
+10. **[Controller → New Agent] Return Result**.
 
-1.  **[New Agent] Key Generation**: The New Agent, upon first launch or when registration is needed, generates a new device key pair (public key `newPubKey`, private key `newPrivKey`).
+*(Security considerations for this protocol are detailed in the "Security Considerations" section below).*
 
-2.  **[New Agent → Controller] Initiate Registration Request**: The New Agent constructs a registration request, including:
-    *   Target DID (`targetDid`: e.g., `did:rooch:alice`)
-    *   New device public key (`newPubKey`)
-    *   Desired `verificationMethod` ID fragment (optional, e.g., `device-key-3` or generated by Controller)
-    *   Desired verification relationships (e.g., `[authentication, assertionMethod, capabilityInvocation]`)
-    *   Device metadata (optional, recommended to be encrypted or minimized, e.g., `deviceName`, `deviceType`)
-    *   One-time use Nonce (`requestNonce`)
-    *   Timestamp (`requestTimestamp`)
-    *   **Note**: This initial request usually **cannot be signed**, as the New Agent is not yet recognized by the DID document.
+## Rationale
 
-3.  **[Controller] Generate Authorization Challenge**: Upon receiving the request, the Controller performs initial validation (e.g., format, timestamp). Then, it generates a unique, temporary authorization challenge (`authChallenge`). This challenge may contain a digest of key request information or a Nonce.
+-   **Single Master DID**: Chosen to provide a unified digital identity for users, preventing fragmentation across services and devices. This aligns with the core principles of self-sovereign identity.
+-   **Multi-Device Sub-Keys**: This approach allows for operational flexibility and enhanced security. If a device key is compromised, it can be revoked without affecting the master identity or other device keys. This is preferable to using the master key for all operations, which would increase its exposure.
+-   **DID Method Agnosticism**: The core model is designed to be compatible with any W3C compliant DID method, offering flexibility and future-proofing. `did:rooch` is presented as one concrete possibility leveraging the Rooch Network's capabilities for VDR.
+-   **Verification Relationships for Permissions**: Using standard DID verification relationships (`authentication`, `assertionMethod`, etc.) for basic permissioning is chosen for its standards compliance and interoperability. More complex authorization can be layered on top (e.g., ZCAP-LD).
+-   **Explicit Key ID in Signatures**: Including `key_id` in signatures is crucial for verifiers to identify the specific key used, look it up in the DID document, and apply the correct policies.
+-   **Challenge-Response for Device Registration**: This mechanism is chosen to ensure that new device registration is explicitly authorized by the user through an existing trusted channel, preventing unauthorized additions of device keys.
 
-4.  **[Controller → New Agent] Return Authorization Challenge**: The Controller returns the `authChallenge` to the New Agent.
+## Backwards Compatibility
 
-5.  **[New Agent → User] Request User Authorization**: The New Agent presents the authorization request to the user.
-    *   **Method 1 (Recommended): QR Code/Link**: The New Agent displays a QR code or a special link containing the `authChallenge` and a summary of the request.
-    *   **Method 2: Push Notification**: If the Controller is a service, it can push an authorization request to the user's other authorized devices.
+This NIP proposes a new identity model.
+-   For new Nuwa Agents and services adopting this NIP, it defines the standard for DID and key management.
+-   Existing systems not using this model will not be directly affected but will not be able to interoperate at the identity level described herein without adopting this NIP.
+-   No direct backwards incompatibilities are introduced for unrelated protocols, but services wishing to leverage this DID model will need to implement support for it.
 
-6.  **[User @ Authorizing Agent] Scan/Open and Authorize**: The user uses an **authorized** device/Agent (Authorizing Agent) to scan the QR code or open the link/notification.
-    *   The Authorizing Agent parses the challenge and request information, confirming with the user: "Allow device [Device Name/Identifier] to be added to your DID [DID] and grant [Permission List] permissions?"
-    *   User confirms authorization.
+## Test Cases
 
-7.  **[Authorizing Agent → Controller] Sign and Send Authorization Proof**: The Authorizing Agent uses its device key, **which is recognized by the DID document and has appropriate permissions** (e.g., `authentication` or specific device management permissions), to sign the `authChallenge` (or other data including the challenge and approval intent), generating an `authProof` (including the signature and the `key_id` used). It then sends the `authProof` and partial original request information (for correlation) to the Controller.
+Test cases should cover, at a minimum:
+1.  Creation of a master DID and registration of an initial device key.
+2.  Registration of an additional device key using an existing authorized device.
+3.  Signature creation by a device key and successful verification against the DID document.
+4.  Verification of a signature where the `key_id` has `authentication` permission.
+5.  Verification of a signature where the `key_id` has `capabilityInvocation` but not `authentication` permission.
+6.  Revocation of a device key and subsequent failure of signature verification using the revoked key.
+7.  Attempted registration of a device key without proper authorization (should fail).
+8.  Verification of a signature with an expired session key (if `expires` is used).
+9.  Replay attack prevention using `nonce` and `timestamp`.
 
-8.  **[Controller] Verify Authorization and Update VDR**: Upon receiving the `authProof`, the Controller:
-    *   Verifies that the signature in `authProof` is valid and that the `key_id` used for signing belongs to `targetDid` and has permission to authorize the addition of new keys.
-    *   Verifies that `authProof` corresponds to the previously issued `authChallenge` (prevents replay).
-    *   If all verifications pass, the Controller constructs a VDR update transaction (signed with its own Controller permission, or on behalf of the user using the Master Key), adds the new `verificationMethod` containing `newPubKey` and related information to the `targetDid`'s DID document, and updates the corresponding verification relationships.
-    *   Submits the transaction to the VDR.
+*(Specific test vectors and a test suite are to be developed alongside a reference implementation.)*
 
-9.  **[VDR] Process Transaction**: The VDR verifies the Controller's permissions and updates the DID document.
+## Reference Implementation
 
-10. **[Controller → New Agent] Return Result**: The Controller (after VDR confirmation) returns a success or failure result to the New Agent. If successful, the New Agent can now use its `newPrivKey` to sign on behalf of `targetDid` (according to the granted verification relationships).
+A reference implementation is planned but not yet available. It should demonstrate:
+-   Libraries for master DID creation and management (for a chosen DID method like `did:rooch` or a generic one).
+-   Agent-side logic for device key generation and registration requests.
+-   Controller/Management Service logic for handling device registration and VDR updates.
+-   Verifier logic for resolving DIDs and validating signatures according to this NIP.
 
-**Other Authorization Methods to Consider:**
-*   **Master Key/Recovery Flow**: If no authorized device is available, the user might need to go through a more stringent process, using their master key (via a dedicated wallet/interface) or account recovery mechanism to directly authorize the Controller to update the DID document.
-*   **Cross-Device Pairing Code**: Similar to device binding in some applications, display a short-term pairing code.
+*(Link to repository will be provided here when available.)*
 
-**Security Considerations:**
-*   **Communication Security**: All communication between the Controller and Agents should use TLS or an equivalent level of encryption.
-*   **Challenge-Response**: The `authChallenge` must be unique, unpredictable, and bound to a specific request to prevent replay attacks.
-*   **Authorizing Key Permissions**: The key used by the Authorizing Agent must explicitly have permission to authorize the addition of new devices (this might be achieved via `authentication` or specific `capabilityDelegation`, to be defined in the permission model).
-*   **Explicit User Consent**: The user interface must clearly inform the user about the operation being authorized and its implications.
-*   **Controller Trustworthiness**: If the Controller is a centralized service, its security and user trust are paramount.
-*   **Rate Limiting**: The Controller should implement rate limiting to prevent abuse of the registration process.
-*   **VDR Security**: The ultimate security of the DID document depends on the security guarantees of the VDR.
+## Security Considerations
 
-## ✅ Summary
+This section incorporates and expands upon the "Security Policies" from the original NIP-1.
 
-| Item                   | Content                                                                      | Status/Considerations                                     |
-| ---------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Master Identity        | Single master DID (can be any DID method, e.g., `did:rooch`), controlled by Master Key(s) | For `did:rooch`, its method spec needs definition; other DID methods follow their respective specs |
-| Master Key Management  | Emphasizes secure storage and recovery mechanisms                            | **Critically important, requires detailed design**        |
-| Device Keys            | One per Agent instance, registered as a `verificationMethod`                 | Different key types optional                              |
-| Verification Relations | Uses standard DID Core relations (`authN`, `assertM`, etc.) for basic permission division | More flexible and standard than original proposal         |
-| Signature & Validation | Includes `key_id`, `nonce`, `timestamp`; clear verification process          | Signed payload content needs to be clearly defined        |
-| Permission Model       | Recommend verification relations + optional Capability Objects or external policies | Avoids DID document bloat                                 |
-| Security Policies      | Includes revocation, rotation, Session Keys, anti-replay                     | Mechanisms require VDR support                            |
-| Device Reg/Update      | Requires detailed, secure interaction protocol                               | **Key interaction point, needs separate specification**   |
-| Privacy                | Avoid exposing excessive device details in public DID document               | Use generic IDs or off-chain metadata                     |
-| Compatibility          | Designed to be compatible with A2A, DIDComm, Rooch Message, etc.             | Maintain openness                                         |
+*   **Master Key Security**:
+    *   **Compromise**: Compromise of the Master Key(s) leads to full identity compromise. Secure offline storage and robust recovery mechanisms are paramount.
+    *   **Recovery**: The design of recovery mechanisms (social, multi-sig) must itself be secure against collusion or coercion.
+*   **Device Key Security**:
+    *   **Compromise**: If a device key is compromised, it should be promptly revoked by the Controller. The scope of damage is limited by the permissions granted to that key.
+    *   **Revocation**: The revocation process must be secure, ensuring only a legitimate Controller can perform it. Delays in VDR updates could mean a compromised key remains valid for a short period.
+    *   **Rotation**: Regular rotation of device keys is recommended to limit the window of opportunity if a key is silently compromised.
+*   **Session Keys**:
+    *   **Expiration**: Verifiers *must* check the `expires` attribute. Clock synchronization issues could lead to premature or delayed invalidation if not handled carefully (e.g., allowing a small grace period).
+*   **Signature Integrity & Anti-Replay**:
+    *   **Nonce**: Verifiers must maintain a list of used nonces per `signer_did` (or `key_id`) to prevent replay. This requires stateful verifiers.
+    *   **Timestamp**: Timestamps prevent replay of old signatures. A defined, reasonable verification window is needed, balancing security with tolerance for clock skew.
+    *   **Signed Payload**: The `signed_data` structure must be canonicalized before signing to prevent ambiguity.
+*   **Device Registration Protocol Security**:
+    *   **Communication Security**: All communication (New Agent ↔ Controller, Authorizing Agent ↔ Controller) must be over secure channels (e.g., TLS).
+    *   **Challenge-Response**: `authChallenge` must be unique, unpredictable, and tied to the specific request.
+    *   **Authorization Proof**: The key used by the Authorizing Agent must have explicit permission to authorize new devices.
+    *   **User Consent**: UI/UX must clearly present what is being authorized.
+    *   **Controller Trust**: If the Controller is a centralized service, its security and the trust model are critical. It becomes a high-value target.
+    *   **Rate Limiting**: The Controller should implement rate limiting on registration attempts.
+*   **DID Document Security**:
+    *   **VDR Security**: The integrity of the DID document relies on the security of the underlying Verifiable Data Registry (e.g., Rooch Network).
+    *   **Unauthorized Updates**: Only the `controller` of the DID should be able to update it.
+*   **Privacy Considerations**:
+    *   Avoid storing sensitive device-specific information directly in the public DID document. Use generic `key_id` fragments.
+    *   Device metadata exchanged during registration should be minimized and potentially encrypted.
 
----
+## Copyright
+
+Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
