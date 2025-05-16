@@ -28,18 +28,6 @@ A standard for defining Caps — agent-callable capabilities with structured inp
 **🌐 Cap Ecosystem**
 A decentralized network of developer-built Caps. Each Cap is a standalone function — accessible by any agent, priced per use, and stackable into complex workflows. No app stores. No lock-in.
 
-## 🗂️ Repo Structure
-``` txt
-nuwa/
-├── par/                  # Personal Agent Runtime – memory, wallet, orchestration logic
-├── caps/                 # Example and core Cap definitions
-├── sdk/                  # SDK for building and registering Caps
-├── protocol/             # Agent Capability Protocol (ACP) schemas and specs
-├── docs/                 # Developer docs, tutorials, and design specs
-└── scripts/              # Dev tooling, automation, and deployment scripts
-```
-| 🛠 This layout may evolve as we scale — contributions are welcome!
-
 ## 🤝 Contributing
 We welcome contributors across code, design, protocol, and community!
 See CONTRIBUTING.md for details.
