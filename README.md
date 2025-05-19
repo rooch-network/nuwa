@@ -29,9 +29,31 @@ A standard for defining Caps — agent-callable capabilities with structured inp
 **🌐 Cap Ecosystem**
 A decentralized network of developer-built Caps. Each Cap is a standalone function — accessible by any agent, priced per use, and stackable into complex workflows. No app stores. No lock-in.
 
-## 🤝 Contributing
-We welcome contributors across code, design, protocol, and community!
-See CONTRIBUTING.md for details.
+## 📂 Repository Structure
+
+This repository is a monorepo containing various components of the Nuwa Protocol. Here's a brief overview of the key directories:
+
+*   **`nips/`**: [Nuwa Improvement Proposals](nips/README.md). This is where the design and specification of the Nuwa protocol and its core components are discussed and documented.
+*   **`contracts/`**: Contains information and potentially ABIs related to Nuwa smart contracts.
+*   **`nuwa-kit/`**: [Development Kits](./nuwa-kit/README.md) for building applications and services on Nuwa. This includes client SDKs and service development frameworks for various languages (e.g., TypeScript, Python).
+*   **`nuwa-services/`**: Reference implementations of key [Nuwa Services](./nuwa-services/README.md) (e.g., Custodian Service, LLM Proxy Service).
+*   **`nuwa-script/`**: (Experimental) A purpose-built scripting language for AI agents.
+
+Please refer to the `README.md` file within each directory for more specific details.
+
+## 🤝 How to Contribute
+
+We warmly welcome contributions to the Nuwa Protocol! Whether you're interested in contributing to the core protocol, developing new Caps, improving SDKs, or helping with documentation, your input is valuable.
+
+To get started, please read our **[Contributing Guidelines (CONTRIBUTING.md)](./CONTRIBUTING.md)**.
+
+This document provides detailed information on:
+- How to report bugs and suggest enhancements.
+- The process for submitting pull requests.
+- Development setup and coding guidelines.
+- The Nuwa Improvement Proposal (NIP) process for significant changes.
+
+You can find open issues suitable for new contributors by looking for the [good first issue](https://github.com/rooch-network/nuwa/labels/good%20first%20issue) or [help wanted](https://github.com/rooch-network/nuwa/labels/help%20wanted) labels in our GitHub issues.
 
 ## 🧭 Roadmap Highlights
 - ✅ MVP Client with memory + Cap execution
