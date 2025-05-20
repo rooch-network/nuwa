@@ -102,3 +102,58 @@ export interface MasterIdentity {
   masterKeyId: string; // ID of the primary master key in verificationMethod
   masterPrivateKey: CryptoKey | Uint8Array; // The private key material for the master key
 }
+
+/**
+ * Interface for Verifiable Data Registry (VDR) implementations
+ * A VDR is responsible for storing and retrieving DID Documents
+ */
+export interface VDRInterface {
+  /**
+   * Store or update a DID Document in the registry
+   * @param didDocument The DID Document to store/update
+   * @returns Promise resolving to true if successful
+   */
+  store(didDocument: DIDDocument): Promise<boolean>;
+  
+  /**
+   * Resolve a DID to its DID Document
+   * @param did The DID to resolve
+   * @returns Promise resolving to the DID Document or null if not found
+   */
+  resolve(did: string): Promise<DIDDocument | null>;
+  
+  /**
+   * Check if a DID exists in the registry
+   * @param did The DID to check
+   * @returns Promise resolving to true if the DID exists
+   */
+  exists(did: string): Promise<boolean>;
+  
+  /**
+   * Get the DID method supported by this VDR
+   * @returns The DID method (e.g., 'key', 'web', 'rooch')
+   */
+  getMethod(): string;
+}
+
+/**
+ * Interface for external signers that can be used for master key operations
+ * This allows the SDK to request signatures from external systems (wallets, HSMs, etc.)
+ * without directly managing the private keys
+ */
+export interface SignerInterface {
+  /**
+   * Signs data with a specified key
+   * @param data The data to sign 
+   * @param keyId The ID of the key to use for signing
+   * @returns A promise that resolves to the signature
+   */
+  sign(data: Uint8Array, keyId: string): Promise<string>;
+  
+  /**
+   * Checks if the signer can sign with a specific key
+   * @param keyId The ID of the key to check
+   * @returns A promise that resolves to true if the signer can sign with the key
+   */
+  canSign(keyId: string): Promise<boolean>;
+}

@@ -1,24 +1,89 @@
-import { DIDDocument, MasterIdentity, CreateMasterIdentityOptions, OperationalKeyInfo, VerificationRelationship, ServiceInfo, NIP1SignedObject, SignedData, NIP1Signature } from './types';
+import { DIDDocument, MasterIdentity, CreateMasterIdentityOptions, OperationalKeyInfo, VerificationRelationship, ServiceInfo, NIP1SignedObject, SignedData, NIP1Signature, SignerInterface, VDRInterface } from './types';
 import { CryptoUtils } from './cryptoUtils';
 
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
+ * Also supports NIP-3 delegation model where the DID controller can be another agent
+ * 
+ * This SDK follows security best practices by:
+ * 1. Not storing the master private key directly (should be managed by a secure wallet)
+ * 2. Supporting external signing for master key operations (via SignerInterface)
+ * 3. Only managing operational keys that are explicitly provided
  */
 export class NuwaIdentityKit {
   private didDocument: DIDDocument;
-  private masterPrivateKey?: CryptoKey | Uint8Array; // Store the master private key securely
   private operationalPrivateKeys: Map<string, CryptoKey | Uint8Array> = new Map(); // keyId -> privateKey
+  private externalSigner?: SignerInterface; // Optional external signer for master key operations
+  private vdrRegistry: Map<string, VDRInterface> = new Map(); // method -> VDR implementation
 
-  constructor(didDocument: DIDDocument, masterPrivateKey?: CryptoKey | Uint8Array, operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>) {
-    this.didDocument = didDocument;
-    this.masterPrivateKey = masterPrivateKey;
-    if (operationalPrivateKeys) {
-      this.operationalPrivateKeys = operationalPrivateKeys;
+  /**
+   * Create a new NuwaIdentityKit instance
+   * @param didDocument The DID Document to manage
+   * @param options Configuration options
+   */
+  constructor(
+    didDocument: DIDDocument, 
+    options?: {
+      operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
+      externalSigner?: SignerInterface,
+      vdrs?: VDRInterface[]
     }
+  ) {
+    this.didDocument = didDocument;
+    if (options?.operationalPrivateKeys) {
+      this.operationalPrivateKeys = options.operationalPrivateKeys;
+    }
+    this.externalSigner = options?.externalSigner;
+    
+    // Register VDRs if provided
+    if (options?.vdrs) {
+      for (const vdr of options.vdrs) {
+        this.registerVDR(vdr);
+      }
+    }
+  }
+  
+  /**
+   * Register a VDR implementation for a specific DID method
+   * @param vdr The VDR implementation to register
+   * @returns The NuwaIdentityKit instance (for method chaining)
+   */
+  registerVDR(vdr: VDRInterface): NuwaIdentityKit {
+    const method = vdr.getMethod();
+    this.vdrRegistry.set(method, vdr);
+    return this;
+  }
+  
+  /**
+   * Get a registered VDR for a specific DID method
+   * @param method The DID method
+   * @returns The registered VDR or undefined if not found
+   */
+  getVDR(method: string): VDRInterface | undefined {
+    return this.vdrRegistry.get(method);
+  }
+
+  /**
+   * Creates a new NuwaIdentityKit instance in delegated mode (NIP-3)
+   * In this mode, we don't have direct access to the master key operations and can only
+   * use the operational keys that are explicitly provided.
+   * 
+   * @param didDocument The DID Document to manage
+   * @param operationalPrivateKeys Optional map of operational private keys
+   * @returns A new NuwaIdentityKit instance operating in delegated mode
+   */
+  static createDelegatedInstance(
+    didDocument: DIDDocument, 
+    operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>
+  ): NuwaIdentityKit {
+    return new NuwaIdentityKit(didDocument, { operationalPrivateKeys });
   }
 
   /**
    * Creates a new master identity (DID, DID Document, and master key pair).
+   * This method does NOT store the master private key in the SDK instance.
+   * Instead, it returns the key to the caller, who should handle it securely
+   * (e.g., by storing it in a wallet or creating an external signer).
    */
   static async createMasterIdentity(options?: CreateMasterIdentityOptions): Promise<MasterIdentity> {
     const didMethod = options?.method || 'key'; // Default to did:key for simplicity
@@ -196,23 +261,19 @@ export class NuwaIdentityKit {
 
   /**
    * Signs data according to NIP-1 signature structure.
-   * Requires the private key for the specified keyId to be available.
+   * Uses either operational private keys stored in the SDK instance or an external signer.
+   * 
+   * @throws Error if the private key for the specified keyId is not available and no external signer is configured
+   * @throws Error if the external signer cannot sign with the specified key
    */
   async createNIP1Signature(payload: Omit<SignedData, 'nonce' | 'timestamp'>, keyId: string): Promise<NIP1SignedObject> {
-    const privateKey = this.operationalPrivateKeys.get(keyId) || 
-      (keyId === (this.didDocument.verificationMethod?.find(vm => vm.controller === this.didDocument.id)?.id) ? 
-      this.masterPrivateKey : undefined);
-      
-    if (!privateKey) {
-      throw new Error(`Private key for keyId ${keyId} not found.`);
-    }
-
+    // Find the verification method for the key
     const verificationMethod = this.didDocument.verificationMethod?.find(vm => vm.id === keyId);
     if (!verificationMethod) {
       throw new Error(`Verification method for keyId ${keyId} not found in DID document.`);
     }
+    
     const keyType = verificationMethod.type;
-
     const signedData: SignedData = {
       ...payload,
       nonce: crypto.getRandomValues(new Uint32Array(1))[0].toString(), // Generate a random nonce
@@ -224,7 +285,29 @@ export class NuwaIdentityKit {
     const canonicalData = JSON.stringify(signedData, Object.keys(signedData).sort());
     const dataToSign = new TextEncoder().encode(canonicalData);
 
-    const signatureValue = await CryptoUtils.sign(dataToSign, privateKey, keyType);
+    // Determine how to sign based on key availability
+    let signatureValue: string;
+    
+    // Check if it's a master key (controller matches DID)
+    const isMasterKey = verificationMethod.controller === this.didDocument.id;
+    
+    if (isMasterKey && this.externalSigner) {
+      // For master key operations, try to use the external signer if available
+      const canSign = await this.externalSigner.canSign(keyId);
+      if (!canSign) {
+        throw new Error(`External signer cannot sign with master key ${keyId}`);
+      }
+      
+      signatureValue = await this.externalSigner.sign(dataToSign, keyId);
+    } else {
+      // For operational keys or when no external signer is available
+      const privateKey = this.operationalPrivateKeys.get(keyId);
+      if (!privateKey) {
+        throw new Error(`Private key for keyId ${keyId} not found and no suitable external signer is available.`);
+      }
+      
+      signatureValue = await CryptoUtils.sign(dataToSign, privateKey, keyType);
+    }
 
     const nip1Signature: NIP1Signature = {
       signer_did: this.didDocument.id,
@@ -240,10 +323,44 @@ export class NuwaIdentityKit {
 
   /**
    * Verifies a NIP-1 signature.
-   * This typically involves resolving the signer's DID document externally first.
+   * This typically involves resolving the signer's DID document first.
+   * 
+   * @param signedObject The NIP-1 signed object to verify
+   * @param resolvedDidDocumentOrVDRs The resolved DID Document or an array of VDRs to use for resolution
+   * @returns Promise resolving to true if the signature is valid
    */
-  static async verifyNIP1Signature(signedObject: NIP1SignedObject, resolvedDidDocument: DIDDocument): Promise<boolean> {
+  static async verifyNIP1Signature(
+    signedObject: NIP1SignedObject,
+    resolvedDidDocumentOrVDRs: DIDDocument | VDRInterface[]
+  ): Promise<boolean> {
     const { signed_data, signature } = signedObject;
+    let resolvedDidDocument: DIDDocument;
+
+    // If we're given VDRs, use them to resolve the DID
+    if (Array.isArray(resolvedDidDocumentOrVDRs)) {
+      const did = signature.signer_did;
+      const didMethod = did.split(':')[1];
+      
+      // Find a suitable VDR
+      const vdr = resolvedDidDocumentOrVDRs.find(v => v.getMethod() === didMethod);
+      if (!vdr) {
+        console.error(`No VDR available for DID method '${didMethod}'`);
+        return false;
+      }
+      
+      // Resolve the DID
+      const document = await vdr.resolve(did);
+      if (!document) {
+        console.error(`Failed to resolve DID ${did}`);
+        return false;
+      }
+      
+      resolvedDidDocument = document;
+    } else {
+      // Use the provided DID Document directly
+      resolvedDidDocument = resolvedDidDocumentOrVDRs;
+    }
+    
 
     // 1. Verify timestamp (e.g., within a certain window, not too old)
     const now = Math.floor(Date.now() / 1000);
@@ -331,21 +448,58 @@ export class NuwaIdentityKit {
   }
 
   /**
-   * Placeholder for publishing/updating the DID document to its VDR.
-   * This is highly dependent on the DID method.
+   * Publishes or updates the DID document to its VDR.
+   * Uses the appropriate registered VDR based on the DID method.
+   * 
+   * @returns Promise resolving to true if successful, or throws an error
+   * @throws Error if no VDR is registered for the DID method
    */
-  async publishDIDDocument(): Promise<void> {
+  async publishDIDDocument(): Promise<boolean> {
     const didMethod = this.didDocument.id.split(':')[1];
-    console.log(`Publishing DID document for ${this.didDocument.id} using method ${didMethod}...`);
-    // For did:web, this would involve updating a file on a web server.
-    // For did:key, it might be a no-op if the document is derived from the key.
-    // For on-chain DIDs, this would involve sending a transaction.
-    if (didMethod === 'web') {
-      // Example: await uploadToWebServer(this.didDocument.id, this.didDocument);
-      console.warn('Publishing for did:web is not implemented in this placeholder.');
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
     }
-    // ... other methods
-    console.log('DID Document published (placeholder).');
+    
+    console.log(`Publishing DID document for ${this.didDocument.id} using ${didMethod} VDR...`);
+    
+    try {
+      // Store document in the appropriate VDR
+      const result = await vdr.store(this.didDocument);
+      if (result) {
+        console.log(`DID Document for ${this.didDocument.id} successfully published.`);
+      } else {
+        console.warn(`DID Document publication for ${this.didDocument.id} returned false.`);
+      }
+      return result;
+    } catch (error) {
+      console.error(`Failed to publish DID Document for ${this.didDocument.id}:`, error);
+      throw new Error(`Failed to publish DID Document: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Resolves a DID to its DID Document using the appropriate VDR.
+   * 
+   * @param did The DID to resolve
+   * @returns Promise resolving to the DID Document or null if not found
+   * @throws Error if no VDR is registered for the DID method
+   */
+  async resolveDID(did: string): Promise<DIDDocument | null> {
+    const didMethod = did.split(':')[1];
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
+    }
+    
+    try {
+      return await vdr.resolve(did);
+    } catch (error) {
+      console.error(`Failed to resolve DID ${did}:`, error);
+      throw new Error(`Failed to resolve DID: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
@@ -364,9 +518,79 @@ export class NuwaIdentityKit {
   }
 
   /**
-   * Retrieves the master private key. Use with extreme caution.
+   * Returns the external signer if configured
+   * 
+   * @returns The external signer instance, or undefined if not available
    */
-  getMasterPrivateKey(): CryptoKey | Uint8Array | undefined {
-    return this.masterPrivateKey;
+  getExternalSigner(): SignerInterface | undefined {
+    return this.externalSigner;
+  }
+  
+  /**
+   * Checks if the SDK has the ability to sign with a specific key
+   * 
+   * @param keyId The ID of the key to check
+   * @returns A promise that resolves to true if the key can be used for signing
+   */
+  async canSignWithKey(keyId: string): Promise<boolean> {
+    // Check if we have the private key directly
+    if (this.operationalPrivateKeys.has(keyId)) {
+      return true;
+    }
+    
+    // Check if the external signer can sign with this key
+    if (this.externalSigner) {
+      return await this.externalSigner.canSign(keyId);
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Creates a SDK instance from a master identity with a simple built-in signer
+   * This is a convenience method for testing and simple applications.
+   * Production applications should implement a proper SignerInterface
+   * that integrates with secure key storage solutions.
+   * 
+   * @param masterIdentity The master identity created with createMasterIdentity
+   * @returns A new NuwaIdentityKit instance with a signer for the master key
+   */
+  static createFromMasterIdentity(masterIdentity: MasterIdentity): NuwaIdentityKit {
+    // Create a simple signer that can sign with the master key
+    const simpleSigner: SignerInterface = {
+      async sign(data: Uint8Array, keyId: string): Promise<string> {
+        if (keyId !== masterIdentity.masterKeyId) {
+          throw new Error(`Simple signer can only sign with master key ${masterIdentity.masterKeyId}`);
+        }
+        
+        // Find the verification method to get the key type
+        const verificationMethod = masterIdentity.didDocument.verificationMethod?.find(
+          vm => vm.id === masterIdentity.masterKeyId
+        );
+        
+        if (!verificationMethod) {
+          throw new Error(`Verification method not found for master key ${masterIdentity.masterKeyId}`);
+        }
+        
+        return CryptoUtils.sign(data, masterIdentity.masterPrivateKey, verificationMethod.type);
+      },
+      
+      async canSign(keyId: string): Promise<boolean> {
+        return keyId === masterIdentity.masterKeyId;
+      }
+    };
+    
+    // Create and return the SDK instance
+    return new NuwaIdentityKit(masterIdentity.didDocument, { externalSigner: simpleSigner });
+  }
+  
+  /**
+   * Checks if this SDK instance is operating in delegated mode (NIP-3)
+   * In delegated mode, we don't have direct access to the master key operations.
+   * 
+   * @returns true if operating in delegated mode (no external signer available), false otherwise
+   */
+  isDelegatedMode(): boolean {
+    return this.externalSigner === undefined;
   }
 }

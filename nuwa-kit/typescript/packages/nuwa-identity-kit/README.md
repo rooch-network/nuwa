@@ -50,14 +50,12 @@ async function createAgentIdentity() {
   console.log('Created DID:', masterIdentity.did);
   console.log('DID Document:', JSON.stringify(masterIdentity.didDocument, null, 2));
   
-  // Create an SDK instance with the DID document and master private key
-  const sdk = new NuwaIdentityKit(
-    masterIdentity.didDocument, 
-    masterIdentity.masterPrivateKey
-  );
+  // Create an SDK instance with the DID document and a simple signer for the master key
+  // In a real-world application, you would use a proper wallet integration
+  const sdk = NuwaIdentityKit.createFromMasterIdentity(masterIdentity);
   
-  // Store the master key (it's automatically the first key)
-  sdk.storeOperationalPrivateKey(masterIdentity.masterKeyId, masterIdentity.masterPrivateKey);
+  // The master private key is NOT stored in the SDK - it's only accessible through the signer
+  // This follows security best practices for private key management
   
   return sdk;
 }
@@ -131,6 +129,58 @@ async function signAndVerify(sdk, keyId) {
 }
 ```
 
+### Using a Custom External Signer (e.g., for Wallet Integration)
+
+```typescript
+import { SignerInterface } from 'nuwa-identity-kit';
+
+// Example of a custom signer that integrates with a wallet
+class WalletSigner implements SignerInterface {
+  private wallet: any; // Your wallet instance
+  private authorizedKeys: string[];
+  
+  constructor(wallet: any, authorizedKeys: string[]) {
+    this.wallet = wallet;
+    this.authorizedKeys = authorizedKeys;
+  }
+  
+  async sign(data: Uint8Array, keyId: string): Promise<string> {
+    if (!this.authorizedKeys.includes(keyId)) {
+      throw new Error(`Key ${keyId} is not authorized for this wallet`);
+    }
+    
+    // Request signature from wallet
+    // This could open a popup or redirect to a wallet app
+    const signature = await this.wallet.requestSignature({
+      didKeyId: keyId,
+      data: Array.from(data) // Convert to format the wallet expects
+    });
+    
+    return signature;
+  }
+  
+  async canSign(keyId: string): Promise<boolean> {
+    return this.authorizedKeys.includes(keyId);
+  }
+}
+
+async function createSDKWithWalletSigner(didDocument) {
+  // Create wallet signer with the master key
+  const masterKeyId = didDocument.verificationMethod[0].id;
+  const walletSigner = new WalletSigner(
+    yourWalletInstance, 
+    [masterKeyId]
+  );
+  
+  // Create SDK with the wallet signer
+  const sdk = new NuwaIdentityKit(didDocument, {
+    externalSigner: walletSigner
+  });
+  
+  return sdk;
+}
+```
+
 ### Publishing the DID Document
 
 ```typescript
@@ -140,13 +190,112 @@ async function publishDID(sdk) {
 }
 ```
 
+### Creating a Delegated Instance (NIP-3)
+
+```typescript
+async function createDelegatedInstance() {
+  // In delegated mode, we have a DID document controlled by another entity
+  // but we may have some operational keys for specific operations
+  
+  // Get the DID document from somewhere (e.g., DID resolver, local storage, etc.)
+  const didDocument = await getDIDDocumentFromResolver('did:example:123456');
+  
+  // Create a map for any operational keys we have access to
+  const operationalKeys = new Map();
+  
+  // We might have some operational keys granted to us by the controller
+  const { publicKey, privateKey } = await CryptoUtils.generateKeyPair('Ed25519VerificationKey2020');
+  const keyId = 'did:example:123456#delegate-key-1';
+  operationalKeys.set(keyId, privateKey);
+  
+  // Create the delegated instance without an external signer for the master key
+  const delegatedSdk = new NuwaIdentityKit(didDocument, { operationalPrivateKeys: operationalKeys });
+  
+  // Check if we're in delegated mode (no external signer for master key operations)
+  console.log('Is delegated mode?', delegatedSdk.isDelegatedMode()); // true
+  
+  // We can check which keys we can sign with
+  const canSignWithMaster = await delegatedSdk.canSignWithKey(didDocument.verificationMethod[0].id); // false
+  const canSignWithDelegate = await delegatedSdk.canSignWithKey(keyId); // true
+  
+  return delegatedSdk;
+}
+```
+
 ## DID Methods Support
 
-This SDK is designed to be DID method agnostic and can work with various methods:
+This SDK is designed to be DID method agnostic and can work with various methods through its VDR (Verifiable Data Registry) abstraction:
 
 - `did:key`: Simple method where the DID is derived directly from a public key
 - `did:web`: DIDs hosted on web servers
 - Custom methods: Can be extended to support methods like `did:rooch` or others
+
+### Using VDRs (Verifiable Data Registries)
+
+The SDK uses VDRs (Verifiable Data Registries) to interact with different DID methods:
+
+```typescript
+import { NuwaIdentityKit, createDefaultVDRs, WebVDR } from 'nuwa-identity-kit';
+
+// Create default VDRs for common DID methods (key, web)
+const vdrs = createDefaultVDRs();
+
+// Or create specific VDRs with custom configuration
+const webVDR = new WebVDR({
+  uploadHandler: async (domain, path, document) => {
+    // Custom implementation to upload the document
+    const response = await fetch(`https://${domain}/${path}/did.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(document)
+    });
+    return response.ok;
+  }
+});
+
+// Create SDK with VDRs
+const sdk = new NuwaIdentityKit(didDocument, {
+  vdrs: [webVDR, ...otherVdrs]
+});
+
+// Publish DID document using the appropriate VDR
+await sdk.publishDIDDocument();
+
+// Resolve another DID using registered VDRs
+const resolvedDoc = await sdk.resolveDID('did:web:example.com');
+
+// Verify a signature with automatic DID resolution
+const signedObject = { /* NIP1SignedObject */ };
+const isValid = await NuwaIdentityKit.verifyNIP1Signature(signedObject, vdrs);
+```
+
+### Creating Custom VDR Implementations
+
+To support a custom DID method:
+
+```typescript
+import { AbstractVDR, DIDDocument } from 'nuwa-identity-kit';
+
+class CustomVDR extends AbstractVDR {
+  constructor() {
+    super('custom'); // The DID method name
+  }
+  
+  async store(didDocument: DIDDocument): Promise<boolean> {
+    // Implementation for storing a DID document
+    return true;
+  }
+  
+  async resolve(did: string): Promise<DIDDocument | null> {
+    // Implementation for resolving a DID document
+    return document;
+  }
+}
+
+// Register the custom VDR with the SDK
+const customVDR = new CustomVDR();
+sdk.registerVDR(customVDR);
+```
 
 ## Development
 
