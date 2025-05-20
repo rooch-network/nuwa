@@ -9,6 +9,15 @@ import { CryptoUtils } from './cryptoUtils';
  * 1. Not storing the master private key directly (should be managed by a secure wallet)
  * 2. Supporting external signing for master key operations (via SignerInterface)
  * 3. Only managing operational keys that are explicitly provided
+ * 
+ * Usage Pattern:
+ * - Use `publishDIDDocument` ONLY for the initial creation of a DID document
+ * - For all updates, use the specific granular methods:
+ *   - addVerificationMethodAndPublish: Add a new key
+ *   - removeVerificationMethodAndPublish: Remove an existing key
+ *   - addServiceAndPublish: Add a service endpoint
+ *   - removeServiceAndPublish: Remove a service endpoint
+ *   - updateRelationships: Update key relationships
  */
 export class NuwaIdentityKit {
   private didDocument: DIDDocument;
@@ -206,6 +215,63 @@ export class NuwaIdentityKit {
 
     return keyId;
   }
+  
+  /**
+   * Adds a new operational key to the DID document and publishes the change using a VDR.
+   * This method both updates the local state and publishes the change to the VDR.
+   * 
+   * @param keyInfo Information about the operational key to add
+   * @param relationships Verification relationships to associate with the key
+   * @param signingKeyId ID of the key to use for signing the update (must have capabilityDelegation)
+   * @param options Optional publishing options
+   * @returns The ID of the added key
+   */
+  async addOperationalKeyAndPublish(
+    keyInfo: OperationalKeyInfo,
+    relationships: VerificationRelationship[],
+    signingKeyId: string,
+    options?: any
+  ): Promise<string> {
+    // First add the key to the local document
+    const keyId = await this.addOperationalKey(keyInfo, relationships);
+    
+    // Get the didMethod to find the appropriate VDR
+    const didMethod = this.didDocument.id.split(':')[1];
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
+    }
+    
+    // Create the verification method object
+    const verificationMethod = this.didDocument.verificationMethod?.find(vm => vm.id === keyId);
+    if (!verificationMethod) {
+      throw new Error(`Failed to find added verification method ${keyId} in local document`);
+    }
+    
+    // Get signer - this could be from the options or from external signer
+    const operationOptions = {
+      ...options,
+      keyId: signingKeyId,
+      signer: options?.signer || this.externalSigner
+    };
+    
+    // Publish the change using the VDR
+    const published = await vdr.addVerificationMethod(
+      this.didDocument.id,
+      verificationMethod,
+      relationships,
+      operationOptions
+    );
+    
+    if (!published) {
+      // Rollback local change if publishing failed
+      this.removeOperationalKey(keyId);
+      throw new Error(`Failed to publish verification method ${keyId}`);
+    }
+    
+    return keyId;
+  }
 
   /**
    * Removes an operational key from the local DID document.
@@ -228,6 +294,57 @@ export class NuwaIdentityKit {
     });
     this.operationalPrivateKeys.delete(keyId);
   }
+  
+  /**
+   * Removes an operational key from the DID document and publishes the change using a VDR.
+   * This method both updates the local state and publishes the change to the VDR.
+   * 
+   * @param keyId ID of the key to remove
+   * @param signingKeyId ID of the key to use for signing the update (must have capabilityDelegation)
+   * @param options Optional publishing options
+   * @returns True if successful
+   */
+  async removeOperationalKeyAndPublish(
+    keyId: string,
+    signingKeyId: string,
+    options?: any
+  ): Promise<boolean> {
+    // First check if the key exists
+    const verificationMethod = this.didDocument.verificationMethod?.find(vm => vm.id === keyId);
+    if (!verificationMethod) {
+      throw new Error(`Verification method ${keyId} not found in local document`);
+    }
+    
+    // Get the didMethod to find the appropriate VDR
+    const didMethod = this.didDocument.id.split(':')[1];
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
+    }
+    
+    // Get signer - this could be from the options or from external signer
+    const operationOptions = {
+      ...options,
+      keyId: signingKeyId,
+      signer: options?.signer || this.externalSigner
+    };
+    
+    // Publish the change using the VDR
+    const published = await vdr.removeVerificationMethod(
+      this.didDocument.id,
+      keyId,
+      operationOptions
+    );
+    
+    if (published) {
+      // Remove from local state if publishing succeeded
+      this.removeOperationalKey(keyId);
+      return true;
+    }
+    
+    throw new Error(`Failed to publish removal of verification method ${keyId}`);
+  }
 
   /**
    * Adds a service description to the local DID document.
@@ -248,6 +365,60 @@ export class NuwaIdentityKit {
     this.didDocument.service.push(serviceEntry);
     return serviceId;
   }
+  
+  /**
+   * Adds a service to the DID document and publishes the change using a VDR.
+   * This method both updates the local state and publishes the change to the VDR.
+   * 
+   * @param serviceInfo Information about the service to add
+   * @param signingKeyId ID of the key to use for signing the update (must have capabilityInvocation)
+   * @param options Optional publishing options
+   * @returns The ID of the added service
+   */
+  async addServiceAndPublish(
+    serviceInfo: ServiceInfo,
+    signingKeyId: string,
+    options?: any
+  ): Promise<string> {
+    // First add the service to the local document
+    const serviceId = this.addService(serviceInfo);
+    
+    // Get the didMethod to find the appropriate VDR
+    const didMethod = this.didDocument.id.split(':')[1];
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
+    }
+    
+    // Create the service object
+    const service = this.didDocument.service?.find(s => s.id === serviceId);
+    if (!service) {
+      throw new Error(`Failed to find added service ${serviceId} in local document`);
+    }
+    
+    // Get signer - this could be from the options or from external signer
+    const operationOptions = {
+      ...options,
+      keyId: signingKeyId,
+      signer: options?.signer || this.externalSigner
+    };
+    
+    // Publish the change using the VDR
+    const published = await vdr.addService(
+      this.didDocument.id,
+      service,
+      operationOptions
+    );
+    
+    if (!published) {
+      // Rollback local change if publishing failed
+      this.removeService(serviceId);
+      throw new Error(`Failed to publish service ${serviceId}`);
+    }
+    
+    return serviceId;
+  }
 
   /**
    * Removes a service description from the local DID document.
@@ -257,6 +428,140 @@ export class NuwaIdentityKit {
     if (this.didDocument.service) {
       this.didDocument.service = this.didDocument.service.filter(s => s.id !== serviceId);
     }
+  }
+  
+  /**
+   * Removes a service from the DID document and publishes the change using a VDR.
+   * This method both updates the local state and publishes the change to the VDR.
+   * 
+   * @param serviceId ID of the service to remove
+   * @param signingKeyId ID of the key to use for signing the update (must have capabilityInvocation)
+   * @param options Optional publishing options
+   * @returns True if successful
+   */
+  async removeServiceAndPublish(
+    serviceId: string,
+    signingKeyId: string,
+    options?: any
+  ): Promise<boolean> {
+    // First check if the service exists
+    const service = this.didDocument.service?.find(s => s.id === serviceId);
+    if (!service) {
+      throw new Error(`Service ${serviceId} not found in local document`);
+    }
+    
+    // Get the didMethod to find the appropriate VDR
+    const didMethod = this.didDocument.id.split(':')[1];
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
+    }
+    
+    // Get signer - this could be from the options or from external signer
+    const operationOptions = {
+      ...options,
+      keyId: signingKeyId,
+      signer: options?.signer || this.externalSigner
+    };
+    
+    // Publish the change using the VDR
+    const published = await vdr.removeService(
+      this.didDocument.id,
+      serviceId,
+      operationOptions
+    );
+    
+    if (published) {
+      // Remove from local state if publishing succeeded
+      this.removeService(serviceId);
+      return true;
+    }
+    
+    throw new Error(`Failed to publish removal of service ${serviceId}`);
+  }
+  
+  /**
+   * Updates the relationships of a verification method in the DID document
+   * and publishes the change using a VDR.
+   * 
+   * @param keyId ID of the verification method to update
+   * @param addRelationships Relationships to add
+   * @param removeRelationships Relationships to remove
+   * @param signingKeyId ID of the key to use for signing the update (must have capabilityDelegation)
+   * @param options Optional publishing options
+   * @returns True if successful
+   */
+  async updateRelationships(
+    keyId: string,
+    addRelationships: VerificationRelationship[],
+    removeRelationships: VerificationRelationship[],
+    signingKeyId: string,
+    options?: any
+  ): Promise<boolean> {
+    // First check if the key exists
+    const verificationMethod = this.didDocument.verificationMethod?.find(vm => vm.id === keyId);
+    if (!verificationMethod) {
+      throw new Error(`Verification method ${keyId} not found in local document`);
+    }
+    
+    // Get the didMethod to find the appropriate VDR
+    const didMethod = this.didDocument.id.split(':')[1];
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
+    }
+    
+    // Get signer - this could be from the options or from external signer
+    const operationOptions = {
+      ...options,
+      keyId: signingKeyId,
+      signer: options?.signer || this.externalSigner
+    };
+    
+    // Update local state
+    if (addRelationships) {
+      for (const rel of addRelationships) {
+        if (!this.didDocument[rel]) {
+          this.didDocument[rel] = [];
+        }
+        
+        const relationshipArray = this.didDocument[rel] as (string | object)[];
+        if (!relationshipArray.some(item => {
+          return typeof item === 'string' ? item === keyId : (item as any).id === keyId;
+        })) {
+          relationshipArray.push(keyId);
+        }
+      }
+    }
+    
+    if (removeRelationships) {
+      for (const rel of removeRelationships) {
+        if (this.didDocument[rel]) {
+          this.didDocument[rel] = (this.didDocument[rel] as any[]).filter(item => {
+            if (typeof item === 'string') return item !== keyId;
+            if (typeof item === 'object' && item.id) return item.id !== keyId;
+            return true;
+          });
+        }
+      }
+    }
+    
+    // Publish the change using the VDR
+    const published = await vdr.updateRelationships(
+      this.didDocument.id,
+      keyId,
+      addRelationships,  // Non-optional parameter now
+      removeRelationships,  // Non-optional parameter now
+      operationOptions
+    );
+    
+    if (!published) {
+      throw new Error(`Failed to publish relationship update for ${keyId}`);
+    }
+    
+    return true;
   }
 
   /**
@@ -448,8 +753,12 @@ export class NuwaIdentityKit {
   }
 
   /**
-   * Publishes or updates the DID document to its VDR.
+   * Publishes the initial DID document to its VDR.
    * Uses the appropriate registered VDR based on the DID method.
+   * 
+   * Note: This method should ONLY be used for the initial creation of the DID document.
+   * For updates, use the specific methods like addVerificationMethodAndPublish, 
+   * removeVerificationMethodAndPublish, etc.
    * 
    * @returns Promise resolving to true if successful, or throws an error
    * @throws Error if no VDR is registered for the DID method
@@ -462,15 +771,15 @@ export class NuwaIdentityKit {
       throw new Error(`No VDR registered for DID method '${didMethod}'`);
     }
     
-    console.log(`Publishing DID document for ${this.didDocument.id} using ${didMethod} VDR...`);
+    console.log(`Publishing initial DID document for ${this.didDocument.id} using ${didMethod} VDR...`);
     
     try {
-      // Store document in the appropriate VDR
+      // Store document in the appropriate VDR - only for initial creation
       const result = await vdr.store(this.didDocument);
       if (result) {
-        console.log(`DID Document for ${this.didDocument.id} successfully published.`);
+        console.log(`Initial DID Document for ${this.didDocument.id} successfully published.`);
       } else {
-        console.warn(`DID Document publication for ${this.didDocument.id} returned false.`);
+        console.warn(`Initial DID Document publication for ${this.didDocument.id} returned false.`);
       }
       return result;
     } catch (error) {
@@ -480,8 +789,26 @@ export class NuwaIdentityKit {
   }
 
   /**
-   * Resolves a DID to its DID Document using the appropriate VDR.
+   * Creates and publishes a DID document only if it doesn't already exist.
+   * If the DID document already exists, this method will return false without making any changes.
    * 
+   * @returns Promise resolving to true if the document was created and published, false if it already existed
+   * @throws Error if no VDR is registered for the DID method or if publishing fails
+   */
+  async createAndPublishIfNotExists(): Promise<boolean> {
+    const didExists = await this.didExists(this.didDocument.id);
+    
+    if (didExists) {
+      console.log(`DID Document for ${this.didDocument.id} already exists. No changes made.`);
+      return false;
+    }
+    
+    return this.publishDIDDocument();
+  }
+
+  /**
+   * Resolves a DID to its DID Document using the appropriate VDR.
+   *
    * @param did The DID to resolve
    * @returns Promise resolving to the DID Document or null if not found
    * @throws Error if no VDR is registered for the DID method
@@ -499,6 +826,30 @@ export class NuwaIdentityKit {
     } catch (error) {
       console.error(`Failed to resolve DID ${did}:`, error);
       throw new Error(`Failed to resolve DID: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Checks if a DID exists in its VDR. Useful to determine whether to use publishDIDDocument (for initial creation)
+   * or the specific update methods like addVerificationMethodAndPublish for updates.
+   * 
+   * @param did The DID to check
+   * @returns Promise resolving to true if the DID exists, false otherwise
+   * @throws Error if no VDR is registered for the DID method
+   */
+  async didExists(did: string): Promise<boolean> {
+    const didMethod = did.split(':')[1];
+    const vdr = this.vdrRegistry.get(didMethod);
+    
+    if (!vdr) {
+      throw new Error(`No VDR registered for DID method '${didMethod}'`);
+    }
+    
+    try {
+      return await vdr.exists(did);
+    } catch (error) {
+      console.error(`Failed to check if DID ${did} exists:`, error);
+      throw new Error(`Failed to check if DID exists: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

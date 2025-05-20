@@ -1,4 +1,4 @@
-import { DIDDocument } from '../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../types';
 import { AbstractVDR } from './abstractVDR';
 import { CryptoUtils } from '../cryptoUtils';
 
@@ -117,6 +117,9 @@ export class KeyVDR extends AbstractVDR {
    * For did:key, storing doesn't make sense as the document is derived from the key itself.
    * However, we can validate the document and cache it.
    * 
+   * Note: This method should ONLY be used for the initial creation of the DID document.
+   * For updates, use the specific methods like addVerificationMethod, etc.
+   * 
    * @param didDocument The DID document to "store"
    * @returns Always true if validation passes
    */
@@ -130,6 +133,375 @@ export class KeyVDR extends AbstractVDR {
       return true;
     } catch (error) {
       console.error(`Error validating document for ${didDocument.id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a verification method to a did:key document
+   * For did:key, this is mostly a simulation as the document is derived from the key
+   * This operation will update the local cache but not the actual structure of the did:key
+   * 
+   * @param did The DID to update
+   * @param verificationMethod The verification method to add
+   * @param relationships Optional relationships to add the verification method to
+   * @param options Additional options like keyId for signing
+   * @returns Promise resolving to true if successful in updating the cache
+   */
+  async addVerificationMethod(
+    did: string,
+    verificationMethod: VerificationMethod,
+    relationships?: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const originalDocument = await this.resolve(did);
+      if (!originalDocument) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check key permission if options.keyId is provided (for non-initial operations)
+      if (options?.keyId) {
+        if (!this.validateKeyPermission(originalDocument, options.keyId, 'capabilityDelegation')) {
+          throw new Error(`Key ${options.keyId} does not have capabilityDelegation permission required for adding a verification method`);
+        }
+      }
+      
+      // Create a mutable copy
+      const document = JSON.parse(JSON.stringify(originalDocument)) as DIDDocument;
+      
+      // Add the verification method if it doesn't already exist
+      if (!document.verificationMethod) {
+        document.verificationMethod = [];
+      }
+      
+      // Check if the verification method already exists
+      if (document.verificationMethod.some(vm => vm.id === verificationMethod.id)) {
+        throw new Error(`Verification method ${verificationMethod.id} already exists`);
+      }
+      
+      // Validate the verification method has proper format
+      if (!verificationMethod.id.startsWith(did)) {
+        throw new Error(`Verification method ID ${verificationMethod.id} must start with DID ${did}`);
+      }
+      
+      document.verificationMethod.push(verificationMethod);
+      
+      // Add to relationships if specified
+      if (relationships) {
+        relationships.forEach(rel => {
+          if (!document[rel]) {
+            document[rel] = [];
+          }
+          (document[rel] as string[]).push(verificationMethod.id);
+        });
+      }
+      
+      // Update the cache
+      this.documentCache.set(did, document);
+      
+      return true;
+    } catch (error) {
+      console.error(`Error adding verification method to ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Remove a verification method from a did:key document
+   * For did:key, this is mostly a simulation as the document is derived from the key
+   * This operation will update the local cache but not the actual structure of the did:key
+   * 
+   * @param did The DID to update
+   * @param id The ID of the verification method to remove
+   * @param options Additional options
+   * @returns Promise resolving to true if successful in updating the cache
+   */
+  async removeVerificationMethod(
+    did: string,
+    id: string,
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const originalDocument = await this.resolve(did);
+      if (!originalDocument) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check permission if options.keyId is provided
+      if (options?.keyId) {
+        if (!this.validateKeyPermission(originalDocument, options.keyId, 'capabilityDelegation')) {
+          throw new Error(`Key ${options.keyId} does not have capabilityDelegation permission required for removing a verification method`);
+        }
+      }
+      
+      // Create a mutable copy
+      const document = JSON.parse(JSON.stringify(originalDocument)) as DIDDocument;
+      
+      // Can't remove the primary key from did:key
+      if (document.verificationMethod?.[0]?.id === id) {
+        throw new Error(`Cannot remove the primary key ${id} from did:key document`);
+      }
+      
+      // Remove the verification method
+      if (document.verificationMethod) {
+        document.verificationMethod = document.verificationMethod.filter(vm => vm.id !== id);
+      }
+      
+      // Remove from all relationships
+      const relationships: VerificationRelationship[] = ['authentication', 'assertionMethod', 'keyAgreement', 'capabilityInvocation', 'capabilityDelegation'];
+      relationships.forEach(rel => {
+        if (document[rel]) {
+          document[rel] = (document[rel] as any[]).filter(item => {
+            if (typeof item === 'string') return item !== id;
+            if (typeof item === 'object' && item.id) return item.id !== id;
+            return true;
+          });
+        }
+      });
+      
+      // Update the cache
+      this.documentCache.set(did, document);
+      
+      return true;
+    } catch (error) {
+      console.error(`Error removing verification method from ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Add a service to a did:key document
+   * For did:key, this is mostly a simulation as the document is derived from the key
+   * This operation will update the local cache but not the actual structure of the did:key
+   * 
+   * @param did The DID to update
+   * @param service The service to add
+   * @param options Additional options
+   * @returns Promise resolving to true if successful in updating the cache
+   */
+  async addService(
+    did: string,
+    service: ServiceEndpoint,
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const originalDocument = await this.resolve(did);
+      if (!originalDocument) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check permission if options.keyId is provided
+      if (options?.keyId) {
+        if (!this.validateKeyPermission(originalDocument, options.keyId, 'capabilityInvocation')) {
+          throw new Error(`Key ${options.keyId} does not have capabilityInvocation permission required for adding a service`);
+        }
+      }
+      
+      // Create a mutable copy
+      const document = JSON.parse(JSON.stringify(originalDocument)) as DIDDocument;
+      
+      // Add the service
+      if (!document.service) {
+        document.service = [];
+      }
+      
+      // Check if the service already exists
+      if (document.service.some(s => s.id === service.id)) {
+        throw new Error(`Service ${service.id} already exists`);
+      }
+      
+      document.service.push(service);
+      
+      // Update the cache
+      this.documentCache.set(did, document);
+      
+      return true;
+    } catch (error) {
+      console.error(`Error adding service to ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Remove a service from a did:key document
+   * For did:key, this is mostly a simulation as the document is derived from the key
+   * This operation will update the local cache but not the actual structure of the did:key
+   * 
+   * @param did The DID to update
+   * @param id The ID of the service to remove
+   * @param options Additional options
+   * @returns Promise resolving to true if successful in updating the cache
+   */
+  async removeService(
+    did: string,
+    id: string,
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const originalDocument = await this.resolve(did);
+      if (!originalDocument) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check permission if options.keyId is provided
+      if (options?.keyId) {
+        if (!this.validateKeyPermission(originalDocument, options.keyId, 'capabilityInvocation')) {
+          throw new Error(`Key ${options.keyId} does not have capabilityInvocation permission required for removing a service`);
+        }
+      }
+      
+      // Create a mutable copy
+      const document = JSON.parse(JSON.stringify(originalDocument)) as DIDDocument;
+      
+      // Remove the service
+      if (document.service) {
+        document.service = document.service.filter(s => s.id !== id);
+      }
+      
+      // Update the cache
+      this.documentCache.set(did, document);
+      
+      return true;
+    } catch (error) {
+      console.error(`Error removing service from ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Update verification relationships for a verification method in a did:key document
+   * For did:key, this is mostly a simulation as the document is derived from the key
+   * This operation will update the local cache but not the actual structure of the did:key
+   * 
+   * @param did The DID to update
+   * @param id The ID of the verification method
+   * @param add Relationships to add
+   * @param remove Relationships to remove
+   * @param options Additional options
+   * @returns Promise resolving to true if successful in updating the cache
+   */
+  async updateRelationships(
+    did: string,
+    id: string,
+    add: VerificationRelationship[],
+    remove: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const originalDocument = await this.resolve(did);
+      if (!originalDocument) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check permission if options.keyId is provided
+      if (options?.keyId) {
+        if (!this.validateKeyPermission(originalDocument, options.keyId, 'capabilityDelegation')) {
+          throw new Error(`Key ${options.keyId} does not have capabilityDelegation permission required for updating relationships`);
+        }
+      }
+      
+      // Create a mutable copy
+      const document = JSON.parse(JSON.stringify(originalDocument)) as DIDDocument;
+      
+      // Check if the verification method exists
+      if (!document.verificationMethod?.some(vm => vm.id === id)) {
+        throw new Error(`Verification method ${id} not found`);
+      }
+      
+      // Add relationships
+      add.forEach(rel => {
+        if (!document[rel]) {
+          document[rel] = [];
+        }
+        
+        const relationshipArray = document[rel] as (string | object)[];
+        if (!relationshipArray.some(item => {
+          return typeof item === 'string' ? item === id : (item as any).id === id;
+        })) {
+          relationshipArray.push(id);
+        }
+      });
+      
+      // Remove relationships
+      remove.forEach(rel => {
+        if (document[rel]) {
+          document[rel] = (document[rel] as any[]).filter(item => {
+            if (typeof item === 'string') return item !== id;
+            if (typeof item === 'object' && item.id) return item.id !== id;
+            return true;
+          });
+        }
+      });
+      
+      // Update the cache
+      this.documentCache.set(did, document);
+      
+      return true;
+    } catch (error) {
+      console.error(`Error updating relationships for ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Update the controller of a did:key document
+   * For did:key, this is mostly a simulation as the document is derived from the key
+   * This operation will update the local cache but not the actual structure of the did:key
+   * 
+   * @param did The DID to update
+   * @param controller The new controller value
+   * @param options Additional options
+   * @returns Promise resolving to true if successful in updating the cache
+   */
+  async updateController(
+    did: string,
+    controller: string | string[],
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const originalDocument = await this.resolve(did);
+      if (!originalDocument) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check permission if options.keyId is provided
+      if (options?.keyId) {
+        if (!this.validateKeyPermission(originalDocument, options.keyId, 'capabilityInvocation')) {
+          throw new Error(`Key ${options.keyId} does not have capabilityInvocation permission required for updating the controller`);
+        }
+      }
+      
+      // Create a mutable copy
+      const document = JSON.parse(JSON.stringify(originalDocument)) as DIDDocument;
+      
+      // Update the controller
+      document.controller = controller;
+      
+      // Update the cache
+      this.documentCache.set(did, document);
+      
+      return true;
+    } catch (error) {
+      console.error(`Error updating controller for ${did}:`, error);
       throw error;
     }
   }

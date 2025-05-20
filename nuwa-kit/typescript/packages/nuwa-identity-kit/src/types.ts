@@ -109,11 +109,15 @@ export interface MasterIdentity {
  */
 export interface VDRInterface {
   /**
-   * Store or update a DID Document in the registry
-   * @param didDocument The DID Document to store/update
+   * Store a new DID Document in the registry
+   * This should be used ONLY for the initial creation of a DID document
+   * For updates, use the specific methods like addVerificationMethod, removeVerificationMethod, etc.
+   * 
+   * @param didDocument The DID Document to store
+   * @param options Optional storing options (e.g., signer, gas limit)
    * @returns Promise resolving to true if successful
    */
-  store(didDocument: DIDDocument): Promise<boolean>;
+  store(didDocument: DIDDocument, options?: any): Promise<boolean>;
   
   /**
    * Resolve a DID to its DID Document
@@ -134,6 +138,96 @@ export interface VDRInterface {
    * @returns The DID method (e.g., 'key', 'web', 'rooch')
    */
   getMethod(): string;
+  
+  /**
+   * Add a new verification method to a DID document
+   * 
+   * @param did The DID to update
+   * @param verificationMethod The verification method to add
+   * @param relationships Optional relationships to add the verification method to
+   * @param options Additional options like signer and keyId
+   * @returns Promise resolving to true if successful
+   */
+  addVerificationMethod(
+    did: string,
+    verificationMethod: VerificationMethod,
+    relationships?: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean>;
+  
+  /**
+   * Remove a verification method from a DID document
+   * 
+   * @param did The DID to update
+   * @param id The ID of the verification method to remove
+   * @param options Additional options like signer and keyId
+   * @returns Promise resolving to true if successful
+   */
+  removeVerificationMethod(
+    did: string,
+    id: string,
+    options?: any
+  ): Promise<boolean>;
+  
+  /**
+   * Add a service to a DID document
+   * 
+   * @param did The DID to update
+   * @param service The service to add
+   * @param options Additional options like signer and keyId
+   * @returns Promise resolving to true if successful
+   */
+  addService(
+    did: string,
+    service: ServiceEndpoint,
+    options?: any
+  ): Promise<boolean>;
+  
+  /**
+   * Remove a service from a DID document
+   * 
+   * @param did The DID to update
+   * @param id The ID of the service to remove
+   * @param options Additional options like signer and keyId
+   * @returns Promise resolving to true if successful
+   */
+  removeService(
+    did: string,
+    id: string,
+    options?: any
+  ): Promise<boolean>;
+  
+  /**
+   * Update the verification relationships for a verification method
+   * 
+   * @param did The DID to update
+   * @param id The ID of the verification method
+   * @param add Relationships to add
+   * @param remove Relationships to remove
+   * @param options Additional options like signer and keyId
+   * @returns Promise resolving to true if successful
+   */
+  updateRelationships(
+    did: string,
+    id: string,
+    add: VerificationRelationship[],
+    remove: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean>;
+  
+  /**
+   * Update the controller of a DID document
+   * 
+   * @param did The DID to update
+   * @param controller The new controller value
+   * @param options Additional options like signer and keyId
+   * @returns Promise resolving to true if successful
+   */
+  updateController(
+    did: string,
+    controller: string | string[],
+    options?: any
+  ): Promise<boolean>;
 }
 
 /**

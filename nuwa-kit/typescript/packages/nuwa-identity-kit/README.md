@@ -8,6 +8,56 @@ This SDK implements the [NIP-1 Agent Single DID Multi-Key Model](https://github.
 
 The core concept is to enable a single master Decentralized Identifier (DID) to manage multiple operational keys (device-specific keys, application-specific keys, service instance keys, etc.). This allows an entity to maintain consistent identity while securely operating across multiple contexts.
 
+## Key Design Concepts
+
+### Verifiable Data Registry (VDR) Abstraction
+
+The SDK implements a Verifiable Data Registry (VDR) abstraction that handles the storage and retrieval of DID Documents across different DID methods (did:key, did:web, did:rooch, etc.). The VDR abstraction follows these key principles:
+
+1. **Clear Separation of Creation and Updates**: 
+   - The `store` method is ONLY for initial document creation
+   - All updates use specific fine-grained methods
+
+2. **Fine-grained Update Operations**:
+   - Each operation (add key, remove key, add service, etc.) has a dedicated method
+   - This allows for better error handling, permission checking, and optimization
+
+3. **NIP-1 Permission Model**:
+   - Key operations require `capabilityDelegation` permission
+   - Service operations require `capabilityInvocation` permission
+   - Controller changes require current controller permission
+
+### Usage Pattern
+
+```typescript
+// First check if the DID exists
+const exists = await identityKit.didExists(did);
+
+if (!exists) {
+  // Initial creation - only happens once
+  await identityKit.publishDIDDocument();
+} else {
+  // For all subsequent operations, use fine-grained methods:
+  await identityKit.addVerificationMethodAndPublish(methodInfo, relationships, signingKeyId);
+  await identityKit.removeVerificationMethodAndPublish(keyToRemoveId, signingKeyId);
+  await identityKit.addServiceAndPublish(serviceInfo, signingKeyId);
+  await identityKit.removeServiceAndPublish(serviceToRemoveId, signingKeyId);
+  await identityKit.updateRelationships(keyId, addRelationships, removeRelationships, signingKeyId);
+}
+```
+
+### Helper Methods
+
+The SDK provides helper methods to simplify common workflows:
+
+```typescript
+// Create and publish only if the document doesn't exist
+await identityKit.createAndPublishIfNotExists();
+
+// Check if a DID exists before performing operations
+const exists = await identityKit.didExists(did);
+```
+
 ## Features
 
 - Create and manage a master DID identity
@@ -181,13 +231,47 @@ async function createSDKWithWalletSigner(didDocument) {
 }
 ```
 
-### Publishing the DID Document
+### Publishing the Initial DID Document
 
 ```typescript
-async function publishDID(sdk) {
-  // This is a placeholder in the SDK - actual implementation depends on the DID method
+async function publishInitialDID(sdk) {
+  // This should ONLY be used for the initial creation of the DID document
+  // For updates, use the specific methods like addVerificationMethodAndPublish, etc.
   await sdk.publishDIDDocument();
 }
+```
+
+### Updating the DID Document
+
+For updates, always use the specific granular methods rather than updating the whole document:
+
+```typescript
+// Add a new verification method (key)
+const keyId = await sdk.addOperationalKeyAndPublish(
+  keyInfo,
+  ['authentication', 'capabilityInvocation'],
+  masterKeyId
+);
+
+// Add a new service endpoint
+const serviceId = await sdk.addServiceAndPublish(
+  serviceInfo,
+  masterKeyId
+);
+
+// Remove a verification method (key)
+await sdk.removeVerificationMethodAndPublish(keyId, masterKeyId);
+
+// Remove a service
+await sdk.removeServiceAndPublish(serviceId, masterKeyId);
+
+// Update key relationships
+await sdk.updateRelationships(
+  keyId,
+  ['authentication'], // relationships to add
+  ['capabilityDelegation'], // relationships to remove
+  masterKeyId
+);
 ```
 
 ### Creating a Delegated Instance (NIP-3)

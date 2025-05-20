@@ -1,4 +1,4 @@
-import { DIDDocument } from '../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../types';
 import { AbstractVDR } from './abstractVDR';
 
 export interface WebVDROptions {
@@ -134,6 +134,9 @@ export class WebVDR extends AbstractVDR {
   /**
    * Stores a DID document for a did:web identifier
    * 
+   * Note: This method should ONLY be used for the initial creation of the DID document.
+   * For updates, use the specific methods like addVerificationMethod, etc.
+   * 
    * Requires the uploadHandler option to be set, as the WebVDR
    * itself doesn't handle authentication for uploading documents.
    * 
@@ -159,6 +162,325 @@ export class WebVDR extends AbstractVDR {
       return await this.options.uploadHandler(domain, path, didDocument);
     } catch (error) {
       console.error(`Error storing document for ${didDocument.id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Adds a verification method to a DID Document for a did:web identifier
+   * 
+   * @param did The DID to update
+   * @param verificationMethod The verification method to add
+   * @param relationships Optional relationships to associate with the verification method
+   * @param options Optional operation options
+   * @returns Promise resolving to true if successful
+   */
+  async addVerificationMethod(
+    did: string,
+    verificationMethod: VerificationMethod,
+    relationships?: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const document = await this.resolve(did);
+      if (!document) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check if verification method already exists
+      if (document.verificationMethod?.some(vm => vm.id === verificationMethod.id)) {
+        throw new Error(`Verification method ${verificationMethod.id} already exists`);
+      }
+      
+      // Add the verification method
+      if (!document.verificationMethod) {
+        document.verificationMethod = [];
+      }
+      document.verificationMethod.push(verificationMethod);
+      
+      // Add to relationships if specified
+      if (relationships && relationships.length > 0) {
+        relationships.forEach(rel => {
+          if (!document[rel]) {
+            document[rel] = [];
+          }
+          (document[rel] as string[]).push(verificationMethod.id);
+        });
+      }
+      
+      // Store the updated document
+      const { domain, path } = this.parseDIDWeb(did);
+      
+      if (!this.options.uploadHandler) {
+        throw new Error('No uploadHandler configured for WebVDR');
+      }
+      
+      return await this.options.uploadHandler(domain, path, document);
+    } catch (error) {
+      console.error(`Error adding verification method to ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Removes a verification method from a DID Document for a did:web identifier
+   * 
+   * @param did The DID to update
+   * @param id The ID of the verification method to remove
+   * @param options Optional operation options
+   * @returns Promise resolving to true if successful
+   */
+  async removeVerificationMethod(
+    did: string,
+    id: string,
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const document = await this.resolve(did);
+      if (!document) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Make sure the verification method exists
+      if (!document.verificationMethod?.some(vm => vm.id === id)) {
+        throw new Error(`Verification method ${id} not found`);
+      }
+      
+      // Remove the verification method
+      if (document.verificationMethod) {
+        document.verificationMethod = document.verificationMethod.filter(vm => vm.id !== id);
+      }
+      
+      // Remove from all relationships
+      const relationships: VerificationRelationship[] = ['authentication', 'assertionMethod', 'keyAgreement', 'capabilityInvocation', 'capabilityDelegation'];
+      relationships.forEach(rel => {
+        if (document[rel]) {
+          document[rel] = (document[rel] as any[]).filter(item => {
+            if (typeof item === 'string') return item !== id;
+            if (typeof item === 'object' && item.id) return item.id !== id;
+            return true;
+          });
+        }
+      });
+      
+      // Store the updated document
+      const { domain, path } = this.parseDIDWeb(did);
+      
+      if (!this.options.uploadHandler) {
+        throw new Error('No uploadHandler configured for WebVDR');
+      }
+      
+      return await this.options.uploadHandler(domain, path, document);
+    } catch (error) {
+      console.error(`Error removing verification method from ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Adds a service to a DID Document for a did:web identifier
+   * 
+   * @param did The DID to update
+   * @param service The service to add
+   * @param options Optional operation options
+   * @returns Promise resolving to true if successful
+   */
+  async addService(
+    did: string,
+    service: ServiceEndpoint,
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const document = await this.resolve(did);
+      if (!document) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check if service already exists
+      if (document.service?.some(s => s.id === service.id)) {
+        throw new Error(`Service ${service.id} already exists`);
+      }
+      
+      // Add the service
+      if (!document.service) {
+        document.service = [];
+      }
+      document.service.push(service);
+      
+      // Store the updated document
+      const { domain, path } = this.parseDIDWeb(did);
+      
+      if (!this.options.uploadHandler) {
+        throw new Error('No uploadHandler configured for WebVDR');
+      }
+      
+      return await this.options.uploadHandler(domain, path, document);
+    } catch (error) {
+      console.error(`Error adding service to ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Removes a service from a DID Document for a did:web identifier
+   * 
+   * @param did The DID to update
+   * @param id The ID of the service to remove
+   * @param options Optional operation options
+   * @returns Promise resolving to true if successful
+   */
+  async removeService(
+    did: string,
+    id: string,
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const document = await this.resolve(did);
+      if (!document) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check if service exists
+      if (!document.service?.some(s => s.id === id)) {
+        throw new Error(`Service ${id} not found`);
+      }
+      
+      // Remove the service
+      if (document.service) {
+        document.service = document.service.filter(s => s.id !== id);
+      }
+      
+      // Store the updated document
+      const { domain, path } = this.parseDIDWeb(did);
+      
+      if (!this.options.uploadHandler) {
+        throw new Error('No uploadHandler configured for WebVDR');
+      }
+      
+      return await this.options.uploadHandler(domain, path, document);
+    } catch (error) {
+      console.error(`Error removing service from ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Updates the verification relationships for a verification method in a DID Document for a did:web identifier
+   * 
+   * @param did The DID to update
+   * @param id The ID of the verification method
+   * @param add Relationships to add
+   * @param remove Relationships to remove
+   * @param options Optional operation options
+   * @returns Promise resolving to true if successful
+   */
+  async updateRelationships(
+    did: string,
+    id: string,
+    add: VerificationRelationship[],
+    remove: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const document = await this.resolve(did);
+      if (!document) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Check if verification method exists
+      if (!document.verificationMethod?.some(vm => vm.id === id)) {
+        throw new Error(`Verification method ${id} not found`);
+      }
+      
+      // Add relationships
+      add.forEach(rel => {
+        if (!document[rel]) {
+          document[rel] = [];
+        }
+        
+        const relationshipArray = document[rel] as (string | object)[];
+        if (!relationshipArray.some(item => {
+          return typeof item === 'string' ? item === id : (item as any).id === id;
+        })) {
+          relationshipArray.push(id);
+        }
+      });
+      
+      // Remove relationships
+      remove.forEach(rel => {
+        if (document[rel]) {
+          document[rel] = (document[rel] as any[]).filter(item => {
+            if (typeof item === 'string') return item !== id;
+            if (typeof item === 'object' && item.id) return item.id !== id;
+            return true;
+          });
+        }
+      });
+      
+      // Store the updated document
+      const { domain, path } = this.parseDIDWeb(did);
+      
+      if (!this.options.uploadHandler) {
+        throw new Error('No uploadHandler configured for WebVDR');
+      }
+      
+      return await this.options.uploadHandler(domain, path, document);
+    } catch (error) {
+      console.error(`Error updating relationships for ${did}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Updates the controller of a DID Document for a did:web identifier
+   * 
+   * @param did The DID to update
+   * @param controller The new controller value
+   * @param options Optional operation options
+   * @returns Promise resolving to true if successful
+   */
+  async updateController(
+    did: string,
+    controller: string | string[],
+    options?: any
+  ): Promise<boolean> {
+    try {
+      this.validateDIDMethod(did);
+      
+      // Get the current document
+      const document = await this.resolve(did);
+      if (!document) {
+        throw new Error(`DID document ${did} not found`);
+      }
+      
+      // Update controller
+      document.controller = controller;
+      
+      // Store the updated document
+      const { domain, path } = this.parseDIDWeb(did);
+      
+      if (!this.options.uploadHandler) {
+        throw new Error('No uploadHandler configured for WebVDR');
+      }
+      
+      return await this.options.uploadHandler(domain, path, document);
+    } catch (error) {
+      console.error(`Error updating controller for ${did}:`, error);
       throw error;
     }
   }
