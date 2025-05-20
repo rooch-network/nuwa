@@ -1,0 +1,372 @@
+import { DIDDocument, MasterIdentity, CreateMasterIdentityOptions, OperationalKeyInfo, VerificationRelationship, ServiceInfo, NIP1SignedObject, SignedData, NIP1Signature } from './types';
+import { CryptoUtils } from './cryptoUtils';
+
+/**
+ * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
+ */
+export class NIP1AgentSDK {
+  private didDocument: DIDDocument;
+  private masterPrivateKey?: CryptoKey | Uint8Array; // Store the master private key securely
+  private operationalPrivateKeys: Map<string, CryptoKey | Uint8Array> = new Map(); // keyId -> privateKey
+
+  constructor(didDocument: DIDDocument, masterPrivateKey?: CryptoKey | Uint8Array, operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>) {
+    this.didDocument = didDocument;
+    this.masterPrivateKey = masterPrivateKey;
+    if (operationalPrivateKeys) {
+      this.operationalPrivateKeys = operationalPrivateKeys;
+    }
+  }
+
+  /**
+   * Creates a new master identity (DID, DID Document, and master key pair).
+   */
+  static async createMasterIdentity(options?: CreateMasterIdentityOptions): Promise<MasterIdentity> {
+    const didMethod = options?.method || 'key'; // Default to did:key for simplicity
+    const keyType = options?.initialOperationalKey?.type || 'Ed25519VerificationKey2020';
+    
+    const { publicKey: masterPubKeyMaterial, privateKey: masterPrivKey } = await CryptoUtils.generateKeyPair(keyType);
+
+    let masterDid: string;
+    let masterKeyId: string;
+    let verificationMethodEntry: any;
+
+    if (didMethod === 'key') {
+      // For did:key, the DID is often derived from the public key itself.
+      // The exact derivation depends on the specific did:key variant (e.g., Ed25519, P-256)
+      // This is a simplified placeholder.
+      const multibasePk = masterPubKeyMaterial instanceof Uint8Array 
+        ? CryptoUtils.publicKeyToMultibase(masterPubKeyMaterial, keyType)
+        : await CryptoUtils.jwkToMultibase(masterPubKeyMaterial as JsonWebKey);
+      masterDid = `did:key:${multibasePk}`;
+      masterKeyId = `${masterDid}#${multibasePk}`;
+    } else if (didMethod === 'web') {
+      // For did:web, the DID is like did:web:example.com or did:web:example.com:path
+      // This requires a domain name, which should be part of options.
+      const domain = (options as any)?.domain || 'example.com'; // Should be passed in options
+      masterDid = `did:web:${domain}`;
+      masterKeyId = `${masterDid}#master`;
+    } else {
+      // For other methods or custom methods like did:rooch, a unique identifier is usually generated.
+      masterDid = `did:${didMethod}:${Date.now()}${Math.random().toString().substring(2)}`; // Placeholder
+      masterKeyId = `${masterDid}#master`;
+    }
+
+    if (masterPubKeyMaterial instanceof Uint8Array) {
+      verificationMethodEntry = {
+        id: masterKeyId,
+        type: keyType,
+        controller: masterDid,
+        publicKeyMultibase: CryptoUtils.publicKeyToMultibase(masterPubKeyMaterial, keyType),
+      };
+    } else { // JWK
+      verificationMethodEntry = {
+        id: masterKeyId,
+        type: keyType, // e.g. EcdsaSecp256k1VerificationKey2019 or JsonWebKey2020
+        controller: masterDid,
+        publicKeyJwk: masterPubKeyMaterial as JsonWebKey,
+      };
+    }
+
+    const initialRelationships = options?.initialOperationalKey?.relationships || 
+      ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'];
+
+    const didDoc: DIDDocument = {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        // Add other contexts if needed, e.g., for specific key types
+        keyType === 'Ed25519VerificationKey2020' ? 'https://w3id.org/security/suites/ed25519-2020/v1' : 
+        (keyType === 'EcdsaSecp256k1VerificationKey2019' || keyType === 'JsonWebKey2020') ? 
+          'https://w3id.org/security/suites/jws-2020/v1' : ''
+      ].filter(Boolean),
+      id: masterDid,
+      controller: masterDid,
+      verificationMethod: [verificationMethodEntry],
+    };
+
+    initialRelationships.forEach(rel => {
+      if (!didDoc[rel]) didDoc[rel] = [];
+      (didDoc[rel] as string[]).push(masterKeyId);
+    });
+
+    return {
+      did: masterDid,
+      didDocument: didDoc,
+      masterKeyId: masterKeyId,
+      masterPrivateKey: masterPrivKey,
+    };
+  }
+
+  /**
+   * Adds a new operational key to the local DID document.
+   * The DID document needs to be published separately.
+   */
+  async addOperationalKey(keyInfo: OperationalKeyInfo, relationships: VerificationRelationship[]): Promise<string> {
+    const keyIdFragment = keyInfo.idFragment || `key-${Date.now()}`;
+    const keyId = `${this.didDocument.id}#${keyIdFragment}`;
+
+    let verificationMethodEntry: any;
+    if (keyInfo.publicKeyMaterial instanceof Uint8Array) {
+      verificationMethodEntry = {
+        id: keyId,
+        type: keyInfo.type,
+        controller: keyInfo.controller || this.didDocument.id,
+        publicKeyMultibase: CryptoUtils.publicKeyToMultibase(keyInfo.publicKeyMaterial, keyInfo.type),
+        expires: keyInfo.expires,
+      };
+    } else { // JWK
+      verificationMethodEntry = {
+        id: keyId,
+        type: keyInfo.type, // e.g. EcdsaSecp256k1VerificationKey2019 or JsonWebKey2020
+        controller: keyInfo.controller || this.didDocument.id,
+        publicKeyJwk: keyInfo.publicKeyMaterial as JsonWebKey,
+        expires: keyInfo.expires,
+      };
+    }
+    
+    if (!this.didDocument.verificationMethod) {
+      this.didDocument.verificationMethod = [];
+    }
+    this.didDocument.verificationMethod.push(verificationMethodEntry);
+
+    relationships.forEach(rel => {
+      if (!this.didDocument[rel]) {
+        this.didDocument[rel] = [];
+      }
+      (this.didDocument[rel] as string[]).push(keyId);
+    });
+    
+    // If the private key for this new operational key was generated externally and passed in,
+    // it should be stored in this.operationalPrivateKeys by the caller.
+    // If generated internally, it would be done here and stored.
+
+    return keyId;
+  }
+
+  /**
+   * Removes an operational key from the local DID document.
+   * The DID document needs to be published separately.
+   */
+  removeOperationalKey(keyId: string): void {
+    if (this.didDocument.verificationMethod) {
+      this.didDocument.verificationMethod = this.didDocument.verificationMethod.filter(vm => vm.id !== keyId);
+    }
+    // Remove from all relationships
+    const relationships: VerificationRelationship[] = ['authentication', 'assertionMethod', 'keyAgreement', 'capabilityInvocation', 'capabilityDelegation'];
+    relationships.forEach(rel => {
+      if (this.didDocument[rel]) {
+        this.didDocument[rel] = (this.didDocument[rel] as any[]).filter(item => {
+          if (typeof item === 'string') return item !== keyId;
+          if (typeof item === 'object' && item.id) return item.id !== keyId; // Embedded VM
+          return true;
+        });
+      }
+    });
+    this.operationalPrivateKeys.delete(keyId);
+  }
+
+  /**
+   * Adds a service description to the local DID document.
+   * The DID document needs to be published separately.
+   */
+  addService(serviceInfo: ServiceInfo): string {
+    const serviceId = `${this.didDocument.id}#${serviceInfo.idFragment}`;
+    const serviceEntry: any = {
+      id: serviceId,
+      type: serviceInfo.type,
+      serviceEndpoint: serviceInfo.serviceEndpoint,
+      ...(serviceInfo.additionalProperties || {}),
+    };
+
+    if (!this.didDocument.service) {
+      this.didDocument.service = [];
+    }
+    this.didDocument.service.push(serviceEntry);
+    return serviceId;
+  }
+
+  /**
+   * Removes a service description from the local DID document.
+   * The DID document needs to be published separately.
+   */
+  removeService(serviceId: string): void {
+    if (this.didDocument.service) {
+      this.didDocument.service = this.didDocument.service.filter(s => s.id !== serviceId);
+    }
+  }
+
+  /**
+   * Signs data according to NIP-1 signature structure.
+   * Requires the private key for the specified keyId to be available.
+   */
+  async createNIP1Signature(payload: Omit<SignedData, 'nonce' | 'timestamp'>, keyId: string): Promise<NIP1SignedObject> {
+    const privateKey = this.operationalPrivateKeys.get(keyId) || 
+      (keyId === (this.didDocument.verificationMethod?.find(vm => vm.controller === this.didDocument.id)?.id) ? 
+      this.masterPrivateKey : undefined);
+      
+    if (!privateKey) {
+      throw new Error(`Private key for keyId ${keyId} not found.`);
+    }
+
+    const verificationMethod = this.didDocument.verificationMethod?.find(vm => vm.id === keyId);
+    if (!verificationMethod) {
+      throw new Error(`Verification method for keyId ${keyId} not found in DID document.`);
+    }
+    const keyType = verificationMethod.type;
+
+    const signedData: SignedData = {
+      ...payload,
+      nonce: crypto.getRandomValues(new Uint32Array(1))[0].toString(), // Generate a random nonce
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+
+    // Canonicalize signed_data (e.g., sort keys, consistent stringification)
+    // For simplicity, using JSON.stringify with sorted keys (though a proper JCS might be better)
+    const canonicalData = JSON.stringify(signedData, Object.keys(signedData).sort());
+    const dataToSign = new TextEncoder().encode(canonicalData);
+
+    const signatureValue = await CryptoUtils.sign(dataToSign, privateKey, keyType);
+
+    const nip1Signature: NIP1Signature = {
+      signer_did: this.didDocument.id,
+      key_id: keyId,
+      value: signatureValue,
+    };
+
+    return {
+      signed_data: signedData,
+      signature: nip1Signature,
+    };
+  }
+
+  /**
+   * Verifies a NIP-1 signature.
+   * This typically involves resolving the signer's DID document externally first.
+   */
+  static async verifyNIP1Signature(signedObject: NIP1SignedObject, resolvedDidDocument: DIDDocument): Promise<boolean> {
+    const { signed_data, signature } = signedObject;
+
+    // 1. Verify timestamp (e.g., within a certain window, not too old)
+    const now = Math.floor(Date.now() / 1000);
+    if (Math.abs(now - signed_data.timestamp) > 300) { // 5 minute window, adjust as needed
+      console.warn('Timestamp out of valid window');
+      return false;
+    }
+
+    // 2. Check nonce (requires verifier to maintain a list of used nonces for this signer_did/key_id)
+    // This is a simplified check; a real implementation needs a nonce store.
+    // For this example, we'll skip rigorous nonce checking.
+
+    // 3. Resolve signer_did (already done, passed as resolvedDidDocument)
+    if (resolvedDidDocument.id !== signature.signer_did) {
+      console.error('Signer DID does not match resolved DID document ID');
+      return false;
+    }
+
+    // 4. Find verificationMethod for key_id
+    const verificationMethod = resolvedDidDocument.verificationMethod?.find(vm => vm.id === signature.key_id);
+    if (!verificationMethod) {
+      console.error(`Verification method ${signature.key_id} not found in DID document.`);
+      return false;
+    }
+
+    // Check for key expiration if present
+    if (verificationMethod.expires) {
+      const expiryDate = new Date(verificationMethod.expires);
+      if (expiryDate.getTime() < Date.now()) {
+        console.warn(`Key ${signature.key_id} has expired.`);
+        return false;
+      }
+    }
+
+    // Extract public key material from the verification method
+    let publicKeyMaterial: JsonWebKey | Uint8Array | null = null;
+    
+    if (verificationMethod.publicKeyJwk) {
+      publicKeyMaterial = verificationMethod.publicKeyJwk;
+    } else if (verificationMethod.publicKeyMultibase) {
+      // In a real implementation, this would use proper multibase decoding
+      // This is a simplified approach for demo purposes
+      publicKeyMaterial = new TextEncoder().encode(verificationMethod.publicKeyMultibase.substring(1));
+    }
+    
+    if (!publicKeyMaterial) {
+      console.error('Public key material not found in verification method.');
+      return false;
+    }
+
+    // 5. Verify signature.value with the public key
+    const canonicalData = JSON.stringify(signed_data, Object.keys(signed_data).sort());
+    const dataToVerify = new TextEncoder().encode(canonicalData);
+    
+    const isValid = await CryptoUtils.verify(dataToVerify, signature.value, publicKeyMaterial, verificationMethod.type);
+    if (!isValid) {
+      console.error('Signature verification failed.');
+      return false;
+    }
+
+    // 6. (Optional) Check key_id against verification relationships for the specific operation
+    // This depends on the `signed_data.operation` and application-specific logic.
+    // Example: if (signed_data.operation === 'authenticateUser') { 
+    //   if (!resolvedDidDocument.authentication?.some(auth => auth === signature.key_id || (typeof auth === 'object' && auth.id === signature.key_id))) {
+    //     console.warn('Key not authorized for authentication.');
+    //     return false;
+    //   }
+    // }
+
+    return true;
+  }
+
+  /**
+   * Finds a service by type in the current DID document.
+   */
+  findServiceByType(serviceType: string): any | undefined {
+    return this.didDocument.service?.find(s => s.type === serviceType);
+  }
+  
+  /**
+   * Returns the current DID document.
+   */
+  getDIDDocument(): DIDDocument {
+    return JSON.parse(JSON.stringify(this.didDocument)); // Return a copy
+  }
+
+  /**
+   * Placeholder for publishing/updating the DID document to its VDR.
+   * This is highly dependent on the DID method.
+   */
+  async publishDIDDocument(): Promise<void> {
+    const didMethod = this.didDocument.id.split(':')[1];
+    console.log(`Publishing DID document for ${this.didDocument.id} using method ${didMethod}...`);
+    // For did:web, this would involve updating a file on a web server.
+    // For did:key, it might be a no-op if the document is derived from the key.
+    // For on-chain DIDs, this would involve sending a transaction.
+    if (didMethod === 'web') {
+      // Example: await uploadToWebServer(this.didDocument.id, this.didDocument);
+      console.warn('Publishing for did:web is not implemented in this placeholder.');
+    }
+    // ... other methods
+    console.log('DID Document published (placeholder).');
+  }
+
+  /**
+   * Stores an operational private key. 
+   * Useful if keys are generated externally or need to be managed by the SDK instance.
+   */
+  storeOperationalPrivateKey(keyId: string, privateKey: CryptoKey | Uint8Array): void {
+    this.operationalPrivateKeys.set(keyId, privateKey);
+  }
+
+  /**
+   * Retrieves a stored operational private key. Use with caution.
+   */
+  getOperationalPrivateKey(keyId: string): CryptoKey | Uint8Array | undefined {
+    return this.operationalPrivateKeys.get(keyId);
+  }
+
+  /**
+   * Retrieves the master private key. Use with extreme caution.
+   */
+  getMasterPrivateKey(): CryptoKey | Uint8Array | undefined {
+    return this.masterPrivateKey;
+  }
+}
