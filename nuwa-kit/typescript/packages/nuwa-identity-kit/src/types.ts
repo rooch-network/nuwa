@@ -79,6 +79,8 @@ export interface ServiceInfo {
 export interface CreateMasterIdentityOptions {
   method?: string; // e.g., 'key', 'web', or a future chain-specific method like 'rooch'
   // Additional options specific to the DID method can be added here
+  keyCurve?: string; // Specifies the curve to use for key generation (e.g., 'secp256k1', 'ed25519')
+  masterKeyIdFragment?: string; // Custom fragment for the master key ID
   initialOperationalKey?: {
     publicKeyMaterial: Uint8Array | JsonWebKey;
     type: string; // e.g., Ed25519VerificationKey2020

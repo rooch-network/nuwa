@@ -39,6 +39,11 @@ export class NuwaIdentityKit {
     }
   ) {
     this.didDocument = didDocument;
+    
+    if (!options?.operationalPrivateKeys && !options?.externalSigner) {
+      throw new Error("You must provide either operationalPrivateKeys or externalSigner to create a NuwaIdentityKit instance");
+    }
+    
     if (options?.operationalPrivateKeys) {
       this.operationalPrivateKeys = options.operationalPrivateKeys;
     }
@@ -96,7 +101,12 @@ export class NuwaIdentityKit {
    */
   static async createMasterIdentity(options?: CreateMasterIdentityOptions): Promise<MasterIdentity> {
     const didMethod = options?.method || 'key'; // Default to did:key for simplicity
-    const keyType = options?.initialOperationalKey?.type || 'Ed25519VerificationKey2020';
+    let keyType = options?.initialOperationalKey?.type || 'Ed25519VerificationKey2020';
+    
+    // If keyCurve is specified, update the key type accordingly
+    if (options?.keyCurve === 'secp256k1') {
+      keyType = 'EcdsaSecp256k1VerificationKey2019';
+    }
     
     const { publicKey: masterPubKeyMaterial, privateKey: masterPrivKey } = await CryptoUtils.generateKeyPair(keyType);
 
@@ -112,7 +122,10 @@ export class NuwaIdentityKit {
         ? CryptoUtils.publicKeyToMultibase(masterPubKeyMaterial, keyType)
         : await CryptoUtils.jwkToMultibase(masterPubKeyMaterial as JsonWebKey);
       masterDid = `did:key:${multibasePk}`;
-      masterKeyId = `${masterDid}#${multibasePk}`;
+      
+      // Use custom key ID fragment if provided, otherwise use the multibase-encoded public key
+      const keyIdFragment = options?.masterKeyIdFragment || multibasePk;
+      masterKeyId = `${masterDid}#${keyIdFragment}`;
     } else if (didMethod === 'web') {
       // For did:web, the DID is like did:web:example.com or did:web:example.com:path
       // This requires a domain name, which should be part of options.

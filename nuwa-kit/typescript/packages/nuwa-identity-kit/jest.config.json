@@ -1,0 +1,34 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "roots": [
+    "<rootDir>/test",
+    "<rootDir>/src"
+  ],
+  "testMatch": [
+    "**/*.test.ts"
+  ],
+  "transform": {
+    "^.+\\.tsx?$": ["ts-jest", {
+      "tsconfig": "tsconfig.test.json"
+    }]
+  },
+  "verbose": true,
+  "collectCoverage": true,
+  "coverageDirectory": "coverage",
+  "coverageReporters": ["text", "lcov"],
+  "collectCoverageFrom": [
+    "src/**/*.ts",
+    "!src/**/types.ts",
+    "!src/**/index.ts"
+  ],
+  "coverageThreshold": {
+    "global": {
+      "branches": 10,
+      "functions": 25,
+      "lines": 15,
+      "statements": 15
+    }
+  }
+}
