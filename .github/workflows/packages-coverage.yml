@@ -72,6 +72,8 @@ jobs:
           pnpm build
       
       - name: Run tests with coverage
+        env:
+          NODE_OPTIONS: --experimental-global-webcrypto
         run: |
           cd ${{ steps.package-path.outputs.path }}
           pnpm test:coverage

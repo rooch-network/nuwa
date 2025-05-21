@@ -30,5 +30,6 @@
       "lines": 0,
       "statements": 0
     }
-  }
+  },
+  "setupFiles": ["<rootDir>/test/setup.js"]
 }

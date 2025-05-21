@@ -68,6 +68,8 @@ jobs:
           pnpm install
       
       - name: Run tests for ${{ matrix.package }}
+        env:
+          NODE_OPTIONS: --experimental-global-webcrypto
         run: |
           PACKAGE_PATH=""
           if [[ "${{ matrix.package }}" == "identity-kit" ]]; then
