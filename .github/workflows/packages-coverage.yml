@@ -1,7 +1,12 @@
-name: Nuwa Identity Kit Coverage
+name: Nuwa Packages Coverage
 
 on:
   workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to generate coverage for (all, identity-kit, ...)'
+        required: true
+        default: 'all'
   schedule:
     - cron: '0 0 * * 0'  # Run weekly on Sunday at midnight UTC
 
@@ -9,6 +14,11 @@ jobs:
   coverage:
     name: Generate Test Coverage
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.package != 'all' && fromJSON(format('["{0}"]', github.event.inputs.package)) || fromJSON('["identity-kit"]') }}
+        # Add other packages to the default array when they're available
+        # fromJSON('["identity-kit", "package-2", "package-3"]') }}
     
     steps:
       - name: Checkout code
@@ -43,19 +53,32 @@ jobs:
           cd nuwa-kit/typescript
           pnpm install
       
+      - name: Generate package path
+        id: package-path
+        run: |
+          PACKAGE_PATH=""
+          if [[ "${{ matrix.package }}" == "identity-kit" ]]; then
+            PACKAGE_PATH="nuwa-kit/typescript/packages/nuwa-identity-kit"
+          # Add more packages when available
+          # elif [[ "${{ matrix.package }}" == "package-2" ]]; then
+          #   PACKAGE_PATH="nuwa-kit/typescript/packages/package-2"
+          fi
+          
+          echo "path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+      
       - name: Build
         run: |
-          cd nuwa-kit/typescript/packages/nuwa-identity-kit
+          cd ${{ steps.package-path.outputs.path }}
           pnpm build
       
       - name: Run tests with coverage
         run: |
-          cd nuwa-kit/typescript/packages/nuwa-identity-kit
+          cd ${{ steps.package-path.outputs.path }}
           pnpm test:coverage
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          directory: nuwa-kit/typescript/packages/nuwa-identity-kit/coverage
-          flags: nuwa-identity-kit
+          directory: ${{ steps.package-path.outputs.path }}/coverage
+          flags: ${{ matrix.package }}
           fail_ci_if_error: false 

@@ -1,0 +1,82 @@
+name: Nuwa Packages Test
+
+on:
+  pull_request:
+    paths:
+      - 'nuwa-kit/typescript/packages/**'
+      - '.github/workflows/packages-test.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'nuwa-kit/typescript/packages/**'
+      - '.github/workflows/packages-test.yml'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            identity-kit: nuwa-kit/typescript/packages/nuwa-identity-kit/**
+            # 添加其他包
+            # package-2: nuwa-kit/typescript/packages/package-2/**
+            # package-3: nuwa-kit/typescript/packages/package-3/**
+
+  test:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.packages != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ${{ fromJSON(needs.detect-changes.outputs.packages) }}
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+      
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+      
+      - name: Install dependencies
+        run: |
+          cd nuwa-kit/typescript
+          pnpm install
+      
+      - name: Run tests for ${{ matrix.package }}
+        run: |
+          PACKAGE_PATH=""
+          if [[ "${{ matrix.package }}" == "identity-kit" ]]; then
+            PACKAGE_PATH="nuwa-kit/typescript/packages/nuwa-identity-kit"
+          # elif [[ "${{ matrix.package }}" == "package-2" ]]; then
+          #   PACKAGE_PATH="nuwa-kit/typescript/packages/package-2"
+          fi
+          
+          if [[ -n "$PACKAGE_PATH" ]]; then
+            cd $PACKAGE_PATH
+            pnpm test
+          fi 
